@@ -151,10 +151,9 @@ class JetzElement {
         this.o.remove();
         this.parent.removeChild(this);
     }
-    removeChild(position){
-        this.children.forEach(child => {
-            console.log(child == this)
-        })
+    removeChild(_child){
+        this.children = this.children.filter(child => 
+            child.position != _child.position)
     }
 }
 

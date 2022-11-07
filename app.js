@@ -43,13 +43,23 @@ let myStyle = css`
     margin-bottom: 4px;
     padding: 8px;
 }
+.btn-delete{
+    float: right;
+    color:rgba(0,0,0,0.6);
+    border-radius:4px;
+    border:0;
+    padding: 4px;
+}
 `;
 
 function todoItem(todo){
     const item = li({ class: 'todo-item' }, todo,
-        button({ onclick: () => {
-            item.remove();
-        }})
+        button('Delete', { 
+            class: 'btn-delete',
+            onclick: () => {
+                item.remove();
+            }
+        })
     );
     return item;
 }
