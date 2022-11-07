@@ -1,166 +1,95 @@
-class Element {
-    // element rendered
-    o;
-    tagName;
-    attributes;
-    children;
-    oldStyle = {};
-    style;
-    listener = [];
+import { Jetz } from "./src/jetz.js";
+import { button, css, div, i, inputNumber, inputText, li, span, ul } from "./src/ui.js";
 
-    constructor(tag, attributes, ...children){
-        this.tagName = tag;
-        this.attributes = attributes;
-        this.children = children;
-    }
+let myStyle = css`
+*{
+    font-family: 'arial';
+    padding:0;
+    margin:0;
+}
+.todo-app{
+    padding: 8px;
+}
+.header{
+    font-size:1.3em;
+    font-weight: bold;
+    padding-bottom: 8px;
+}
+.todo-input{
+    display:flex;
+    margin-bottom: 12px;
+}
+.todo-input input{
+    width:100%;
+    padding:10px;
+    border:0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.btn-add{
+    color:white;
+    background:purple;
+    border:0;
+    padding:4px;
+    width:40px;
+    margin-left: 8px;
+}
+.btn-add:hover{
+    opacity: 0.6;
+}
+.todo-item {
+    display: block;
+    border: 1px solid rgba(0,0,0,0.3);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    padding: 8px;
+}
+`;
 
-    render(){
-        this.o = document.createElement(this.tagName);
-        this.assignAttributes();
-        this.assignChildren();
-        this.initStyle();
-        this.initListener();
-        return this.o;
-    }
-    assignAttributes(){
-        for (const attr in this.attributes) {
-            if (Object.hasOwnProperty.call(this.attributes, attr)) {
-                const attrValue = this.attributes[attr];
-                if(typeof(attrValue) == 'function'){
-                    this.o.addEventListener(attr.substring(2), attrValue);
-                }else{
-                    
-                    this.addAttr(attr, attrValue);
-                }
+function todoItem(todo){
+    const item = li({ class: 'todo-item' }, todo,
+        button({ onclick: () => {
+            item.remove();
+        }})
+    );
+    return item;
+}
+
+// Dummy Todo Items
+let dummyTodo = [
+    'Dummy 1 todo', 'Dummy 2 todo', 'Dummy 3 todo'
+].map(todo => todoItem(todo));
+
+// Header component
+let header = div({ class:'header' }, 'Todo App');
+
+// Edit Text component
+let todoField = inputText({ placeholder: 'Add your new todo' });
+
+// ToDo Input Component
+let todoInput = div({ class: 'todo-input' },
+    todoField,
+    button({ class:'btn-add',
+            onclick: () => {
+                const todo = todoField.value();
+                todoList.append(
+                    todoItem(todo)
+                );
+                todoField.value('');
             }
-        }
-    }
-    assignChildren(){
-        this.children.forEach(child => {
-            let _child;
-            if(typeof(child) == 'object' && child instanceof Element)
-                _child = child.render();
-            else 
-                _child = child;
-            this.o.append(_child);
-        })
-    }
-    hide(){
-        if(typeof(this.oldStyle.display) == 'undefined')
-            this.oldStyle.display = this.o.style.display ?? '';
-        
-        this.o.style.display = 'none';
-    }
-    show(){
-        this.o.style.display = this.oldStyle.display;
-    }
-    initStyle(){
-        this.style = new Proxy(this.o.style, {
-            set(target, symbol, value){
-                target[symbol] = value;
-            }
-        })
-    }
-    initListener(){
-        this.listener.forEach(_listener => {
-            this.#addListener(_listener.eventName, _listener.callback);
-        })
-    }
-    remoteAttr(attrName){
-        this.o.removeAttribute(attrName);
-    }
-    addAttr(attrName, attrValue){
-        this.o.setAttribute(attrName, attrValue)
-    }
-    addClass(className){
+        },
+        i({ class:'fa-solid fa-arrow-right fa-fw' })
+    )
+)
 
-    }
-    removeClass(className){
+// ToDo List component
+let todoList = ul({ class:'todo-list' }, ...dummyTodo );
 
-    }
-    #addListener(eventName, callback){
-        this.o.addEventListener(eventName, callback);
-    }
-    on(eventName, callback = e => {}){
-        this.listener.push({ eventName, callback  });
-        return this;
-    }
-}
-
-class App {
-    static mount(element, target){
-        let _render = element.render();
-        target.append(_render)
-    }
-}
-
-function createElement(tag, ...args){
-    let attr = {};
-    if(args.length > 0){
-        args = args.filter(arg => {
-            if(typeof(arg) == 'object'){
-                if(arg instanceof Element){
-                    return true;
-                }else{
-                    attr = { ...arg, ...attr };
-                    return false;
-                }
-            }
-            return true;
-        });
-        if(typeof(args[0]) == 'object' && !(args[0] instanceof Element)){
-            attr = args[0];
-            args = args.slice(1);
-        }
-    }
-    return new Element(tag, attr, ...args);
-}
-
-function inputText(...args) {
-    return createElement('input', { type:'text' }, ...args);
-}
-function numberText(...args) {
-    return createElement('input', { type:'number' }, ...args);
-}
-function span(...args) {
-    return createElement('span', ...args);
-}
-function div(...args) {
-    return createElement('div', ...args);
-}
-function button(...args) {
-    return createElement('button', ...args);
-}
-
-let noticeComponent = div(
-    inputText({
-        placeholder: 'Input text here'
-    }),
-    numberText({
-        placeholder: 'Your age'
-    }),
-    span('Be aware, this content may be harmfull')
+// ToDo component
+let todoComponent = div({class: 'todo-app'},
+    header,
+    todoInput,
+    todoList
 );
 
-let hideBtn = button({
-    class:'item',
-    onclick:() => {
-        noticeComponent.hide();
-    }
-}, 'Hide');
-
-let showBtn = button({
-    class:'item'
-}, 'Show').on('click', () => {
-    noticeComponent.style.marginLeft = margin + 'px';
-});
-
-let devaComponent = 
-div({ class:'container' },
-    // SPAN
-    noticeComponent, 
-    // BUTTON
-    hideBtn, showBtn
-);
-
-App.mount(devaComponent, document.body);
+Jetz.style(myStyle);
+Jetz.mount(todoComponent, document.body);
