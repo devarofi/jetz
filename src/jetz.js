@@ -5,7 +5,7 @@ class JetzElement {
     attributes;
     children;
     oldStyle = {};
-    style;
+    style = {};
     listener = [];
     parent;
     position;
@@ -41,8 +41,21 @@ class JetzElement {
                 if(typeof(attrValue) == 'function'){
                     this.o.addEventListener(attr.substring(2), attrValue.bind(this));
                 }else{
+                    if(attr == 'style'){
+                        // addStyle
+                        this.#addStyle(attrValue);
+                        continue;
+                    }
                     this.addAttr(attr, attrValue);
                 }
+            }
+        }
+    }
+    #addStyle(styles){
+        for (const key in styles) {
+            if (Object.hasOwnProperty.call(styles, key)) {
+                const value = styles[key];
+                this.o.style[key] = value;
             }
         }
     }
@@ -85,10 +98,13 @@ class JetzElement {
         });
     }
     hide(){
-        if(typeof(this.oldStyle.display) == 'undefined')
-            this.oldStyle.display = this.o.style.display ?? '';
+        if(typeof(this.o) != 'undefined'){
+            this.o.style.display = 'none';
+            if(typeof(this.oldStyle.display) == 'undefined')
+                this.oldStyle.display = this.o.style.display ?? '';
+        }else
+            this.style.display = 'none';
         
-        this.o.style.display = 'none';
         return this;
     }
     show(){

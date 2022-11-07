@@ -43,7 +43,7 @@ let myStyle = css`
     margin-bottom: 4px;
     padding: 8px;
 }
-.btn-delete{
+.btn-action{
     float: right;
     color:rgba(0,0,0,0.6);
     border-radius:4px;
@@ -52,14 +52,28 @@ let myStyle = css`
 }
 `;
 
+let editField = todo => inputText({value: todo});
+
 function todoItem(todo){
+    let _editField = editField(todo).hide();
     const item = li({ class: 'todo-item' }, todo,
-        button('Delete', { 
-            class: 'btn-delete',
+        _editField,
+        button({ 
+            class: 'btn-action',
+            style:{
+                backgroundColor: 'red',
+                color:'white',
+                opacity: 0.7
+            },
             onclick: () => {
                 item.remove();
-            }
-        })
+            },
+        },
+            i({class:'fa-solid fa-trash'})
+        ),
+        button({ class:'btn-action' },
+            i({ class:'fa-solid fa-pencil' })
+        )
     );
     return item;
 }
