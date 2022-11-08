@@ -1,78 +1,60 @@
 import { Jetz } from "./src/jetz.js";
-import { button, css, div, i, inputNumber, inputText, li, span, ul } from "./src/ui.js";
+import { button, div, i, inputText, li, span, ul } from "./src/ui.js";
+import { myStyle } from "./style.js";
 
-let myStyle = css`
-*{
-    font-family: 'arial';
-    padding:0;
-    margin:0;
-}
-.todo-app{
-    padding: 8px;
-}
-.header{
-    font-size:1.3em;
-    font-weight: bold;
-    padding-bottom: 8px;
-}
-.todo-input{
-    display:flex;
-    margin-bottom: 12px;
-}
-.todo-input input{
-    width:100%;
-    padding:10px;
-    border:0;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-.btn-add{
-    color:white;
-    background:purple;
-    border:0;
-    padding:4px;
-    width:40px;
-    margin-left: 8px;
-}
-.btn-add:hover{
-    opacity: 0.6;
-}
-.todo-item {
-    display: block;
-    border: 1px solid rgba(0,0,0,0.3);
-    border-radius: 4px;
-    margin-bottom: 4px;
-    padding: 8px;
-}
-.btn-action{
-    float: right;
-    color:rgba(0,0,0,0.6);
-    border-radius:4px;
-    border:0;
-    padding: 4px;
-}
-`;
+let _editField = todo => inputText({value: todo});
 
-let editField = todo => inputText({value: todo});
+const _btnEdit = () => button({
+        id:'btn-edit',
+        class:'btn-action',
+        style: {
+            background: 'none'
+        }
+    },
+    i({ class:'fa-solid fa-pencil' })
+);
+const _btnSave = () => button({
+    id: 'btn-save',
+    class:'btn-action'
+}, 'Save').hide();
+const _btnDelete = () => button(
+    {
+        class: 'btn-action',
+        style:{
+            color: 'red',
+            opacity: 0.7
+        },
+    },
+    i({class:'fa-solid fa-trash'})
+);
 
 function todoItem(todo){
-    let _editField = editField(todo).hide();
-    const item = li({ class: 'todo-item' }, todo,
-        _editField,
-        button({ 
-            class: 'btn-action',
-            style:{
-                backgroundColor: 'red',
-                color:'white',
-                opacity: 0.7
-            },
-            onclick: () => {
+    let todoContent = span(todo);
+    let editField = _editField(todo).hide();
+    let btnSave = _btnSave();
+    let btnEdit = _btnEdit();
+    let btnDelete = _btnDelete();
+
+    const item = li({ class: 'todo-item' }, todoContent,
+        editField,
+        
+        div({style: { display: 'block' }},
+            btnDelete.on('click', () => {
                 item.remove();
-            },
-        },
-            i({class:'fa-solid fa-trash'})
-        ),
-        button({ class:'btn-action' },
-            i({ class:'fa-solid fa-pencil' })
+            }),
+            btnSave.on('click', function(){
+                editField.hide();
+                todoContent.show();
+                todoContent.text(editField.value());
+                btnEdit.show();
+                this.hide();
+            }),
+            btnEdit.on('click', function(){
+                editField.show();
+                todoContent.hide();
+                btnSave.show();
+                this.hide();
+            })
         )
     );
     return item;
