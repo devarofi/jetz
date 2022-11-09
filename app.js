@@ -1,3 +1,6 @@
+// INFO :
+// This is just a DEMO file how to use a Jetz js
+
 import { Jetz } from "./src/jetz.js";
 import { button, div, i, inputText, li, span, ul } from "./src/ui.js";
 import { myStyle } from "./style.js";
