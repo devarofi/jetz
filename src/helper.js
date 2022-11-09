@@ -1,13 +1,15 @@
-Object.isEmpty = function(target){
-    if(target){
-        for (const _ in target) {
-            return false;
+const Obj = {
+    isEmpty: function(target){
+        if(target){
+            for (const _ in target) {
+                return false;
+            }
         }
+        return true;
+    },
+    isNotEmpty: function(target){
+        return !Obj.isEmpty(target);
     }
-    return true;
-}
-Object.isNotEmpty = function(target){
-    return !Object.isEmpty(target);
 }
 
-export default Object;
+export default Obj;
