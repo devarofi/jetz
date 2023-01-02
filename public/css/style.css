@@ -1,0 +1,56 @@
+
+.todo-app{
+    padding: 24px;
+}
+.header{
+    font-size:2em;
+    font-weight: bold;
+    padding-bottom: 8px;
+}
+.todo-input{
+    display:flex;
+    margin-bottom: 12px;
+}
+.todo-input input{
+    width:100%;
+    border:0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    font-size: 1.2em;
+}
+.todo-app input{
+    font-size: 1.2em;
+    padding: 8px 12px;
+}
+.btn-add{
+    color:white;
+    background:purple;
+    border:0;
+    padding:4px;
+    width:40px;
+    margin-left: 8px;
+}
+.btn-add:hover{
+    opacity: 0.6;
+}
+.todo-item {
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    padding: 8px;
+    font-size: 1.2em;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.btn-action{
+    float: right;
+    color:rgba(0,0,0,0.6);
+    border-radius:4px;
+    border:0;
+    padding: 8px;
+    font-size: 1.1em;
+}
+.dropdown-content{
+    width: max-content !important;
+    height:auto !important;
+ }
