@@ -1,5 +1,7 @@
 let path = require('path');
 let HtmlWebpackPlugin = require('html-webpack-plugin');
+const { LibManifestPlugin } = require('webpack');
+const { WebpackManifestPlugin } = require('webpack-manifest-plugin');
 
 module.exports = {
     entry: './app.js',
@@ -19,6 +21,9 @@ module.exports = {
     plugins: [
         new HtmlWebpackPlugin({
             template: './public/index.html'
+        }),
+        new WebpackManifestPlugin({
+            fileName: 'manifest.json'
         })
     ],
     devServer: {

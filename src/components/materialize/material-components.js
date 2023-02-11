@@ -1,6 +1,7 @@
 import { css } from "../../lib/helper";
-import { a, button, div, i, li, nav, span, ul } from "../../lib/ui";
+import { a, button, div, i, inputNumber, inputText, label, li, nav, span, ul } from "../../lib/ui";
 
+export let mContainer = (...args) => div({ class: 'container' }, args);
 export let mRow = (...args) => div({ class: 'row' }, args);
 export let mCol1 = (...args) => div({ class: 'col s1' }, args);
 export let mCol2 = (...args) => div({ class: 'col s2' }, args);
@@ -33,7 +34,7 @@ export let navBar = (menus = [], ...args) => {
                 ul({ class: 'right hide-on-med-and-down', id: 'nav-mobile' },
                     menus
                     .map(menu => li(
-                        a({ href: '#' }, menu)
+                        menu
                     ))
                 )
             )
@@ -41,8 +42,8 @@ export let navBar = (menus = [], ...args) => {
     )
 }
 export let dropdown = (collections = [], ...args) => ul(args, { class: 'dropdown-content' },
-    collections.map(item => li(
-        a({ href: '#!' }, item, span({ class: 'badge' }, 1))
+    collections.map((item, i) => li({ tabIndex: i },
+        item
     ))
 )
 export let btnDropdown = (target, ...args) => a(args, 
@@ -51,4 +52,22 @@ export let btnDropdown = (target, ...args) => a(args,
         class: 'btn dropdown-trigger', 
         href: '#!',
         'data-target': target
-    }); 
+    });
+
+export let mInputTextField = (id, placeholder,...args) => {
+    let inputField = inputText({ class: 'validate' }).id(id);
+    let inputBase = div({ class: 'input-field' },
+        inputField,
+        label({ for: id }, placeholder)
+    );
+    inputBase['value'] = function(value = null){
+        return inputField.value(value)
+    }
+    return inputBase;
+}
+export let mInputNumberField = (id, placeholder,...args) => {
+    return div({ class: 'input-field' },
+        inputNumber({ class: 'validate' }).id(id),
+        label({ for: id }, placeholder)
+    )
+}

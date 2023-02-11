@@ -25,6 +25,20 @@ const todo =
     )
   );
 ```
+with state list :
+``` javascript
+let cartState = listOf();
+let myApp = main(
+  ul(
+    loop(cartState, item => li(item))
+  ),
+  button('Add new item', {
+    onclick:() => {
+      cartState.push(`New Item ${cartState.length + 1}`)
+    }
+  })
+);
+```
 
 ## Event Listener
 in html :
@@ -69,6 +83,43 @@ button({
   onclick: () => myContent.text('Paragraph was changed into other content')
 });
 ```
+Jetz with state and binding value :
+``` javascript
+let myState = stateOf('');
+let myComponent = div(
+  div('My name is : ', myState),
+  inputText({
+    bind: myState,
+    placeholder: 'Input your name...'
+  })
+);
+```
+## Dispatcher
+``` javascript
+let pageContent = stateOf(div())
+
+let dispatcher = new Dispatcher(action => {
+  if(action === 'home'){
+    pageContent.value = home()
+  }else if(action === 'about'){
+    pageContent.value = about()
+  }else if(action === 'contact-us'){
+    pageContent.value = contactUs()
+  }
+})
+
+let myApp = main(
+  nav(
+    ul(
+      li('Home').on('click', () => dispatcher.dispatch('home')),
+      li('About').on('click', () => dispatcher.dispatch('about')),
+      li('Contact Us').on('click', () => dispatcher.dispatch('contact-us'))
+    )
+  ),
+  pageContent
+)
+```
+
 It's just a little sample, i'm not yet ready for release. But, you can support me 😁
 
 If this repository get 100 stars i'll focus to develop this library more intens. ☕
