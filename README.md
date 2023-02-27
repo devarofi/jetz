@@ -19,8 +19,8 @@ in javascript with Jetz :
 ``` javascript
 const item = [1, 2, 3];
 const todo =
-  div({ class:'container' }, 
-    ul({ class:'todo-list' },
+  div( css`container`, 
+    ul( css`todo-list`,
       items.map(data => li('Item ' + data))
     )
   );
@@ -33,7 +33,7 @@ let myApp = main(
     loop(cartState, item => li(item))
   ),
   button('Add new item', {
-    onclick:() => {
+    onclick() {
       cartState.push(`New Item ${cartState.length + 1}`)
     }
   })
@@ -55,9 +55,8 @@ in html :
 ```
 in javascript with Jetz :
 ``` javascript
-button('Show Alert', {
-  class:'btn btn-info', 
-  onclick: () => {
+button('Show Alert', css`btn btn-info`, {
+  onclick(){
     alert('Aww Snap');
   }
 });
@@ -80,7 +79,9 @@ in javascript with Jetz :
 ``` javascript
 let myContent = p('This is paragraph of your content');
 button({
-  onclick: () => myContent.text('Paragraph was changed into other content')
+  onclick(){
+    myContent.text('Paragraph was changed into other content');
+  }
 });
 ```
 Jetz with state and binding value :
