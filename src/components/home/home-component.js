@@ -1,4 +1,4 @@
-import { div } from "../../lib/ui";
+import { div } from "../../lib/jetz-ui";
 import { modal } from "../dialog/modal";
 import { todoV2 } from "../todo/todo-v2";
 // import { counter } from "../counter/counter";

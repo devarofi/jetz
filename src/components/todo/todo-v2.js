@@ -1,5 +1,7 @@
 import { Component, listOf, loop, stateOf } from "../../lib/jetz";
-import { button, div, h2, hr, inputText, li, span, ul } from "../../lib/ui";
+import { button, div, h2, hr, inputText, li, span, ul } from "../../lib/jetz-ui";
+
+// Example with a component class
 
 class ToDoV2 extends Component {
     constructor(){
@@ -34,12 +36,12 @@ class ToDoV2 extends Component {
             onclick: this.checkTodo
         },
         inputText({
-            oninput:(e) => {
+            oninput(e) {
                 todo.text.value = e.target.value;
             }
         }),
         button('Change Text', {
-            onclick: () => {
+            onclick() {
                 todo.text.value = 'Changed'
             }
         }),
@@ -58,10 +60,9 @@ class ToDoV2 extends Component {
                     value: this.todoTemp,
                     oninput: this.writeTodo.bind(this)
                 }),
-                span('Add', css`addBtn`, { onclick: this.newTodo.bind(this) }),
+                span('Add', css`addBtn`, { onclick: () => this.newTodo() }),
                 span('Plus', { 
                     onclick: () => { 
-                        console.log('waw')
                         this.todoList.map(todo => {
                             todo.text.value = '*' + todo.text
                             return todo;

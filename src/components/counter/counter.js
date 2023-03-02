@@ -1,5 +1,5 @@
 import { listOf, loop, stateOf } from "../../lib/jetz";
-import { button, div, hr, inputText, li, main, ul } from "../../lib/ui";
+import { button, div, hr, inputText, li, main, ul } from "../../lib/jetz-ui";
 
 
 let cartState = listOf();
@@ -8,7 +8,7 @@ let myApp = main(
     loop(cartState, item => li(item))
   ),
   button('Add new item', {
-    onclick:() => {
+    onclick() {
       cartState.push(`New Item ${cartState.length + 1}`)
     }
   })
@@ -30,7 +30,7 @@ export let counter = main(
                 bind:nameState
             }),
             button('Add +1', {
-                onclick: function() {
+                onclick() {
                     countState.value++;
                     if(countState.value == 2){
                         this.style.backgroundColor = 'red'

@@ -1,7 +1,7 @@
 {
   "name": "jetz",
   "version": "1.0.0",
-  "description": "ui library",
+  "description": "A composable javascript framework",
   "main": "app.js",
   "private": true,
   "scripts": {

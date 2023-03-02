@@ -1,4 +1,3 @@
-
 const Obj = {
     isEmpty: function(target){
         if(target){
@@ -12,9 +11,41 @@ const Obj = {
         return !Obj.isEmpty(target);
     }
 }
-/** 
- * @param {Array} arr
- */
+NodeList.prototype.last = function(){
+	return this[this.length - 1];
+}
+Array.prototype.last = function(){
+	return this[this.length - 1];
+}
+Array.prototype.take = function(to){
+	return this.slice(0, to);
+}
+Number.prototype.range = function(to){
+	return range(this.valueOf(), to);
+}
+class UniqueString extends String {
+    constructor(val){
+        super(val)
+    }
+}
+class UniqueNumber extends Number {
+    constructor(val){
+        super(val)
+    }
+}
+function toNodes(content){
+	let _ = document.createElement('_');
+	_.innerHTML = content;
+	return _.childNodes;
+}
+export function range(start, to) {
+	let arr = [];
+	while(start <= to){
+		arr.push(start);
+		start++;
+	}
+	return arr;
+}
 export function flatMap(arr){
     let newArr = [];
     arr.forEach(item => {
@@ -30,9 +61,6 @@ export function flatMap(arr){
     });
     return newArr;
 }
-export function css(value){
-    return { class: value };
-}
 export function addScript(src, options = {}){
     document.addEventListener('DOMContentLoaded', e => {
         e.preventDefault();
@@ -41,13 +69,59 @@ export function addScript(src, options = {}){
         document.body.append(script);
     });
 }
+function createElement(tag, ...args) {
+	args = flatMap(args);
+	let attr = {};
+	if (args.length > 0) {
+		args = args.filter(( arg, position ) => {
+			if (typeof arg === "object") {
+				if (arg instanceof JetzElement) {
+					return true;
+				}else if(arg instanceof State){
+					return true;
+				}else if(arg instanceof ListState){
+					return true;
+				}else if(arg instanceof Component){
+					return true;
+				}else if(
+					arg instanceof UniqueString ||
+					arg instanceof UniqueNumber
+					){
+					return true;
+				}else if(arg instanceof Raw){
+					return true;
+				} else {
+					// skipped
+					attr = mergeObject(arg, attr);
+					return false;
+				}
+			}
+			return true;
+		});
+		if (typeof args[0] === "object") {
+			if(args[0].constructor.name === 'Object'){
+				attr = args[0];
+				args = args.slice(1);
+			}
+		}
+	}
+	return new JetzElement(tag, attr, ...args);
+}
+class Dispacher{
+    #actionDispatch;
+    constructor(callback = action => {}){
+        this.#actionDispatch = callback;
+    }
+    dispatch(action, ...args){
+        console.info('Called dispacher', this)
+        return this.#actionDispatch(action, ...args);
+    }
+}
 
-Object.prototype.toString = function(){
-    if(this.constructor.name === State.name)
-        return this.value;
-	else if(this.constructor.name === ListState.name)
-		return this.values.join(',');
-    return this;
+class Component {
+	render(){
+		return null;
+	};
 }
 
 class JetzElement {
@@ -65,7 +139,9 @@ class JetzElement {
 	lifecycles = {
 		onRendered: null,
 		onStart: null
-	}
+	};
+	collectionConditionalChild = [];
+	renderPosition = 0; // 0 parent, 1 after, 2 before
 
 	constructor(tag, attributes, ...children) {
 		this.tagName = tag;
@@ -82,8 +158,17 @@ class JetzElement {
 			Jetz.addRenderedEffect(this.lifecycles.onRendered);
 		}
 	}
-
-	render(parent = null) {
+	triggerCondition(){
+		this.collectionConditionalChild.forEach(condition => {
+			condition.trigger();
+		})
+	}
+	setPrevious(previous){
+		this.previousElement = previous;
+	}
+	render(parent = null, renderPosition = 0) {
+		this.collectionConditionalChild = [];
+		this.renderPosition = renderPosition;
 		this.parent = parent; // Parent JetzElement
 		this.#atLifecycles(() => {
 			this.o = document.createElement(this.tagName);
@@ -91,7 +176,7 @@ class JetzElement {
 			this.assignChildren();
 			this.initStyle();
 			this.initListener();
-			this.o.instance = this;
+			this.o.$ = this;
 		})
 	}
 	getElement(){
@@ -109,18 +194,44 @@ class JetzElement {
 		for (const attr in this.attributes) {
 			if (Object.hasOwnProperty.call(this.attributes, attr)) {
 				const attrValue = this.attributes[attr];
-				if (typeof attrValue === "function") {
-					this.o.addEventListener(attr.substring(2), attrValue.bind(this));
+				if(attr.substring(0, 2) == 'on') {
+					if (typeof attrValue === "function")
+						this.o.addEventListener(attr.substring(2), attrValue.bind(this));
 				}else if(attr === 'bind'){
 					this.#bindInputValue(attrValue);
-				} else {
-					if (attr === "style") {
-						this.#addStyle(attrValue);
-						console.log(this.attributes, this.o)
-						continue;
-					}
+				} else if (attr === "style") {
+					this.#addStyle(attrValue);
+					console.log(this.attributes, this.o)
+					continue;
+				}else if(attr === 'if' || attr === 'else' || attr === 'elseif'){
+					this.#assignConditionalAttr(attr, attrValue);
+				}else{
 					this.addAttr(attr, attrValue);
 				}
+			} 
+		}
+	}
+	#assignConditionalAttr(attrName, attrValue){
+		if(attrName === 'if'){
+			let attrSpecial = new If(this, attrValue);
+			// // check is assign or not
+			this.parent.collectionConditionalChild.push(attrSpecial);
+			if(Jetz.isAllowToRemount(this.parent)){
+				Jetz.remountByAttr.push(this.parent);
+			}
+		}else if(attrName === 'else'){
+			var currentIfElement = this.parent.collectionConditionalChild.last();
+			var newElse = new Else(this, currentIfElement);
+			if(currentIfElement){
+				currentIfElement._else = newElse;
+			}
+		}else if(attrName === 'elseif'){
+			var currentIfElement = this.parent.collectionConditionalChild.last();
+			if(currentIfElement){
+				let newElseIf = new ElseIf(this, attrValue);
+				currentIfElement.addElseIf(newElseIf);
+			}else{
+				throw new Error('expect IF declaration before ELSE IF', this.o);
 			}
 		}
 	}
@@ -147,9 +258,22 @@ class JetzElement {
 		this.#appendChildren(this.children);
 	}
 	#appendChildren(children) {
-		children.forEach((child) => {
+		children.forEach((child, i) => {
+			if(child instanceof JetzElement){
+				this.addPreviousElement(child, children, i);
+			}
 			this.append(child);
 		});
+	}
+	addPreviousElement(element, children, childPosition){
+		const prevPosition = childPosition - 1;
+		if(prevPosition >= 0){
+			let childPrev = children[prevPosition];
+			if(childPrev instanceof State)
+				element.setPrevious(childPrev.container.last());
+			else
+				element.setPrevious(childPrev);
+		}
 	}
 	append(child, ...children) {
 		if (children.length > 0) {
@@ -164,7 +288,6 @@ class JetzElement {
 			}else if(child instanceof State){
 				_child = child.generateMutable();
 			}else if(child instanceof ListState){
-				// this.#appendChildren(child.views.flat(2));
 				child.assignParent(this);
 				return this;
 			}else if(child instanceof Component){
@@ -175,6 +298,13 @@ class JetzElement {
 				}else{
 					_child = childComponent;
 				}
+			}else if(
+				child instanceof UniqueString ||
+				child instanceof UniqueNumber
+				){
+				_child = child;
+			}else if(child instanceof Raw){
+				_child = child;
 			}
 		}else if(typeof child === 'function'){
 			let childFunction = child.call();
@@ -187,13 +317,24 @@ class JetzElement {
 		if (typeof this.o === "undefined") {
 			this.children.push(_child);
 		} else {
-			this.o.append(_child);
+			if(this.renderPosition == 0){
+				if(_child instanceof Raw){
+					let nodes = toNodes(_child.get());
+					if(nodes.length > 0)
+						this.o.append(...nodes);
+				}else{
+					this.o.append(_child);
+				}
+			}else if(this.renderPosition == 1){
+				console.log(_child, 'render')
+			}
 		}
 		if(child instanceof JetzElement){
 			if(child.lifecycles.onRendered){
-				child.lifecycles.onRendered()
+				child.lifecycles.onRendered();
 			}
 		}
+
 		return this;
 	}
 	initStyle() {
@@ -205,7 +346,7 @@ class JetzElement {
 			set: (function(target, symbol, value) {
 				this.o.style[symbol] = value;
 				target[symbol] = value;
-				console.log(this.o.style, symbol, value)
+				// console.log(this.o.style, symbol, value)
 				return true;
 			}).bind(this),
 		});
@@ -341,12 +482,6 @@ class JetzElement {
 	}
 	remove() {
 		this.o.remove();
-		this.parent.removeChild(this);
-	}
-	removeChild(_child) {
-		this.children = this.children.filter(
-			(child) => child.position !== _child.position,
-		);
 	}
 	id(idName) {
 		this.attributes.id = idName;
@@ -354,24 +489,12 @@ class JetzElement {
 	}
 	findId(idName) {
 		var element = document.getElementById(idName);
-		return element.instance;
+		return element.$;
 	}
 }
-
-class Reactive {
-	static isReactive = false;
-
-	static clear(){
-		Reactive.isReactive = false;
-	}
-}
-
-function _(text){
-	Reactive.isReactive = true;
-	return text;
-}
-
 class Jetz {
+	// Jetz Element Collection that have If Else Annotation
+	static remountByAttr = []; 
 	static #onRenderedCollections = [];
 	static addRenderedEffect(callback){
 		Jetz.#onRenderedCollections.push(callback)
@@ -381,14 +504,22 @@ class Jetz {
 	}
 	// static #startListener = [];
 	static mount(jetzElement, target, event = { onStart(){}, onLoad(){} }) {
+		let components = flatMap([jetzElement])
+		console.log(components)
 		// debugger;
 		this.onStart(event.onStart);
-
-		jetzElement.render();
-		let element = jetzElement.getElement();
-		target.append(element);
+		if(Array.isArray(components)){
+			components.forEach(element => {
+				let _el = element.render();
+				target.append(element.getElement());
+			});
+		}
+		// jetzElement.render();
+		// let element = jetzElement.getElement();
+		// target.append(element);
 		
 		Jetz.onFirstRenderPage();
+		Jetz.triggerByState();
 		
 		this.onLoad(event.onLoad);
 	}
@@ -409,6 +540,18 @@ class Jetz {
 			});
 		}
 	}
+	static triggerByState(){
+		// console.log('By State', this.remountByAttr);
+		this.remountByAttr.forEach(element => {
+			element.collectionConditionalChild.forEach(rm => rm.trigger())
+			// console.log('By State', element)
+		});
+	}
+	static isAllowToRemount(findElement){
+		return Jetz.remountByAttr.filter(element => {
+			return element == findElement;
+		}).length == 0
+	}
 }
 class StyleState {
 	container;
@@ -421,44 +564,48 @@ class StyleState {
 	}
 }
 class State{
-	value;
+	#value;
+	// value;
 	container = [];
-	constructor(value){
-		this.value = value;
+	#handler;
+	constructor(value, handler = { get(obj){}, set(obj){} }){
+		this.#value = value;
+		this.#handler = handler;
 	}
 	addContainer(container){
 		this.container.push(container)
 	}
 	generateMutable(){
 		let element = null;
-		if(this.value instanceof JetzElement){
-			this.value.render();
-			element = this.value.getElement();
+		if(this.#value instanceof JetzElement){
+			this.#value.render();
+			element = this.#value.getElement();
 		}else{
-			element = new Text(this.value);
+			element = new Text(this.#value);
 		}
 		this.container.push(element);
 		// Will added in element tree
 		return element;
 	}
 	setState(newValue){
-		this.value = newValue;
+		this.#value = newValue;
 		this.container = this.container.map(container => {
-			if(this.value instanceof JetzElement){
-				this.value.render();
-				let element = this.value.getElement();
+			if(this.#value instanceof JetzElement){
+				this.#value.render();
+				let element = this.#value.getElement();
 				container.replaceWith(element);
 				// trigger lifecycle
-				if(this.value.lifecycles.onRendered)
-					this.value.lifecycles.onRendered();
+				if(this.#value.lifecycles.onRendered)
+					this.#value.lifecycles.onRendered();
 				return element;
-			}else if(typeof(this.value) === 'object'){
+			}else if(typeof(this.#value) === 'object'){
 				console.log('obj')
 			}else{
-				this.#assignContainerValue(container, this.value);
+				this.#assignContainerValue(container, this.#value);
 			}
 			return container;
 		});
+		Jetz.triggerByState();
 	}
 	#assignContainerValue(container, value){
 		if(container instanceof HTMLElement){
@@ -472,21 +619,44 @@ class State{
 		}else if(container instanceof Text){
 			container.textContent = value;
 		}else if(container instanceof StyleState){
-			console.log('style dec')
 			container.value = value;
 			container.container[container.key] = container.value;
 		}
 	}
 	getValue(){
-		return this.value;
+		return this.#value;
+	}
+	get value(){
+		return this.#value;
+	}
+	set value(val){
+		this.#handler.set(this, val);
+	}
+	toString(){
+		if(this.constructor.name === State.name)
+			return this.#value;
+		else if(this.constructor.name === ListState.name)
+			return this.values.join(',');
+	}
+	valueOf(){
+		return this.#value;
 	}
 }
 
 
-export class ListState extends Array{
+export class ListState extends Array {
 	parentElement = [];
 	values = [];
 	views = [];
+	uniqueValue = false;
+
+	asUnique(){
+		this.uniqueValue = true;
+		this.values = this.values.map(val => {
+			return this.#fixValue(val)
+		});
+		return this;
+	}
 
 	at(index){
 		return this.values[index];
@@ -499,12 +669,20 @@ export class ListState extends Array{
 		this.values = values;
 		this.length = values.length;
 	}
+	set(newData){
+		this.values = newData;
+		super.values = newData;
+		this.renderView(true);
+	}
 	createItemView(parent, item, index){
 		var renderedItem = this.renderCallback(item, index);
 		renderedItem.render(parent);
 		return renderedItem;
 	}
 	push(item){
+		if(this.uniqueValue)
+			item = this.#fixValue(item);
+
 		super.push(item);
 		this.values.push(item);
 		this.parentElement.map((parent, i) => {
@@ -572,13 +750,29 @@ export class ListState extends Array{
 		this.values = this.values.map(value => stateOf(value));
 		return this;
 	}
+	#fixValue(value){
+		if(typeof value === 'string'){
+			return new UniqueString(value);
+		}else if(typeof value === 'number'){
+			return new UniqueNumber(value);
+		}else{
+			return value;
+		}
+	}
+	take(to){
+		return this.values.take(to)
+	}
 	*[Symbol.iterator](){
 		yield* this.values;
 	}
 }
-
 export function listOf(...items){
 	return new ListState(...items);
+}
+
+export function sequenceOf(...items){
+	let listState = new ListState(...items);
+	return listState.asUnique();
 }
 export function loop(collections, render = (item, index = 0) => { return item; }){
 	if(collections instanceof ListState)
@@ -593,19 +787,8 @@ export function loop(collections, render = (item, index = 0) => { return item; }
 	}
 	return collections;
 }
-
 function stateOf(value, handler = { get(value){ return value } }){
-	const optDefaultProxy = {
-		get(obj, prop){
-			let outValue = handler.get(obj[prop]);
-			return outValue ?? obj[prop];
-		},
-		set(obj, prop, value){
-			obj.setState(value);
-			return true;
-		}
-	};
-	let optProxy = optDefaultProxy
+	let instance = null;
 	if(typeof value === 'object' && !(value instanceof JetzElement)){
 		for (const prop in value) {
 			if (Object.hasOwnProperty.call(value, prop)) {
@@ -613,17 +796,25 @@ function stateOf(value, handler = { get(value){ return value } }){
 				value[prop] = stateOf(propValue);
 			}
 		}
-		return value;
+		// return value;
+		instance = value;
 	}else{
-		let objState = new State(value);
-		let proxy = new Proxy(objState, optProxy);
-		
+		const optDefaultProxy = {
+			get(obj, prop){
+				let outValue = handler.get(obj[prop]);
+				return outValue ?? obj[prop];
+			},
+			set(obj, value){
+				obj.setState(value);
+				return true;
+			}
+		};
+		let objState = new State(value, optDefaultProxy);
 		// custom function string
-
-		return proxy;
+		instance = objState;
 	}
+	return instance;
 }
-
 function mergeObject(obj1, ...obj2){
 	if(obj2 === undefined || obj2 == null) obj2 = [];
 	obj2.push(obj1);
@@ -660,55 +851,198 @@ function mergeObject(obj1, ...obj2){
 	}
 	return newObj;
 }
+class Raw {
+	#content;
+	constructor(content) {
+		this.#content = content;
+	}
+	get(){
+		return this.#content;
+	}
+	set(content){
+		this.#content = content;
+	}
+	valueOf(){
+		return this.#content;
+	}
+}
+class AttrSpecial{
+    value;
+	element;
+	
+	beforeNode; // 0
+	afterNode; // 1
+	parentNode; // 2
 
-function createElement(tag, ...args) {
-	args = flatMap(args);
-	let attr = {};
-	if (args.length > 0) {
-		args = args.filter(( arg, position ) => {
-			if (typeof arg === "object") {
-				if (arg instanceof JetzElement) {
-					return true;
-				}else if(arg instanceof State){
-					return true;
-				}else if(arg instanceof ListState){
-					return true;
-				}else if(arg instanceof Component){
-					return true;
-				} else {
-					// skipped
-					attr = mergeObject(arg, attr);
-					return false;
-				}
+	copyNode;
+	positionElement;
+
+	_else;
+	_elseIf = [];
+
+	isDefined = false;
+
+	constructor(element, value) {
+		this.value = value;
+		this.element = element;
+	}
+
+	initContainer(){
+		if(!this.isDefined){
+			if(this.element.o.previousSibling){
+				this.beforeNode = this.element.o.previousSibling;
+				this.positionElement = 0;
+			}else if(this.element.o.nextElementSibling){
+				this.afterNode = this.element.o.nextElementSibling;
+				this.positionElement = 1;
+			}else{
+				this.parentNode = this.element.o.parentNode;
+				this.positionElement = 2;
 			}
-			return true;
-		});
-		if (typeof args[0] === "object") {
-			if(args[0].constructor.name === 'Object'){
-				console.log(args[0].constructor.name === 'Object')
-				attr = args[0];
-				args = args.slice(1);
-			}
+			this.isDefined = true;
+		}
+		this.copyNode = this.element.o.cloneNode(true);
+	}
+	addElseIf(elseIf){
+		this._elseIf.push(elseIf);
+	}
+
+	hide(){
+		this.initContainer();
+		// if(this._else){
+		// 	this._else.setParentIf(this);
+		// 	this._else.initContainer();
+		// }
+		this.element.remove();
+	}
+	show(){
+		this.initContainer();
+		if(this.positionElement == 0){
+			// this.element.remove();
+			// this.element.o = this.copyNode;
+			// this.beforeNode.after(this.copyNode);
+			// this.element.render();
+			// console.log(this.element)
+			
+			this.beforeNode.after(this.element.o);
 		}
 	}
-	return new JetzElement(tag, attr, ...args);
+}
+class If extends AttrSpecial{
+	triggerResult;
+	constructor(element, value) {
+		super(element, value);
+	}
+	trigger(){
+		let condition = this.value.call();
+		this.triggerResult = condition;
+		this.show();
+
+		let parentIf = this;
+		let elseIfCondition = false;
+		let elseCondition = false;
+
+		this._elseIf.forEach((__elseIf, i) => {
+			__elseIf.setParentIf(parentIf);
+			__elseIf.initContainer();
+			__elseIf.trigger();
+			if(!elseIfCondition){
+				elseIfCondition = __elseIf.triggerResult;
+			}
+			if(__elseIf.triggerResult && !condition){
+				elseCondition = false;
+				__elseIf.show();
+			}else{
+				__elseIf.hide();
+			}
+		});
+		// console.log('condition', condition)
+		if(!condition)
+			this.hide();
+		if(this._else){
+			this._else.setParentIf(this);
+			this._else.initContainer();
+			this._else.hide();
+			
+			if(!elseIfCondition && !condition){
+				elseCondition = true;
+			}
+			if(elseCondition){
+				this._else.show();
+			}
+			// console.log(this._else, condition, elseIfCondition, elseCondition)
+		}
+	}
+}
+class ElseIf extends AttrSpecial{
+	parentIfCondition;
+	positionElement;
+	constructor(element, value) {
+		super(element, value);
+	}
+	setParentIf(parentIf){
+		// this.parentIfCondition = parentIf;
+		this.beforeNode = parentIf.beforeNode;
+		this.afterNode = parentIf.afterNode;
+		this.parentNode = parentIf.parentNode;
+		this.positionElement = parentIf.positionElement;
+	}
+	initContainer(){
+		this.copyNode = this.element.o.cloneNode(true);
+	}
+	trigger(){
+		return this.triggerResult = this.value();
+	}
 }
 
-class Dispacher{
-    #actionDispatch;
-    constructor(callback = action => {}){
-        this.#actionDispatch = callback;
-    }
-    dispatch(action){
-        console.info('Called dispacher', this)
-        return this.#actionDispatch(action);
-    }
-}
+class Else {
+	element;
+	currentIf;
+	copyNode;
+	
+	parentIfCondition;
+	positionElement;
+	
+	initContainer(){
+		// console.log('Else Init')
+		if(this.parentIfCondition.positionElement == 0){
+			this.beforeNode = this.parentIfCondition.beforeNode;
+		}else if(this.parentIfCondition.positionElement == 1){
+			this.afterNode = this.parentIfCondition.afterNode;
+		}else{
+			this.parentNode = this.parentIfCondition.parentNode;
+		}
+		this.positionElement = this.parentIfCondition.positionElement;
+		this.copyNode = this.element.o.cloneNode(true);
+	}
+	setParentIf(parentIf){
+		this.parentIfCondition = parentIf;
+	}
 
-class Component {
-	render(){
-		return null;
-	};
-}
+	constructor(element, currentIf) {
+		this.element = element;
+		this.currentIf = currentIf;
+	}
 
-export { JetzElement, Jetz, Dispacher, Component, createElement, stateOf, _ };
+	hide(){
+		if(this.positionElement == 0){ 
+			this.element.remove();
+		}
+	}
+	show(){
+		if(this.positionElement == 0){
+			// this.element.o = this.copyNode;
+			this.element.render(this.currentIf.element.parent);
+			this.beforeNode.after(this.element.getElement());
+		}else if(this.positionElement == 1){
+			console.log('after');
+		}else{
+			console.log('parent');
+		}
+	}
+}
+const _else = { else:null };
+const _if = boolCallback => ({ if:boolCallback })
+const html = content => new Raw(content);
+
+export { JetzElement, Jetz, Dispacher, Component, createElement, stateOf, _else, _if, html };
