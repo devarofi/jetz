@@ -1,6 +1,14 @@
 # Jetz 🚀
 Jetz is a library for writing front end with declarative javascript DOM.
 
+## Demo
+Write this command in terminal :
+```terminal
+npm install
+npm run watch
+npm run start
+```
+
 ## Why Jetz
 Jetz is inspired by Jetpack Compose. Is using for creating rich UI with simple, fast, declarative syntax in android. But Jetz was coming for Web Developers.
 

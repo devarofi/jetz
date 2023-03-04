@@ -88,7 +88,7 @@ function createElement(tag, ...args) {
 					arg instanceof UniqueNumber
 					){
 					return true;
-				}else if(arg instanceof Raw){
+				} else if(arg instanceof Raw){
 					return true;
 				} else {
 					// skipped
@@ -107,23 +107,26 @@ function createElement(tag, ...args) {
 	}
 	return new JetzElement(tag, attr, ...args);
 }
-class Dispacher{
+class Dispatcher{
     #actionDispatch;
     constructor(callback = action => {}){
         this.#actionDispatch = callback;
     }
     dispatch(action, ...args){
-        console.info('Called dispacher', this)
         return this.#actionDispatch(action, ...args);
     }
 }
 
 class Component {
+	$params;
 	render(){
 		return null;
 	};
 }
-
+class JetzUtil {
+	install(context){}
+	uninstall(context){}
+}
 class JetzElement {
 	// element rendered
 	o;
@@ -201,7 +204,6 @@ class JetzElement {
 					this.#bindInputValue(attrValue);
 				} else if (attr === "style") {
 					this.#addStyle(attrValue);
-					console.log(this.attributes, this.o)
 					continue;
 				}else if(attr === 'if' || attr === 'else' || attr === 'elseif'){
 					this.#assignConditionalAttr(attr, attrValue);
@@ -346,7 +348,6 @@ class JetzElement {
 			set: (function(target, symbol, value) {
 				this.o.style[symbol] = value;
 				target[symbol] = value;
-				// console.log(this.o.style, symbol, value)
 				return true;
 			}).bind(this),
 		});
@@ -396,8 +397,6 @@ class JetzElement {
 		}else{
 			// is state
 			if(attrValue instanceof State){
-				// let newAttr = document.createAttribute(attrName);
-				// newAttr.value = attrValue.value;
 				let newAttr = this.o.getAttributeNode(attrName);
 				if(newAttr == null){
 					newAttr = document.createAttribute(attrName);
@@ -502,22 +501,19 @@ class Jetz {
 	static onFirstRenderPage(){
 		Jetz.#onRenderedCollections.forEach(callback => callback());
 	}
-	// static #startListener = [];
 	static mount(jetzElement, target, event = { onStart(){}, onLoad(){} }) {
 		let components = flatMap([jetzElement])
-		console.log(components)
-		// debugger;
 		this.onStart(event.onStart);
 		if(Array.isArray(components)){
 			components.forEach(element => {
-				let _el = element.render();
+				if(typeof element === 'function'){
+					element = element();
+				}
+				
+				element.render();
 				target.append(element.getElement());
 			});
 		}
-		// jetzElement.render();
-		// let element = jetzElement.getElement();
-		// target.append(element);
-		
 		Jetz.onFirstRenderPage();
 		Jetz.triggerByState();
 		
@@ -541,16 +537,17 @@ class Jetz {
 		}
 	}
 	static triggerByState(){
-		// console.log('By State', this.remountByAttr);
 		this.remountByAttr.forEach(element => {
 			element.collectionConditionalChild.forEach(rm => rm.trigger())
-			// console.log('By State', element)
 		});
 	}
 	static isAllowToRemount(findElement){
 		return Jetz.remountByAttr.filter(element => {
 			return element == findElement;
 		}).length == 0
+	}
+	static use(app){
+		app.install(Jetz);
 	}
 }
 class StyleState {
@@ -565,7 +562,6 @@ class StyleState {
 }
 class State{
 	#value;
-	// value;
 	container = [];
 	#handler;
 	constructor(value, handler = { get(obj){}, set(obj){} }){
@@ -796,7 +792,6 @@ function stateOf(value, handler = { get(value){ return value } }){
 				value[prop] = stateOf(propValue);
 			}
 		}
-		// return value;
 		instance = value;
 	}else{
 		const optDefaultProxy = {
@@ -874,7 +869,6 @@ class AttrSpecial{
 	afterNode; // 1
 	parentNode; // 2
 
-	copyNode;
 	positionElement;
 
 	_else;
@@ -901,7 +895,6 @@ class AttrSpecial{
 			}
 			this.isDefined = true;
 		}
-		this.copyNode = this.element.o.cloneNode(true);
 	}
 	addElseIf(elseIf){
 		this._elseIf.push(elseIf);
@@ -909,21 +902,11 @@ class AttrSpecial{
 
 	hide(){
 		this.initContainer();
-		// if(this._else){
-		// 	this._else.setParentIf(this);
-		// 	this._else.initContainer();
-		// }
 		this.element.remove();
 	}
 	show(){
 		this.initContainer();
 		if(this.positionElement == 0){
-			// this.element.remove();
-			// this.element.o = this.copyNode;
-			// this.beforeNode.after(this.copyNode);
-			// this.element.render();
-			// console.log(this.element)
-			
 			this.beforeNode.after(this.element.o);
 		}
 	}
@@ -956,7 +939,6 @@ class If extends AttrSpecial{
 				__elseIf.hide();
 			}
 		});
-		// console.log('condition', condition)
 		if(!condition)
 			this.hide();
 		if(this._else){
@@ -970,7 +952,6 @@ class If extends AttrSpecial{
 			if(elseCondition){
 				this._else.show();
 			}
-			// console.log(this._else, condition, elseIfCondition, elseCondition)
 		}
 	}
 }
@@ -981,14 +962,12 @@ class ElseIf extends AttrSpecial{
 		super(element, value);
 	}
 	setParentIf(parentIf){
-		// this.parentIfCondition = parentIf;
 		this.beforeNode = parentIf.beforeNode;
 		this.afterNode = parentIf.afterNode;
 		this.parentNode = parentIf.parentNode;
 		this.positionElement = parentIf.positionElement;
 	}
 	initContainer(){
-		this.copyNode = this.element.o.cloneNode(true);
 	}
 	trigger(){
 		return this.triggerResult = this.value();
@@ -998,13 +977,11 @@ class ElseIf extends AttrSpecial{
 class Else {
 	element;
 	currentIf;
-	copyNode;
 	
 	parentIfCondition;
 	positionElement;
 	
 	initContainer(){
-		// console.log('Else Init')
 		if(this.parentIfCondition.positionElement == 0){
 			this.beforeNode = this.parentIfCondition.beforeNode;
 		}else if(this.parentIfCondition.positionElement == 1){
@@ -1013,7 +990,6 @@ class Else {
 			this.parentNode = this.parentIfCondition.parentNode;
 		}
 		this.positionElement = this.parentIfCondition.positionElement;
-		this.copyNode = this.element.o.cloneNode(true);
 	}
 	setParentIf(parentIf){
 		this.parentIfCondition = parentIf;
@@ -1031,7 +1007,6 @@ class Else {
 	}
 	show(){
 		if(this.positionElement == 0){
-			// this.element.o = this.copyNode;
 			this.element.render(this.currentIf.element.parent);
 			this.beforeNode.after(this.element.getElement());
 		}else if(this.positionElement == 1){
@@ -1045,4 +1020,4 @@ const _else = { else:null };
 const _if = boolCallback => ({ if:boolCallback })
 const html = content => new Raw(content);
 
-export { JetzElement, Jetz, Dispacher, Component, createElement, stateOf, _else, _if, html };
+export { JetzElement, Jetz, Dispatcher, Component, createElement, stateOf, _else, _if, html };
