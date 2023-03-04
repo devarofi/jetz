@@ -129,6 +129,51 @@ let myApp = main(
 )
 ```
 
+## Router
+Create jetz element
+```javascript
+```
+
+Register route into Jetz
+```javascript
+import { Jetz } from "./src/lib/jetz";
+import { Router, route } from "./src/lib/jetz-router";
+import { MovieApp } from './src/components/movie-app/movie-app';
+import { MovieHome } from "./src/components/movie-app/movie-home";
+import { MovieSeries } from "./src/components/movie-app/movie-series";
+
+let router = new Router(
+    route('/', MovieHome),
+    route('series', MovieSeries)
+);
+// register router in Jetz
+Jetz.use(router);
+// mount compose element into document.body
+Jetz.mount(MovieApp, document.body);
+```
+Place routeBrowser and link in element
+```javascript
+function menuBar(){
+  return ul( css`menu-list`,
+    link('/',
+      li( css`menu-item`, 'Home')
+    ),
+    link('series',
+      li( css`menu-item`, 'Series')
+    ),
+  )
+}
+
+let MovieApp = function(){
+  return main(
+    menuBar,
+    Jetz.$route.browser()
+  )
+}
+export default MovieApp;
+```
+
+
 It's just a little sample, i'm not yet ready for release. But, you can support me 😁
 
 If this repository get 100 stars i'll focus to develop this library more intens. ☕
