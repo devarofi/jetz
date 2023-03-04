@@ -130,10 +130,6 @@ let myApp = main(
 ```
 
 ## Router
-Create jetz element
-```javascript
-```
-
 Register route into Jetz
 ```javascript
 import { Jetz } from "./src/lib/jetz";
