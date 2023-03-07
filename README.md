@@ -1,5 +1,5 @@
 # Jetz 🚀
-Jetz is a library for writing front end with declarative javascript DOM.
+Jetz is a front-end framework javascript for build a front end with declarative javascript DOM.
 
 ## Demo
 Write this command in terminal :
