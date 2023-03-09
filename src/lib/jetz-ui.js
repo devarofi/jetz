@@ -1,4 +1,4 @@
-import { createElement } from './jetz.js'
+import { createElement } from './jetz'
 export function find(selector){
     return document.querySelector(selector);
 }
@@ -32,6 +32,9 @@ export function id(text){
 }
 export function type(text){
     return { type: text }
+}
+export function style(styles){
+    return { style: styles }
 }
 export const wrap = {
     wrap: 'hard'

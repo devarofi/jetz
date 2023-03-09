@@ -69,6 +69,13 @@ export function addScript(src, options = {}){
         document.body.append(script);
     });
 }
+export class JetzArgument {
+	element;
+	setElement(element){
+		this.element = element;
+	}
+}
+
 function createElement(tag, ...args) {
 	args = flatMap(args);
 	let attr = {};
@@ -90,6 +97,9 @@ function createElement(tag, ...args) {
 					return true;
 				} else if(arg instanceof Raw){
 					return true;
+				} else if(arg.constructor.prototype instanceof JetzArgument){
+					attr = mergeObject(attr, { arg });
+					return false;
 				} else {
 					// skipped
 					attr = mergeObject(arg, attr);
@@ -119,13 +129,12 @@ class Dispatcher{
 
 class Component {
 	$params;
+	static new(...arg){
+		return new this(...arg);
+	}
 	render(){
 		return null;
 	};
-}
-class JetzUtil {
-	install(context){}
-	uninstall(context){}
 }
 class JetzElement {
 	// element rendered
@@ -207,7 +216,7 @@ class JetzElement {
 					continue;
 				}else if(attr === 'if' || attr === 'else' || attr === 'elseif'){
 					this.#assignConditionalAttr(attr, attrValue);
-				}else{
+				} else{
 					this.addAttr(attr, attrValue);
 				}
 			} 
@@ -240,7 +249,8 @@ class JetzElement {
 	#bindInputValue(stateTarget){
 		this.#addListener('input', e => {
 			stateTarget.value = e.target.value
-		})
+		});
+		this.addAttr('value', stateTarget);
 	}
 	#addStyle(styles) {
 		for (const key in styles) {
@@ -408,6 +418,11 @@ class JetzElement {
 					newAttr.nodeValue = attrValue;
 				}
 				attrValue.addContainer(newAttr);
+			}else if(typeof attrValue === 'object'){
+				if(attrValue.constructor.prototype instanceof JetzArgument){
+					attrValue.setElement(this);
+					attrValue.onAssigned();
+				}
 			}else{
 				this.o.setAttribute(attrName, attrValue);
 			}
@@ -722,6 +737,8 @@ export class ListState extends Array {
 			return view;
 		});
 		this.splice(index, 1);
+		// trigger state
+		Jetz.triggerByState();
 	}
 	get(index){
 		return this.values[index];
@@ -1016,8 +1033,10 @@ class Else {
 		}
 	}
 }
-const _else = { else:null };
 const _if = boolCallback => ({ if:boolCallback })
+const _elseif = boolCallback => ({ elseif:boolCallback })
+const _else = { else:null };
 const html = content => new Raw(content);
+const _show = _if;
 
-export { JetzElement, Jetz, Dispatcher, Component, createElement, stateOf, _else, _if, html };
+export { JetzElement, Jetz, Dispatcher, Component, createElement, stateOf, _show, _else, _elseif, _if, html };

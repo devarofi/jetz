@@ -1,4 +1,4 @@
-import { Component, Jetz, JetzElement, stateOf } from "./jetz";
+import { Component, Jetz, JetzArgument, JetzElement, stateOf } from "./jetz";
 
 export class Router {
     #varname = '$route';
@@ -18,7 +18,7 @@ export class Router {
         });
     }
     #fixRoutename(route){
-        if(route[0] === '/')
+        if(route[0] === '/' && route.length > 1)
             route = route.substring(1);
         if(route == '') 
             return '/';
@@ -108,4 +108,32 @@ export function link(routename, element, params = null){
         e.preventDefault();
         Jetz.$route.to(routename, params)
     })
+}
+
+class Link extends JetzArgument {
+    routename;
+    params = null;
+    constructor(routename, params = null){
+        super();
+        this.routename = routename;
+        this.params = params;
+    }
+    onAssigned(){
+        console.log('new type added ', this.element)
+        this.element.on('click', e => {
+            e.preventDefault();
+            Jetz.$route.to(this.routename, this.params);
+        });
+    }
+}
+
+export function asLink(routeName, params = null){
+    return new Link(routeName, params);
+}
+
+export let asBackLink = {
+    onclick(e){
+        e.preventDefault();
+        Jetz.$route.back();
+    }
 }
