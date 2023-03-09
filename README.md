@@ -1,4 +1,11 @@
-# Jetz 🚀
+<div style="text-align:center">
+<img src="./public/img/logo/small.png" width="150"/>
+<h2>Jetz</h2>
+<span>Composable Javascript Framework</span>
+</div>
+<br>
+
+# Jetz
 Jetz is a front-end framework javascript for build a front end with declarative javascript DOM.
 
 ## Demo
@@ -15,6 +22,9 @@ Jetz is inspired by Jetpack Compose. Is using for creating rich UI with simple, 
 ## Built-in
 ```
 - element function
+- element function
+- composable variable
+- conditional element
 - state management
 - routing
 ```
@@ -344,6 +354,73 @@ let myComponent = div(
   })
 );
 ```
+
+## Conditional Element
+For conditional element Jetz using function capture that return boolean to recheck condition, because that element will recheck for condition when condition was changed.
+use `_if(() => condition)` example :
+```javascript
+div( _if(() => 1 > 3),
+  'content'
+) // it will hidden, because value is false
+```
+use `_elseif(() => condition)` example :
+```javascript
+let counter = stateOf(0);
+let myComponent = div(
+  div( if(() => counter.value == 1),
+    'One'
+  ),
+  div( _elseif(() => counter.value == 2),
+    'Two'
+  ),
+  button( 'count',{
+    onclick(){
+      counter.value++;
+    }
+  })
+)
+```
+use `_else` property example :
+```javascript
+let isShow = stateOf(true);
+
+let myComponent = div(
+  div( if(() => isShow.value),
+    'Im true'
+  ),
+  div( _else,
+    'Im false'
+  ),
+  button('Change value', {
+    onclick(){
+      isShow.value = false;
+    }
+  })
+)
+```
+```javascript
+let counter = stateOf(0);
+let myComponent = div(
+  div('Number is : ', 
+    div( _if(() => counter.value == 0),
+      'Zero'
+    ),
+    div( _elseif(() => counter.value == 1),
+      'One'
+    ),
+    div( _elseif(() => counter.value == 2),
+      'Two'
+    ),
+    div( _else,
+      'More (', counter,')'
+    ),
+  ),
+  button('Count', {
+    onclick(){ counter.value++ }
+  })
+);
+```
+
 ## Dispatcher
 ``` javascript
 let pageContent = stateOf(div())
