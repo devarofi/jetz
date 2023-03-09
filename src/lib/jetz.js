@@ -302,14 +302,6 @@ class JetzElement {
 			}else if(child instanceof ListState){
 				child.assignParent(this);
 				return this;
-			}else if(child instanceof Component){
-				const childComponent = child.render();
-				if(Array.isArray(childComponent)){
-					this.#appendChildren(childComponent);
-					return this;
-				}else{
-					_child = childComponent;
-				}
 			}else if(
 				child instanceof UniqueString ||
 				child instanceof UniqueNumber
@@ -319,13 +311,31 @@ class JetzElement {
 				_child = child;
 			}
 		}else if(typeof child === 'function'){
+		
 			let childFunction = child.call();
 			this.append(childFunction);
 			return this;
 		} else {
 			_child = child;
 		}
-
+		if(child instanceof Component){
+			const childComponent = child.render();
+			if(Array.isArray(childComponent)){
+				this.#appendChildren(childComponent);
+				return this;
+			}
+			this.append(childComponent);
+			return this;
+		}else if(child.prototype instanceof Component){
+			child = new child();
+			const childComponent = child.render();
+			if(Array.isArray(childComponent)){
+				this.#appendChildren(childComponent);
+				return this;
+			}
+			this.append(childComponent);
+			return this;
+		}
 		if (typeof this.o === "undefined") {
 			this.children.push(_child);
 		} else {
