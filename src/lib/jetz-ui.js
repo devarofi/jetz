@@ -33,6 +33,9 @@ export function id(text){
 export function type(text){
     return { type: text.toString() }
 }
+export function style(styles){
+    return { style: styles }
+}
 export const wrap = {
     wrap: 'hard'
 };
