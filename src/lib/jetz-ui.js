@@ -1,4 +1,4 @@
-import { createElement } from './jetz'
+import { createElement } from './jetz.js'
 export function find(selector){
     return document.querySelector(selector);
 }
@@ -7,42 +7,58 @@ export function findAll(selector){
 }
 // Attributes
 export function src(source){
-    return { src: source };
+    return { src: source.toString() };
 }
 export function placeholder(text){
-    return { placeholder: text };
+    return { placeholder: text.toString() };
 }
 export function name(text){
-    return { name: text };
+    return { name: text.toString() };
 }
 export function width(number){
-    return { width: number };
+    return { width: number.toString() };
 }
 export function height(number){
-    return { height: number };
+    return { height: number.toString() };
 }
 export function alt(text){
-    return { alt: text };
+    return { alt: text.toString() };
 }
 export function href(text){
-    return { href: text }
+    return { href: text.toString() }
 }
 export function id(text){
-    return { id: text }
+    return { id: text.toString() }
 }
 export function type(text){
-    return { type: text }
-}
-export function style(styles){
-    return { style: styles }
+    return { type: text.toString() }
 }
 export const wrap = {
     wrap: 'hard'
 };
-export function css(value){
-    return { class: value };
+export function text(...content){
+    let originalText = content[0].raw;
+    let raw = content;
+    let length = originalText.length + raw.length -1;
+
+    let originalTextIndex = 0;
+    let rawIndex = 1;
+    let contentMerging = [];
+    for (let i = 0; i < length; i++) {
+        if(i % 2 === 0){
+            contentMerging.push(originalText[originalTextIndex]);
+            originalTextIndex++;
+        }else{
+            contentMerging.push(raw[rawIndex]);
+            rawIndex++;
+        }
+    } 
+    return contentMerging;
 }
-export const value = val => ({ value: val });
+export function css(value){
+    return { class: value.toString() };
+}
+export const value = val => ({ value: val.toString() });
 // INPUT
 export function inputText(...args) {
     return createElement('input', { type:'text' }, ...args);
