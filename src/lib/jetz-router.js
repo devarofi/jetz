@@ -6,7 +6,11 @@ export class Router {
     #routes;
 
     constructor(...route) {
-        this.#routes = route;
+        if(Array.isArray(route)){
+            this.#routes = route.flat(1);
+        }else{
+            this.#routes = route;
+        }
     }
     #initialNavigateListener(){
         navigation.addEventListener("navigate", (event) => {
