@@ -234,7 +234,7 @@ let RootPage = main( css`container`,
 ```
 
 ## Event Listener
-To create an event listener in element, you can write directly in element or using find to search element by selector.
+Create an event listener in element.
 ### Example Listener 
 ```javascript
 let myCounter = function(){
@@ -278,6 +278,23 @@ export class MyCounter {
   }
 }
 ```
+### Build-in Function
+`find(selector)` (`return HTMLElement`) is used for find one element by selector<br />
+`find(selector)` (`return Array<HTMLElement>`) is used for find one element by selector<br />
+example :
+```javascript
+let MainApp = main(
+  button('Click ME', {
+    onclick(){
+      find('#my-label').innerText = 'Clicked';
+      // OR use $ to call instance of JetzElement
+      // find('#my-label').$.text('Clicked');
+    }
+  }),
+  label(id`my-label`, 'You are not yet clicked')
+)
+```
+
 ## State Management
 Jetz was have a state built-in, which is `stateOf` and `listOf` and `sequenceOf`
 ### stateOf
@@ -356,7 +373,7 @@ let myComponent = div(
 ```
 
 ## Conditional Element
-For conditional element Jetz using function capture that return boolean to recheck condition, because that element will recheck for condition when condition was changed.
+For conditional element Jetz using function with callback parameter that return boolean to recheck condition, because that element will revalidated when the value was changed.
 use `_if(() => condition)` example :
 ```javascript
 div( _if(() => 1 > 3),
@@ -398,6 +415,7 @@ let myComponent = div(
   })
 )
 ```
+Or with `_if`, `_elseif`, and `_else`
 ```javascript
 let counter = stateOf(0);
 let myComponent = div(
@@ -485,9 +503,6 @@ let MovieApp = function(){
 }
 export default MovieApp;
 ```
-
-
-It's just a little sample, i'm not yet ready for release. But, you can support me 😁
 
 If this repository get 100 stars i'll focus to develop this library more intens. ☕
 
