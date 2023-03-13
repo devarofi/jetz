@@ -279,8 +279,10 @@ export class MyCounter {
 }
 ```
 ### Build-in Function
-`find(selector)` (`return HTMLElement`) is used for find one element by selector<br />
-`find(selector)` (`return Array<HTMLElement>`) is used for find one element by selector<br />
+```typescript 
+find(selector) // is used for get one element by selector and returned HTMLElement
+findAll(selector):Array<HTMLElement> //  is used for get some element by selector
+``` 
 example :
 ```javascript
 let MainApp = main(
