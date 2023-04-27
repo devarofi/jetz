@@ -36,6 +36,32 @@ export function type(text){
 export function style(styles){
     return { style: styles }
 }
+export function role(role){
+    return { role: role.toString() }
+}
+export function tabindex(tabindex){
+    return { tabindex: tabindex.toString() }
+}
+export function data_(objData){
+    let obj = {};
+    for (const key in objData) {
+        if (Object.hasOwnProperty.call(objData, key)) {
+            const value = objData[key];
+            obj['data-' + key] = value;
+        }
+    }
+    return obj;
+}
+export function aria_(objAria){
+    let obj = {};
+    for (const key in objAria) {
+        if (Object.hasOwnProperty.call(objAria, key)) {
+            const value = objAria[key];
+            obj['aria-' + key] = value;
+        }
+    }
+    return obj;
+}
 export const wrap = {
     wrap: 'hard'
 };

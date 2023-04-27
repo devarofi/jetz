@@ -1,4 +1,5 @@
 import { Component, Jetz, JetzArgument, JetzElement, stateOf } from "./jetz";
+import { Middleware } from "./middleware";
 
 export class Router {
     #varname = '$route';
@@ -65,10 +66,33 @@ export class Router {
             const route = this.#routes[i];
             
             if(route.path === routename){
-                this.#saveParams(routename, params);
-                return toElement(route.component, params)
+                let _next = true;
+                if(route.middlewares.length != 0){
+                    _next = this.verifyMiddlewares(route.middlewares, params);
+                }
+                if(_next === true){
+                    this.#saveParams(routename, params);
+                    return toElement(route.component, params)
+                }else{
+                    return _next;
+                }
             }
         }
+    }
+    verifyMiddlewares(middlewares, params){
+        let _next = false;
+        middlewares.forEach(middleware => {
+            if(middleware.prototype instanceof Middleware){
+                let _m = new middleware();
+                _next = _m.next(params, function(){
+                    return true;
+                });
+                if(_next !== true){
+                    return _m.error;
+                }
+            }
+        });
+        return _next;
     }
     #navigate(routename, params){
         routename = this.#fixRoutename(routename);
@@ -78,9 +102,9 @@ export class Router {
     }
     // REQUIRED
     install(context){
+        context[this.#varname] = this;
         this.#setDefaultPage();
         this.#initialNavigateListener();
-        context[this.#varname] = this;
     }
 }
 function toElement(component, params = null){
@@ -89,8 +113,17 @@ function toElement(component, params = null){
     }else if(component.prototype instanceof Component){
         let _component = new component();
         _component.$params = params;
-        return _component.render();
+        let element = _component.render();
+        // if Component was implement onRender, call onRender
+        if(element != null){
+            if(_component.constructor.prototype.hasOwnProperty('onRendered')){
+                element.onRendered(_component.onRendered.bind(_component));
+            }else{
+            }
+        }
+        return element;
     }else if(component instanceof Component){
+        component.$params = params;
         return component.render();
     }else if(typeof component === 'function'){
         if(params == null)
@@ -103,7 +136,8 @@ function toElement(component, params = null){
 export function route(path, component){
     return {
         path: path,
-        component: component
+        component: component,
+        middlewares: []
     }
 }
 
@@ -123,11 +157,11 @@ class Link extends JetzArgument {
         this.params = params;
     }
     onAssigned(){
-        console.log('new type added ', this.element)
-        this.element.on('click', e => {
-            e.preventDefault();
-            Jetz.$route.to(this.routename, this.params);
-        });
+        if(this.element != null)
+            this.element.on('click', e => {
+                e.preventDefault();
+                Jetz.$route.to(this.routename, this.params);
+            });
     }
 }
 
@@ -140,4 +174,7 @@ export let asBackLink = {
         e.preventDefault();
         Jetz.$route.back();
     }
+}
+export function redirect(url){
+    window.location.href = url;
 }

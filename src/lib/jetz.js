@@ -82,9 +82,10 @@ function createElement(tag, ...args) {
 	if (args.length > 0) {
 		args = args.filter(( arg, position ) => {
 			if (typeof arg === "object") {
+				if(arg == null) return false;
 				if (arg instanceof JetzElement) {
 					return true;
-				}else if(arg instanceof State){
+				}else if(arg instanceof State || arg.prototype instanceof State){
 					return true;
 				}else if(arg instanceof ListState){
 					return true;
@@ -135,6 +136,7 @@ class Component {
 	render(){
 		return null;
 	};
+	onRendered(){}
 }
 class JetzElement {
 	// element rendered
@@ -217,6 +219,9 @@ class JetzElement {
 				}else if(attr === 'if' || attr === 'else' || attr === 'elseif'){
 					this.#assignConditionalAttr(attr, attrValue);
 				} else{
+					if(attr == 'arg'){
+						console.log(this.attributes, attr, 'twive')
+					}
 					this.addAttr(attr, attrValue);
 				}
 			} 
@@ -256,7 +261,7 @@ class JetzElement {
 		for (const key in styles) {
 			if (Object.hasOwnProperty.call(styles, key)) {
 				const value = styles[key];
-				if(typeof(value) === 'object' && value instanceof State){
+				if(typeof(value) === 'object' && (value instanceof State || value.prototype instanceof State)){
 					const styleState = new StyleState(this.o.style, key, value);
 					value.addContainer(styleState);
 					this.o.style[key] = value.value;
@@ -281,7 +286,7 @@ class JetzElement {
 		const prevPosition = childPosition - 1;
 		if(prevPosition >= 0){
 			let childPrev = children[prevPosition];
-			if(childPrev instanceof State)
+			if(childPrev instanceof State || childPrev.prototype instanceof State)
 				element.setPrevious(childPrev.container.last());
 			else
 				element.setPrevious(childPrev);
@@ -297,7 +302,7 @@ class JetzElement {
 			if(child instanceof JetzElement){
 				child.render(this);
 				_child = child.getElement();
-			}else if(child instanceof State){
+			}else if(child instanceof State || child.prototype instanceof State){
 				_child = child.generateMutable();
 			}else if(child instanceof ListState){
 				child.assignParent(this);
@@ -311,9 +316,11 @@ class JetzElement {
 				_child = child;
 			}
 		}else if(typeof child === 'function'){
-		
 			let childFunction = child.call();
-			this.append(childFunction);
+			if(Array.isArray(childFunction))
+				this.append(...childFunction);
+			else
+				this.append(childFunction);
 			return this;
 		} else {
 			_child = child;
@@ -325,6 +332,12 @@ class JetzElement {
 				return this;
 			}
 			this.append(childComponent);
+			// if Component was implement onRender, call onRender
+			if(child.constructor.prototype.hasOwnProperty('onRendered')){
+				childComponent.onRendered(child.onRendered.bind(child));
+			}else{
+				console.log(child, 'not include')
+			}
 			return this;
 		}else if(child.prototype instanceof Component){
 			child = new child();
@@ -334,6 +347,11 @@ class JetzElement {
 				return this;
 			}
 			this.append(childComponent);
+			if(child.constructor.prototype.hasOwnProperty('onRendered')){
+				childComponent.onRendered(child.onRendered.bind(child));
+			}else{
+				console.log(child, 'not include')
+			}
 			return this;
 		}
 		if (typeof this.o === "undefined") {
@@ -415,17 +433,21 @@ class JetzElement {
 		if(attrName === 'class'){
 			this.addClass(attrValue);
 		}else{
+			if(attrName === 'value' && attrValue == null){
+				this.o.value = attrValue;
+				return this;
+			}
 			// is state
-			if(attrValue instanceof State){
+			if(attrValue !== null && (attrValue instanceof State || attrValue.prototype instanceof State)){
 				let newAttr = this.o.getAttributeNode(attrName);
 				if(newAttr == null){
 					newAttr = document.createAttribute(attrName);
 					this.o.setAttributeNode(newAttr);
 				}
 				if(attrName === 'value'){
-					this.o.value = attrValue;
+					this.o.value = attrValue.getValue();
 				}else{
-					newAttr.nodeValue = attrValue;
+					newAttr.nodeValue = attrValue.getValue();
 				}
 				attrValue.addContainer(newAttr);
 			}else if(typeof attrValue === 'object'){
@@ -531,12 +553,14 @@ class Jetz {
 		this.onStart(event.onStart);
 		if(Array.isArray(components)){
 			components.forEach(element => {
-				if(typeof element === 'function'){
-					element = element();
+				if(element != null){
+					if(typeof element === 'function'){
+						element = element();
+					}
+					
+					element.render();
+					target.append(element.getElement());
 				}
-				
-				element.render();
-				target.append(element.getElement());
 			});
 		}
 		Jetz.onFirstRenderPage();
@@ -586,10 +610,11 @@ class StyleState {
 	}
 }
 class State{
+
 	#value;
 	container = [];
 	#handler;
-	constructor(value, handler = { get(obj){}, set(obj){} }){
+	constructor(value, handler = { get(obj, prop){ return obj[prop] }, set(obj){} }){
 		this.#value = value;
 		this.#handler = handler;
 	}
@@ -648,7 +673,8 @@ class State{
 		return this.#value;
 	}
 	get value(){
-		return this.#value;
+		this.#handler.get(this);
+		return this.getValue();
 	}
 	set value(val){
 		this.#handler.set(this, val);
@@ -660,10 +686,75 @@ class State{
 			return this.values.join(',');
 	}
 	valueOf(){
+		console.log('ooo')
 		return this.#value;
 	}
 }
 
+class _RememberStateTemp {
+	static keyRememberState = 'app-remember-state';
+	static rememberCollections = {};
+	static assignCollectionValue(id, childKey, childValue){
+		let dataCollection = {};
+		const oldCollection = sessionStorage.getItem(this.keyRememberState);
+		if(oldCollection != null){
+			dataCollection = JSON.parse(oldCollection);
+			this.rememberCollections = dataCollection
+		}
+		if(this.rememberCollections.hasOwnProperty(id) == false){
+			this.rememberCollections[id] = dataCollection;
+		}
+		this.rememberCollections[id][childKey] = childValue;
+		// save collection
+		sessionStorage.setItem(this.keyRememberState, JSON.stringify(this.rememberCollections));
+	}
+	static getCollectionValue(id, key, def = null){
+		const collections = this.rememberCollections[id];
+		if(collections == null) return def;
+		const value = collections[key];
+		if(value == null) return def;
+		return value;
+	}
+	static async init(){
+		const _rememberCollections = sessionStorage.getItem(this.keyRememberState);
+		if(_rememberCollections == null){
+			this.rememberCollections = {};
+		}else{
+			this.rememberCollections = JSON.parse(_rememberCollections);
+		}
+	}
+}
+new Promise(res => {
+	return _RememberStateTemp.init();
+})
+
+class RememberState extends State {
+	id;
+	static #idTemp = 0;
+	static generateId(_state){
+		RememberState.#idTemp++;
+		_state.id = _state.pathId+RememberState.#idTemp;
+	}
+	valueOf(){
+		return this.getValue();
+	}
+	pathId = location.pathname.replace('/', '-');
+	constructor(value, handler = { get(obj){}, set(obj){} }) {
+		super(value, handler);
+		RememberState.generateId(this);
+		// TODO Get data from session
+		// Or split into other data
+
+		let oldValue = _RememberStateTemp.getCollectionValue(this.pathId, this.id);
+		if(oldValue != null){
+			this.setState(oldValue);
+		}
+	}
+	setState(newValue){
+		super.setState(newValue);
+		_RememberStateTemp.assignCollectionValue(this.pathId, this.id, newValue);
+	}
+}
 
 export class ListState extends Array {
 	parentElement = [];
@@ -707,7 +798,7 @@ export class ListState extends Array {
 		super.push(item);
 		this.values.push(item);
 		this.parentElement.map((parent, i) => {
-			this.newView(i, this.views[i], item);
+			this.newView(i, this.views[i], item, this.values.length - 1);
 			return parent;
 		})
 	}
@@ -724,14 +815,14 @@ export class ListState extends Array {
 			})
 		}
 		this.views.map((view, i) => {
-			this.values.forEach(_item => {
-				this.newView(i, view, _item)
+			this.values.forEach((_item, j) => {
+				this.newView(i, view, _item, j)
 			})
 			return view;
 		});
 	}
-	newView(index, view, content){
-		var renderedItem = this.createItemView(this.parentElement[index], content, this.length-1);
+	newView(index, view, content, _index){
+		var renderedItem = this.createItemView(this.parentElement[index], content, _index);
 		view.push(renderedItem);
 		this.parentElement[index].append(renderedItem);
 	}
@@ -785,6 +876,9 @@ export class ListState extends Array {
 	take(to){
 		return this.values.take(to)
 	}
+	find(searchCallback = value => true){
+		return this.values.filter(searchCallback);
+	}
 	*[Symbol.iterator](){
 		yield* this.values;
 	}
@@ -810,6 +904,39 @@ export function loop(collections, render = (item, index = 0) => { return item; }
 	}
 	return collections;
 }
+function rememberOf(value) {
+	let instance = null;
+	if(typeof value === 'object' && !(value instanceof JetzElement)){
+		for (const prop in value) {
+			if (Object.hasOwnProperty.call(value, prop)) {
+				const propValue = value[prop];
+				value[prop] = rememberOf(propValue);
+			}
+		}
+		instance = value;
+	}else{
+		const optDefaultProxy = {
+			get(obj, prop){
+				return obj.getValue();
+			},
+			set(obj, value){
+				obj.setState(value);
+				return true;
+			}
+		};
+		let objState = new RememberState(value, optDefaultProxy);
+		// custom function string
+		instance = objState;
+	}
+	return instance;
+}
+let PageSession = {
+	setItem(key, value){
+	},
+	getItem(key){
+
+	}
+}
 function stateOf(value, handler = { get(value){ return value } }){
 	let instance = null;
 	if(typeof value === 'object' && !(value instanceof JetzElement)){
@@ -819,11 +946,22 @@ function stateOf(value, handler = { get(value){ return value } }){
 				value[prop] = stateOf(propValue);
 			}
 		}
+		value.toObject = function(){
+			let _obj = {};
+			for (const key in value) {
+				if (Object.hasOwnProperty.call(value, key)) {
+					const element = value[key];
+					_obj[key] = element.value;
+				}
+			}
+			delete _obj['toObject'];
+			return _obj;
+		}
 		instance = value;
 	}else{
 		const optDefaultProxy = {
-			get(obj, prop){
-				let outValue = handler.get(obj[prop]);
+			get(obj){
+				let outValue = handler.get(obj);
 				return outValue ?? obj[prop];
 			},
 			set(obj, value){
@@ -851,11 +989,17 @@ function mergeObject(obj1, ...obj2){
 					const value2 = newObj[prop];
 					// check datatype
 					if(Array.isArray(value)){
-						newObj[prop] = (Array.isArray(value2)) ? 
-										value.push(...value2) : value.push(value2);
+						if(Array.isArray(value2))
+							value.push(...value2)
+						else
+							value.push(value2);
+						newObj[prop] = value;
 					}else if(Array.isArray(value2)){
-						newObj[prop] = (Array.isArray(value)) ? 
-										value2.push(...value) : value.push(value);
+						if(Array.isArray(value)) 
+							value2.push(...value) 
+						else
+							value2.push(value);
+						newObj[prop] = value2;
 					}else{
 						if(Array.isArray(newObj[prop])){
 							newObj[prop].push(value2);
@@ -1049,4 +1193,4 @@ const _else = { else:null };
 const html = content => new Raw(content);
 const _show = _if;
 
-export { JetzElement, Jetz, Dispatcher, Component, createElement, stateOf, _show, _else, _elseif, _if, html };
+export { JetzElement, Jetz, Dispatcher, Component, createElement, rememberOf, stateOf, _show, _else, _elseif, _if, html };
