@@ -1,14 +1,31 @@
 {
   "name": "jetz",
   "version": "1.0.0",
-  "description": "ui library",
-  "main": "app.js",
+  "description": "A composable javascript framework",
+  "main": "index.js",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": [
+      {
+        "import": "./src/lib/jetz.js",
+        "require": "./src/lib/jetz.js"
+      }
+    ],
+    "./ui": {
+      "import": "./src/lib/jetz-ui.js",
+      "require": "./src/lib/jetz-ui.js"
+    },
+    "./router": {
+      "import": "./src/lib/jetz-router.js",
+      "require": "./src/lib/jetz-router.js"
+    }
+  },
   "private": true,
   "scripts": {
     "start": "npx webpack server",
     "build": "webpack build -- --config webpack.prod.js",
     "watch": "webpack build -- --config webpack.dev.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "karma start test.conf.js"
   },
   "repository": {
     "type": "git",
@@ -22,7 +39,9 @@
   "homepage": "https://github.com/devarofi/jetz#readme",
   "devDependencies": {
     "css-loader": "^6.7.1",
+    "file-loader": "^6.2.0",
     "html-webpack-plugin": "^5.5.0",
+    "puppeteer": "^19.7.4",
     "style-loader": "^3.3.1",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.10.0",

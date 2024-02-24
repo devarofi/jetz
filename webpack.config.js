@@ -4,9 +4,10 @@ const { LibManifestPlugin } = require('webpack');
 const { WebpackManifestPlugin } = require('webpack-manifest-plugin');
 
 module.exports = {
-    entry: './app.js',
+    entry: './index.js',
     mode:'production',
     output: {
+        publicPath:'/public',
         filename: 'bundle.js',
         path: path.resolve(__dirname, 'dist')
     },
@@ -15,7 +16,11 @@ module.exports = {
             {
                 test: /\.css/i,
                 use: ['style-loader', 'css-loader']
-            }
+            },
+            {
+              test: /\.(png|svg|jpg|jpeg|gif)$/i,
+              type: 'asset/resource',
+            },
         ]
     },
     plugins: [
@@ -27,6 +32,7 @@ module.exports = {
         })
     ],
     devServer: {
+        historyApiFallback: true,
         static: {
             directory: path.join(__dirname, 'dist'),
             publicPath: '/',

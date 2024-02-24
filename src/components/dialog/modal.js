@@ -1,11 +1,8 @@
 import { stateOf } from "../../lib/jetz";
 import { button, div, h2, h4, p } from "../../lib/jetz-ui";
 
-let showModal = stateOf('none')
-let stateWidth = stateOf('80%')
-
-let cardModal = div({
-    style: {
+let _css = {
+    container: {
         display: showModal,
         position: 'fixed',
         top: 0,
@@ -15,28 +12,34 @@ let cardModal = div({
         height: '100%',
         overflow: 'auto',
         backgroundColor: 'rgba(0,0,0, 0.4)'
-    }},
-    div({
-        style: {
-            backgroundColor: 'white',
-            width: stateWidth,
-            margin: '15% auto',
-            padding: '20px',
-            display:'block'
-        }},
+    },
+    body: {
+        backgroundColor: 'white',
+        width: stateWidth,
+        margin: '15% auto',
+        padding: '20px',
+        display:'block'
+    }
+}
+
+let showModal = stateOf('none')
+let stateWidth = stateOf('80%')
+
+let cardModal = div({ style: _css.cardContainer },
+    div({ style: _css.modalBody },
         h2('This is modal'),
         button('Close', {
-            onclick: () => {
+            onclick() {
                 showModal.value = 'none';
             }
         }),
         button('Green Background', {
-            onclick: () => {
+            onclick() {
                 cardModal.style.backgroundColor = 'green';
             }
         }),
         button('Change Width', {
-            onclick: () => {
+            onclick() {
                 stateWidth.value = '50%';
             }
         })
@@ -45,7 +48,7 @@ let cardModal = div({
 export let modal = div(
     cardModal,
     button('Show Modal', {
-        onclick: () => {
+        onclick() {
             showModal.value = 'block';
         }
     })

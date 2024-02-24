@@ -175,13 +175,21 @@ class JetzElement {
 	triggerCondition() {
 		this.collectionConditionalChild.forEach(condition => {
 			condition.trigger();
+<<<<<<< HEAD
 		});
 		// this.collectionConditionalChild = [];
+=======
+		})
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 	}
 	setPrevious(previous) {
 		this.previousElement = previous;
 	}
 	render(parent = null, renderPosition = 0) {
+<<<<<<< HEAD
+=======
+		this.collectionConditionalChild = [];
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		this.renderPosition = renderPosition;
 		this.parent = parent; // Parent JetzElement
 		this.#atLifecycles(() => {
@@ -220,6 +228,10 @@ class JetzElement {
 					this.#assignConditionalAttr(attr, attrValue);
 				} else {
 					if (attr == 'arg') {
+<<<<<<< HEAD
+=======
+						console.log(this.attributes, attr, 'twive')
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 					}
 					this.addAttr(attr, attrValue);
 				}
@@ -304,7 +316,10 @@ class JetzElement {
 			} else if (child instanceof State || child.prototype instanceof State) {
 				_child = child.generateMutable();
 			} else if (child instanceof ListState) {
+<<<<<<< HEAD
 				// _child = child;
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 				child.assignParent(this);
 				return this;
 			} else if (
@@ -314,8 +329,11 @@ class JetzElement {
 				_child = child;
 			} else if (child instanceof Raw) {
 				_child = child;
+<<<<<<< HEAD
 			} else if(child instanceof StateListener){
 
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 			}
 		} else if (typeof child === 'function') {
 			let childFunction = child.call();
@@ -341,7 +359,11 @@ class JetzElement {
 				console.log(child, 'not include')
 			}
 			return this;
+<<<<<<< HEAD
 		} else if (typeof child != 'undefined' && child.prototype instanceof Component) {
+=======
+		} else if (child.prototype instanceof Component) {
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 			child = new child();
 			const childComponent = child.render();
 			if (Array.isArray(childComponent)) {
@@ -367,6 +389,11 @@ class JetzElement {
 				} else {
 					this.o.append(_child);
 				}
+<<<<<<< HEAD
+=======
+			} else if (this.renderPosition == 1) {
+				console.log(_child, 'render')
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 			}
 		}
 		if (child instanceof JetzElement) {
@@ -374,9 +401,12 @@ class JetzElement {
 				child.lifecycles.onRendered();
 			}
 		}
+<<<<<<< HEAD
 		if(child instanceof StateListener){
 			// console.log(this);
 		}
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 
 		return this;
 	}
@@ -651,7 +681,11 @@ class State {
 					this.#value.lifecycles.onRendered();
 				return element;
 			} else if (typeof (this.#value) === 'object') {
+<<<<<<< HEAD
 				// console.log('obj')
+=======
+				console.log('obj')
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 			} else {
 				this.#assignContainerValue(container, this.#value);
 			}
@@ -692,27 +726,46 @@ class State {
 			return this.values.join(',');
 	}
 	valueOf() {
+<<<<<<< HEAD
+=======
+		console.log('ooo')
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		return this.#value;
 	}
 }
 
 class _RememberStateTemp {
+<<<<<<< HEAD
 	static storageDriver = localStorage;
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 	static keyRememberState = 'app-remember-state';
 	static rememberCollections = {};
 	static assignCollectionValue(id, childKey, childValue) {
 		let dataCollection = {};
+<<<<<<< HEAD
 		const oldCollection = this.storageDriver.getItem(this.keyRememberState);
+=======
+		const oldCollection = sessionStorage.getItem(this.keyRememberState);
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		if (oldCollection != null) {
 			dataCollection = JSON.parse(oldCollection);
 			this.rememberCollections = dataCollection
 		}
 		if (this.rememberCollections.hasOwnProperty(id) == false) {
+<<<<<<< HEAD
 			this.rememberCollections[id] = {};
 		}
 		this.rememberCollections[id][childKey] = childValue;
 		// save collection
 		this.storageDriver.setItem(this.keyRememberState, JSON.stringify(this.rememberCollections));
+=======
+			this.rememberCollections[id] = dataCollection;
+		}
+		this.rememberCollections[id][childKey] = childValue;
+		// save collection
+		sessionStorage.setItem(this.keyRememberState, JSON.stringify(this.rememberCollections));
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 	}
 	static getCollectionValue(id, key, def = null) {
 		const collections = this.rememberCollections[id];
@@ -722,7 +775,11 @@ class _RememberStateTemp {
 		return value;
 	}
 	static async init() {
+<<<<<<< HEAD
 		const _rememberCollections = this.storageDriver.getItem(this.keyRememberState);
+=======
+		const _rememberCollections = sessionStorage.getItem(this.keyRememberState);
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		if (_rememberCollections == null) {
 			this.rememberCollections = {};
 		} else {
@@ -744,10 +801,20 @@ class RememberState extends State {
 	valueOf() {
 		return this.getValue();
 	}
+<<<<<<< HEAD
 	pathId = location.pathname.replace('/', '__');
 	constructor(value, handler = { get(obj) { }, set(obj) { } }) {
 		super(value, handler);
 		RememberState.generateId(this);
+=======
+	pathId = location.pathname.replace('/', '-');
+	constructor(value, handler = { get(obj) { }, set(obj) { } }) {
+		super(value, handler);
+		RememberState.generateId(this);
+		// TODO Get data from session
+		// Or split into other data
+
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		let oldValue = _RememberStateTemp.getCollectionValue(this.pathId, this.id);
 		if (oldValue != null) {
 			this.setState(oldValue);
@@ -757,12 +824,15 @@ class RememberState extends State {
 		super.setState(newValue);
 		_RememberStateTemp.assignCollectionValue(this.pathId, this.id, newValue);
 	}
+<<<<<<< HEAD
 	toString(){
 		return this.getValue();
 	}
 	// toInteger(){
 	// 	return this.getValue();
 	// }
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 }
 
 export class ListState extends Array {
@@ -770,8 +840,11 @@ export class ListState extends Array {
 	values = [];
 	views = [];
 	uniqueValue = false;
+<<<<<<< HEAD
 	isRemember = false;
 	objRemember;
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 
 	asUnique() {
 		this.uniqueValue = true;
@@ -781,15 +854,19 @@ export class ListState extends Array {
 		return this;
 	}
 
+<<<<<<< HEAD
 	asRemember(){
 	}
 
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 	at(index) {
 		return this.values[index];
 	}
 
 	renderCallback = item => { return item };
 
+<<<<<<< HEAD
 	constructor(isRemember = false, ...values) {
 		if(isRemember){
 			var objRemember = new RememberState(JSON.stringify(values));
@@ -800,12 +877,19 @@ export class ListState extends Array {
 		}else{
 			super(...values);
 		}
+=======
+	constructor(...values) {
+		super(...values);
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		this.values = values;
 		this.length = values.length;
 	}
 	set(newData) {
 		this.values = newData;
+<<<<<<< HEAD
 		this.length = this.values.length;
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		super.values = newData;
 		this.renderView(true);
 	}
@@ -869,6 +953,7 @@ export class ListState extends Array {
 		Jetz.triggerByState();
 	}
 	get(index) {
+<<<<<<< HEAD
 		if (typeof index == 'number') {
 			return this.values[index];
 		} else if (typeof index == 'string') {
@@ -876,6 +961,9 @@ export class ListState extends Array {
 		} else {
 
 		}
+=======
+		return this.values[index];
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 	}
 	map(callback) {
 		this.values = this.values.map(callback);
@@ -893,11 +981,14 @@ export class ListState extends Array {
 			this.views[this.views.length - 1].push(renderedItem);
 		});
 	}
+<<<<<<< HEAD
 	setViews(views) {
 		this.views = views;
 		if (views.length > 0)
 			this.parentElement = views[0].parent;
 	}
+=======
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 	toState() {
 		this.values = this.values.map(value => stateOf(value));
 		return this;
@@ -922,6 +1013,7 @@ export class ListState extends Array {
 	}
 }
 export function listOf(...items) {
+<<<<<<< HEAD
 	return new ListState(false, ...items);
 	// return new Proxy(items, {
 	// 	listState: new ListState(...items),
@@ -953,6 +1045,19 @@ export function loop(collections, render = (item, index = 0) => { return item; }
 	if (collections instanceof ListState){
 		collections.renderCallback = render;
 	}else {
+=======
+	return new ListState(...items);
+}
+
+export function sequenceOf(...items) {
+	let listState = new ListState(...items);
+	return listState.asUnique();
+}
+export function loop(collections, render = (item, index = 0) => { return item; }) {
+	if (collections instanceof ListState)
+		collections.renderCallback = render;
+	else {
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		let rendered = [];
 		for (let index = 0; index < collections.length; index++) {
 			const item = collections[index];
@@ -963,6 +1068,7 @@ export function loop(collections, render = (item, index = 0) => { return item; }
 	}
 	return collections;
 }
+<<<<<<< HEAD
 export function createList(length, callbackItem = (index) => { return index; }) {
 	var dataList = [];
 	for (let index = 0; index < length; index++) {
@@ -973,6 +1079,11 @@ export function createList(length, callbackItem = (index) => { return index; }) 
 function rememberOf(value) {
 	let instance = null;
 	if (typeof value === 'object' && !(value instanceof Array) && !(value instanceof JetzElement)) {
+=======
+function rememberOf(value) {
+	let instance = null;
+	if (typeof value === 'object' && !(value instanceof JetzElement)) {
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		for (const prop in value) {
 			if (Object.hasOwnProperty.call(value, prop)) {
 				const propValue = value[prop];
@@ -980,9 +1091,13 @@ function rememberOf(value) {
 			}
 		}
 		instance = value;
+<<<<<<< HEAD
 	} else if(value instanceof Array){
 		instance = new ListState(true, ...value);
 	}else {
+=======
+	} else {
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 		const optDefaultProxy = {
 			get(obj, prop) {
 				return obj.getValue();
@@ -1223,6 +1338,7 @@ class ElseIf extends AttrSpecial {
 class Else {
 	element;
 	currentIf;
+<<<<<<< HEAD
 
 	parentIfCondition;
 	positionElement;
@@ -1275,6 +1391,46 @@ class StateListener {
 
 function listen(fn){
   return StateListener(fn);
+=======
+
+	parentIfCondition;
+	positionElement;
+
+	initContainer() {
+		if (this.parentIfCondition.positionElement == 0) {
+			this.beforeNode = this.parentIfCondition.beforeNode;
+		} else if (this.parentIfCondition.positionElement == 1) {
+			this.afterNode = this.parentIfCondition.afterNode;
+		} else {
+			this.parentNode = this.parentIfCondition.parentNode;
+		}
+		this.positionElement = this.parentIfCondition.positionElement;
+	}
+	setParentIf(parentIf) {
+		this.parentIfCondition = parentIf;
+	}
+
+	constructor(element, currentIf) {
+		this.element = element;
+		this.currentIf = currentIf;
+	}
+
+	hide() {
+		if (this.positionElement == 0) {
+			this.element.remove();
+		}
+	}
+	show() {
+		if (this.positionElement == 0) {
+			this.element.render(this.currentIf.element.parent);
+			this.beforeNode.after(this.element.getElement());
+		} else if (this.positionElement == 1) {
+			console.log('after');
+		} else {
+			console.log('parent');
+		}
+	}
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 }
 const _if = boolCallback => ({ if: boolCallback })
 const _elseif = boolCallback => ({ elseif: boolCallback })
@@ -1282,4 +1438,8 @@ const _else = { else: null };
 const html = content => new Raw(content);
 const _show = _if;
 
+<<<<<<< HEAD
 export { Jetz, Dispatcher, Component, JetzElement, createElement, rememberOf, stateOf, _show, _else, _elseif, _if, html, listen };
+=======
+export { JetzElement, Jetz, Dispatcher, Component, createElement, rememberOf, stateOf, _show, _else, _elseif, _if, html };
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
