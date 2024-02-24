@@ -1,5 +1,5 @@
 import { stateOf } from "../../lib/jetz";
-import { button, div, h2, h4, p } from "../../lib/ui";
+import { button, div, h2, h4, p } from "../../lib/jetz-ui";
 
 let showModal = stateOf('none')
 let stateWidth = stateOf('80%')

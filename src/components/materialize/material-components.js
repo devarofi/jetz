@@ -1,5 +1,5 @@
 import { css } from "../../lib/helper";
-import { a, button, div, i, inputNumber, inputText, label, li, nav, span, ul } from "../../lib/ui";
+import { a, button, div, i, inputNumber, inputText, label, li, nav, span, ul } from "../../lib/jetz-ui";
 
 export let mContainer = (...args) => div({ class: 'container' }, args);
 export let mRow = (...args) => div({ class: 'row' }, args);

@@ -1,4 +1,4 @@
-import { div, h2 } from "../../lib/ui";
+import { div, h2 } from "../../lib/jetz-ui";
 import { mCol12, mRow } from "../materialize/material-components";
 
 export let aboutComponent = mRow(

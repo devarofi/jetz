@@ -1,5 +1,5 @@
 import { Component, listOf, loop, stateOf } from "../../lib/jetz";
-import { button, div, h2, hr, inputText, li, span, ul } from "../../lib/ui";
+import { button, div, h2, hr, inputText, li, span, ul } from "../../lib/jetz-ui";
 
 class ToDoV2 extends Component {
     constructor(){

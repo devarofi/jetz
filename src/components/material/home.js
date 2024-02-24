@@ -1,5 +1,5 @@
 import { listOf, loop, stateOf, _ } from "../../lib/jetz";
-import { a, div, li, p, span } from "../../lib/ui";
+import { a, div, li, p, span } from "../../lib/jetz-ui";
 import { btnDropdown, dropdown, mBtnLight, mCol12, mRow } from "../materialize/material-components";
 
 

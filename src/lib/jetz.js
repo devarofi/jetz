@@ -1,55 +1,143 @@
-
 const Obj = {
-    isEmpty: function(target){
-        if(target){
-            for (const _ in target) {
-                return false;
-            }
-        }
-        return true;
-    },
-    isNotEmpty: function(target){
-        return !Obj.isEmpty(target);
-    }
+	isEmpty: function (target) {
+		if (target) {
+			for (const _ in target) {
+				return false;
+			}
+		}
+		return true;
+	},
+	isNotEmpty: function (target) {
+		return !Obj.isEmpty(target);
+	}
 }
-/** 
- * @param {Array} arr
- */
-export function flatMap(arr){
-    let newArr = [];
-    arr.forEach(item => {
-        if(Array.isArray(item)){
-            if(item instanceof ListState){
-                newArr.push(item);
-            }else{
-                newArr = [...newArr, ...flatMap(item)];
-            }
-        }else{
-            newArr.push(item);
-        }
-    });
-    return newArr;
+NodeList.prototype.last = function () {
+	return this[this.length - 1];
 }
-export function css(value){
-    return { class: value };
+Array.prototype.last = function () {
+	return this[this.length - 1];
 }
-export function addScript(src, options = {}){
-    document.addEventListener('DOMContentLoaded', e => {
-        e.preventDefault();
-        const script = document.createElement('script');
-        script.setAttribute('src', src);
-        document.body.append(script);
-    });
+Array.prototype.take = function (to) {
+	return this.slice(0, to);
+}
+Number.prototype.range = function (to) {
+	return range(this.valueOf(), to);
+}
+class UniqueString extends String {
+	constructor(val) {
+		super(val)
+	}
+}
+class UniqueNumber extends Number {
+	constructor(val) {
+		super(val)
+	}
+}
+function toNodes(content) {
+	let _ = document.createElement('_');
+	_.innerHTML = content;
+	return _.childNodes;
+}
+export function range(start, to) {
+	let arr = [];
+	while (start <= to) {
+		arr.push(start);
+		start++;
+	}
+	return arr;
+}
+export function flatMap(arr) {
+	let newArr = [];
+	arr.forEach(item => {
+		if (Array.isArray(item)) {
+			if (item instanceof ListState) {
+				newArr.push(item);
+			} else {
+				newArr = [...newArr, ...flatMap(item)];
+			}
+		} else {
+			newArr.push(item);
+		}
+	});
+	return newArr;
+}
+export function addScript(src, options = {}) {
+	document.addEventListener('DOMContentLoaded', e => {
+		e.preventDefault();
+		const script = document.createElement('script');
+		script.setAttribute('src', src);
+		document.body.append(script);
+	});
+}
+export class JetzArgument {
+	element;
+	setElement(element) {
+		this.element = element;
+	}
 }
 
-Object.prototype.toString = function(){
-    if(this.constructor.name === State.name)
-        return this.value;
-	else if(this.constructor.name === ListState.name)
-		return this.values.join(',');
-    return this;
+function createElement(tag, ...args) {
+	args = flatMap(args);
+	let attr = {};
+	if (args.length > 0) {
+		args = args.filter((arg, position) => {
+			if (typeof arg === "object") {
+				if (arg == null) return false;
+				if (arg instanceof JetzElement) {
+					return true;
+				} else if (arg instanceof State || arg.prototype instanceof State) {
+					return true;
+				} else if (arg instanceof ListState) {
+					return true;
+				} else if (arg instanceof Component) {
+					return true;
+				} else if (
+					arg instanceof UniqueString ||
+					arg instanceof UniqueNumber
+				) {
+					return true;
+				} else if (arg instanceof Raw) {
+					return true;
+				} else if (arg.constructor.prototype instanceof JetzArgument) {
+					attr = mergeObject(attr, { arg });
+					return false;
+				} else {
+					// skipped
+					attr = mergeObject(arg, attr);
+					return false;
+				}
+			}
+			return true;
+		});
+		if (typeof args[0] === "object") {
+			if (args[0].constructor.name === 'Object') {
+				attr = args[0];
+				args = args.slice(1);
+			}
+		}
+	}
+	return new JetzElement(tag, attr, ...args);
+}
+class Dispatcher {
+	#actionDispatch;
+	constructor(callback = action => { }) {
+		this.#actionDispatch = callback;
+	}
+	dispatch(action, ...args) {
+		return this.#actionDispatch(action, ...args);
+	}
 }
 
+class Component {
+	$params;
+	static new(...arg) {
+		return new this(...arg);
+	}
+	render() {
+		return null;
+	};
+	onRendered() { }
+}
 class JetzElement {
 	// element rendered
 	o;
@@ -65,7 +153,9 @@ class JetzElement {
 	lifecycles = {
 		onRendered: null,
 		onStart: null
-	}
+	};
+	collectionConditionalChild = [];
+	renderPosition = 0; // 0 parent, 1 after, 2 before
 
 	constructor(tag, attributes, ...children) {
 		this.tagName = tag;
@@ -73,17 +163,26 @@ class JetzElement {
 		this.children = children;
 	}
 
-	#atLifecycles(main){
-		if(this.lifecycles.onStart){
+	#atLifecycles(main) {
+		if (this.lifecycles.onStart) {
 			this.lifecycles.onStart();
 		}
 		main()
-		if(this.lifecycles.onRendered){
+		if (this.lifecycles.onRendered) {
 			Jetz.addRenderedEffect(this.lifecycles.onRendered);
 		}
 	}
-
-	render(parent = null) {
+	triggerCondition() {
+		this.collectionConditionalChild.forEach(condition => {
+			condition.trigger();
+		});
+		// this.collectionConditionalChild = [];
+	}
+	setPrevious(previous) {
+		this.previousElement = previous;
+	}
+	render(parent = null, renderPosition = 0) {
+		this.renderPosition = renderPosition;
 		this.parent = parent; // Parent JetzElement
 		this.#atLifecycles(() => {
 			this.o = document.createElement(this.tagName);
@@ -91,17 +190,17 @@ class JetzElement {
 			this.assignChildren();
 			this.initStyle();
 			this.initListener();
-			this.o.instance = this;
+			this.o.$ = this;
 		})
 	}
-	getElement(){
+	getElement() {
 		return this.o;
 	}
-	onRendered(callback = null){
+	onRendered(callback = null) {
 		this.lifecycles.onRendered = callback;
 		return this;
 	}
-	onStart(callback = () => {}){
+	onStart(callback = () => { }) {
 		this.lifecycles.onStart = callback;
 		return this;
 	}
@@ -109,35 +208,63 @@ class JetzElement {
 		for (const attr in this.attributes) {
 			if (Object.hasOwnProperty.call(this.attributes, attr)) {
 				const attrValue = this.attributes[attr];
-				if (typeof attrValue === "function") {
-					this.o.addEventListener(attr.substring(2), attrValue.bind(this));
-				}else if(attr === 'bind'){
+				if (attr.substring(0, 2) == 'on') {
+					if (typeof attrValue === "function")
+						this.o.addEventListener(attr.substring(2), attrValue.bind(this));
+				} else if (attr === 'bind') {
 					this.#bindInputValue(attrValue);
+				} else if (attr === "style") {
+					this.#addStyle(attrValue);
+					continue;
+				} else if (attr === 'if' || attr === 'else' || attr === 'elseif') {
+					this.#assignConditionalAttr(attr, attrValue);
 				} else {
-					if (attr === "style") {
-						this.#addStyle(attrValue);
-						console.log(this.attributes, this.o)
-						continue;
+					if (attr == 'arg') {
 					}
 					this.addAttr(attr, attrValue);
 				}
 			}
 		}
 	}
-	#bindInputValue(stateTarget){
+	#assignConditionalAttr(attrName, attrValue) {
+		if (attrName === 'if') {
+			let attrSpecial = new If(this, attrValue);
+			// // check is assign or not
+			this.parent.collectionConditionalChild.push(attrSpecial);
+			if (Jetz.isAllowToRemount(this.parent)) {
+				Jetz.remountByAttr.push(this.parent);
+			}
+		} else if (attrName === 'else') {
+			var currentIfElement = this.parent.collectionConditionalChild.last();
+			var newElse = new Else(this, currentIfElement);
+			if (currentIfElement) {
+				currentIfElement._else = newElse;
+			}
+		} else if (attrName === 'elseif') {
+			var currentIfElement = this.parent.collectionConditionalChild.last();
+			if (currentIfElement) {
+				let newElseIf = new ElseIf(this, attrValue);
+				currentIfElement.addElseIf(newElseIf);
+			} else {
+				throw new Error('expect IF declaration before ELSE IF', this.o);
+			}
+		}
+	}
+	#bindInputValue(stateTarget) {
 		this.#addListener('input', e => {
 			stateTarget.value = e.target.value
-		})
+		});
+		this.addAttr('value', stateTarget);
 	}
 	#addStyle(styles) {
 		for (const key in styles) {
 			if (Object.hasOwnProperty.call(styles, key)) {
 				const value = styles[key];
-				if(typeof(value) === 'object' && value instanceof State){
+				if (typeof (value) === 'object' && (value instanceof State || value.prototype instanceof State)) {
 					const styleState = new StyleState(this.o.style, key, value);
 					value.addContainer(styleState);
 					this.o.style[key] = value.value;
-				}else{
+				} else {
 					this.o.style[key] = value;
 				}
 			}
@@ -147,9 +274,22 @@ class JetzElement {
 		this.#appendChildren(this.children);
 	}
 	#appendChildren(children) {
-		children.forEach((child) => {
+		children.forEach((child, i) => {
+			if (child instanceof JetzElement) {
+				this.addPreviousElement(child, children, i);
+			}
 			this.append(child);
 		});
+	}
+	addPreviousElement(element, children, childPosition) {
+		const prevPosition = childPosition - 1;
+		if (prevPosition >= 0) {
+			let childPrev = children[prevPosition];
+			if (childPrev instanceof State || childPrev.prototype instanceof State)
+				element.setPrevious(childPrev.container.last());
+			else
+				element.setPrevious(childPrev);
+		}
 	}
 	append(child, ...children) {
 		if (children.length > 0) {
@@ -158,42 +298,86 @@ class JetzElement {
 		}
 		let _child;
 		if (typeof child === "object") {
-			if(child instanceof JetzElement){
+			if (child instanceof JetzElement) {
 				child.render(this);
 				_child = child.getElement();
-			}else if(child instanceof State){
+			} else if (child instanceof State || child.prototype instanceof State) {
 				_child = child.generateMutable();
-			}else if(child instanceof ListState){
-				// this.#appendChildren(child.views.flat(2));
+			} else if (child instanceof ListState) {
+				// _child = child;
 				child.assignParent(this);
 				return this;
-			}else if(child instanceof Component){
-				const childComponent = child.render();
-				if(Array.isArray(childComponent)){
-					this.#appendChildren(childComponent);
-					return this;
-				}else{
-					_child = childComponent;
-				}
+			} else if (
+				child instanceof UniqueString ||
+				child instanceof UniqueNumber
+			) {
+				_child = child;
+			} else if (child instanceof Raw) {
+				_child = child;
+			} else if(child instanceof StateListener){
+
 			}
-		}else if(typeof child === 'function'){
+		} else if (typeof child === 'function') {
 			let childFunction = child.call();
-			this.append(childFunction);
+			if (Array.isArray(childFunction))
+				this.append(...childFunction);
+			else
+				this.append(childFunction);
 			return this;
 		} else {
 			_child = child;
 		}
-
+		if (child instanceof Component) {
+			const childComponent = child.render();
+			if (Array.isArray(childComponent)) {
+				this.#appendChildren(childComponent);
+				return this;
+			}
+			this.append(childComponent);
+			// if Component was implement onRender, call onRender
+			if (child.constructor.prototype.hasOwnProperty('onRendered')) {
+				childComponent.onRendered(child.onRendered.bind(child));
+			} else {
+				console.log(child, 'not include')
+			}
+			return this;
+		} else if (typeof child != 'undefined' && child.prototype instanceof Component) {
+			child = new child();
+			const childComponent = child.render();
+			if (Array.isArray(childComponent)) {
+				this.#appendChildren(childComponent);
+				return this;
+			}
+			this.append(childComponent);
+			if (child.constructor.prototype.hasOwnProperty('onRendered')) {
+				childComponent.onRendered(child.onRendered.bind(child));
+			} else {
+				console.log(child, 'not include')
+			}
+			return this;
+		}
 		if (typeof this.o === "undefined") {
 			this.children.push(_child);
 		} else {
-			this.o.append(_child);
-		}
-		if(child instanceof JetzElement){
-			if(child.lifecycles.onRendered){
-				child.lifecycles.onRendered()
+			if (this.renderPosition == 0) {
+				if (_child instanceof Raw) {
+					let nodes = toNodes(_child.get());
+					if (nodes.length > 0)
+						this.o.append(...nodes);
+				} else {
+					this.o.append(_child);
+				}
 			}
 		}
+		if (child instanceof JetzElement) {
+			if (child.lifecycles.onRendered) {
+				child.lifecycles.onRendered();
+			}
+		}
+		if(child instanceof StateListener){
+			// console.log(this);
+		}
+
 		return this;
 	}
 	initStyle() {
@@ -202,10 +386,9 @@ class JetzElement {
 			this.#addStyle(this.style);
 		}
 		this.style = new Proxy(this.style, {
-			set: (function(target, symbol, value) {
+			set: (function (target, symbol, value) {
 				this.o.style[symbol] = value;
 				target[symbol] = value;
-				console.log(this.o.style, symbol, value)
 				return true;
 			}).bind(this),
 		});
@@ -215,7 +398,7 @@ class JetzElement {
 			this.#addListener(_listener.eventName, _listener.callback.bind(this));
 		});
 	}
-	hide() { 
+	hide() {
 		if (typeof this.o !== "undefined") {
 			this.o.style.display = "none";
 			if (typeof this.oldStyle.display === "undefined") {
@@ -250,47 +433,54 @@ class JetzElement {
 		return this;
 	}
 	addAttr(attrName, attrValue) {
-		if(attrName === 'class'){
+		if (attrName === 'class') {
 			this.addClass(attrValue);
-		}else{
+		} else {
+			if (attrName === 'value' && attrValue == null) {
+				this.o.value = attrValue;
+				return this;
+			}
 			// is state
-			if(attrValue instanceof State){
-				// let newAttr = document.createAttribute(attrName);
-				// newAttr.value = attrValue.value;
+			if (attrValue !== null && (attrValue instanceof State || attrValue.prototype instanceof State)) {
 				let newAttr = this.o.getAttributeNode(attrName);
-				if(newAttr == null){
+				if (newAttr == null) {
 					newAttr = document.createAttribute(attrName);
 					this.o.setAttributeNode(newAttr);
 				}
-				if(attrName === 'value'){
-					this.o.value = attrValue;
-				}else{
-					newAttr.nodeValue = attrValue;
+				if (attrName === 'value') {
+					this.o.value = attrValue.getValue();
+				} else {
+					newAttr.nodeValue = attrValue.getValue();
 				}
 				attrValue.addContainer(newAttr);
-			}else{
+			} else if (typeof attrValue === 'object') {
+				if (attrValue.constructor.prototype instanceof JetzArgument) {
+					attrValue.setElement(this);
+					attrValue.onAssigned();
+				}
+			} else {
 				this.o.setAttribute(attrName, attrValue);
 			}
 		}
 		return this;
-	} 
+	}
 	addClass(value) {
-		if(typeof(this.o) === 'undefined'){
+		if (typeof (this.o) === 'undefined') {
 			this.attributes['class'] = value;
-		}else{
-			if(Array.isArray(value)){
+		} else {
+			if (Array.isArray(value)) {
 				const values = flatMap(value.map(x => (typeof x === 'string') ? x.split(' ') : x));
 				this.#addClassClassification(values);
-			}else if(typeof value === 'string'){
+			} else if (typeof value === 'string') {
 				this.o.classList.add(...(value.split(' ')));
 			}
 		}
 		return this;
 	}
-	#addClassClassification(cssClass){
+	#addClassClassification(cssClass) {
 		this.o.classList.add(...cssClass);
 	}
-	toggleClass(className){
+	toggleClass(className) {
 		this.o.classList.toggle(className);
 	}
 	removeClass(className) {
@@ -311,7 +501,7 @@ class JetzElement {
 	#addListener(eventName, callback) {
 		this.o.addEventListener(eventName, callback);
 	}
-	on(eventName, callback = (e) => {}) {
+	on(eventName, callback = (e) => { }) {
 		this.listener.push({ eventName, callback });
 		return this;
 	}
@@ -323,7 +513,7 @@ class JetzElement {
 		return value;
 	}
 	value(newValue = null) {
-		if(newValue != null){
+		if (newValue != null) {
 			if (typeof this.o.value === "undefined") {
 				console.error(`The ${this.o} not support for value`);
 				return undefined;
@@ -341,12 +531,6 @@ class JetzElement {
 	}
 	remove() {
 		this.o.remove();
-		this.parent.removeChild(this);
-	}
-	removeChild(_child) {
-		this.children = this.children.filter(
-			(child) => child.position !== _child.position,
-		);
 	}
 	id(idName) {
 		this.attributes.id = idName;
@@ -354,42 +538,40 @@ class JetzElement {
 	}
 	findId(idName) {
 		var element = document.getElementById(idName);
-		return element.instance;
+		return element.$;
 	}
 }
-
-class Reactive {
-	static isReactive = false;
-
-	static clear(){
-		Reactive.isReactive = false;
-	}
-}
-
-function _(text){
-	Reactive.isReactive = true;
-	return text;
-}
-
 class Jetz {
+	// Jetz Element Collection that have If Else Annotation
+	static remountByAttr = [];
 	static #onRenderedCollections = [];
-	static addRenderedEffect(callback){
+	static addRenderedEffect(callback) {
 		Jetz.#onRenderedCollections.push(callback)
 	}
-	static onFirstRenderPage(){
+	static onFirstRenderPage() {
 		Jetz.#onRenderedCollections.forEach(callback => callback());
 	}
-	// static #startListener = [];
-	static mount(jetzElement, target, event = { onStart(){}, onLoad(){} }) {
-		// debugger;
+	static mount(jetzElement, target, event = { onStart() { }, onLoad() { } }) {
+		if (typeof (target) === 'string') {
+			target = document.querySelector(target);
+		}
+		let components = flatMap([jetzElement])
 		this.onStart(event.onStart);
+		if (Array.isArray(components)) {
+			components.forEach(element => {
+				if (element != null) {
+					if (typeof element === 'function') {
+						element = element();
+					}
 
-		jetzElement.render();
-		let element = jetzElement.getElement();
-		target.append(element);
-		
+					element.render();
+					target.append(element.getElement());
+				}
+			});
+		}
 		Jetz.onFirstRenderPage();
-		
+		Jetz.triggerByState();
+
 		this.onLoad(event.onLoad);
 	}
 	static style(cssStyle) {
@@ -397,17 +579,30 @@ class Jetz {
 		_style.textContent = cssStyle;
 		document.head.append(_style);
 	}
-	static onStart(callback){
-		if(callback != null){
+	static onStart(callback) {
+		if (callback != null) {
 			callback.call();
 		}
 	}
-	static onLoad(callback){
-		if(callback != null){
+	static onLoad(callback) {
+		if (callback != null) {
 			document.addEventListener('DOMContentLoaded', () => {
 				callback();
 			});
 		}
+	}
+	static triggerByState() {
+		this.remountByAttr.forEach(element => {
+			element.collectionConditionalChild.forEach(rm => rm.trigger())
+		});
+	}
+	static isAllowToRemount(findElement) {
+		return Jetz.remountByAttr.filter(element => {
+			return element == findElement;
+		}).length == 0
+	}
+	static use(app) {
+		app.install(Jetz);
 	}
 }
 class StyleState {
@@ -420,127 +615,249 @@ class StyleState {
 		this.value = value;
 	}
 }
-class State{
-	value;
+class State {
+
+	#value;
 	container = [];
-	constructor(value){
-		this.value = value;
+	#handler;
+	constructor(value, handler = { get(obj, prop) { return obj[prop] }, set(obj) { } }) {
+		this.#value = value;
+		this.#handler = handler;
 	}
-	addContainer(container){
+	addContainer(container) {
 		this.container.push(container)
 	}
-	generateMutable(){
+	generateMutable() {
 		let element = null;
-		if(this.value instanceof JetzElement){
-			this.value.render();
-			element = this.value.getElement();
-		}else{
-			element = new Text(this.value);
+		if (this.#value instanceof JetzElement) {
+			this.#value.render();
+			element = this.#value.getElement();
+		} else {
+			element = new Text(this.#value);
 		}
 		this.container.push(element);
 		// Will added in element tree
 		return element;
 	}
-	setState(newValue){
-		this.value = newValue;
+	setState(newValue) {
+		this.#value = newValue;
 		this.container = this.container.map(container => {
-			if(this.value instanceof JetzElement){
-				this.value.render();
-				let element = this.value.getElement();
+			if (this.#value instanceof JetzElement) {
+				this.#value.render();
+				let element = this.#value.getElement();
 				container.replaceWith(element);
 				// trigger lifecycle
-				if(this.value.lifecycles.onRendered)
-					this.value.lifecycles.onRendered();
+				if (this.#value.lifecycles.onRendered)
+					this.#value.lifecycles.onRendered();
 				return element;
-			}else if(typeof(this.value) === 'object'){
-				console.log('obj')
-			}else{
-				this.#assignContainerValue(container, this.value);
+			} else if (typeof (this.#value) === 'object') {
+				// console.log('obj')
+			} else {
+				this.#assignContainerValue(container, this.#value);
 			}
 			return container;
 		});
+		Jetz.triggerByState();
 	}
-	#assignContainerValue(container, value){
-		if(container instanceof HTMLElement){
+	#assignContainerValue(container, value) {
+		if (container instanceof HTMLElement) {
 			container.innerHTML = value;
-		}else if(container instanceof Attr){
-			if(container.nodeName === 'value'){
+		} else if (container instanceof Attr) {
+			if (container.nodeName === 'value') {
 				container.ownerElement.value = value;
 				container.nodeValue = value;
-			}else
+			} else
 				container.nodeValue = value;
-		}else if(container instanceof Text){
+		} else if (container instanceof Text) {
 			container.textContent = value;
-		}else if(container instanceof StyleState){
-			console.log('style dec')
+		} else if (container instanceof StyleState) {
 			container.value = value;
 			container.container[container.key] = container.value;
 		}
 	}
-	getValue(){
-		return this.value;
+	getValue() {
+		return this.#value;
+	}
+	get value() {
+		this.#handler.get(this);
+		return this.getValue();
+	}
+	set value(val) {
+		this.#handler.set(this, val);
+	}
+	toString() {
+		if (this.constructor.name === State.name)
+			return this.#value;
+		else if (this.constructor.name === ListState.name)
+			return this.values.join(',');
+	}
+	valueOf() {
+		return this.#value;
 	}
 }
 
+class _RememberStateTemp {
+	static storageDriver = localStorage;
+	static keyRememberState = 'app-remember-state';
+	static rememberCollections = {};
+	static assignCollectionValue(id, childKey, childValue) {
+		let dataCollection = {};
+		const oldCollection = this.storageDriver.getItem(this.keyRememberState);
+		if (oldCollection != null) {
+			dataCollection = JSON.parse(oldCollection);
+			this.rememberCollections = dataCollection
+		}
+		if (this.rememberCollections.hasOwnProperty(id) == false) {
+			this.rememberCollections[id] = {};
+		}
+		this.rememberCollections[id][childKey] = childValue;
+		// save collection
+		this.storageDriver.setItem(this.keyRememberState, JSON.stringify(this.rememberCollections));
+	}
+	static getCollectionValue(id, key, def = null) {
+		const collections = this.rememberCollections[id];
+		if (collections == null) return def;
+		const value = collections[key];
+		if (value == null) return def;
+		return value;
+	}
+	static async init() {
+		const _rememberCollections = this.storageDriver.getItem(this.keyRememberState);
+		if (_rememberCollections == null) {
+			this.rememberCollections = {};
+		} else {
+			this.rememberCollections = JSON.parse(_rememberCollections);
+		}
+	}
+}
+new Promise(res => {
+	return _RememberStateTemp.init();
+})
 
-export class ListState extends Array{
+class RememberState extends State {
+	id;
+	static #idTemp = 0;
+	static generateId(_state) {
+		RememberState.#idTemp++;
+		_state.id = _state.pathId + RememberState.#idTemp;
+	}
+	valueOf() {
+		return this.getValue();
+	}
+	pathId = location.pathname.replace('/', '__');
+	constructor(value, handler = { get(obj) { }, set(obj) { } }) {
+		super(value, handler);
+		RememberState.generateId(this);
+		let oldValue = _RememberStateTemp.getCollectionValue(this.pathId, this.id);
+		if (oldValue != null) {
+			this.setState(oldValue);
+		}
+	}
+	setState(newValue) {
+		super.setState(newValue);
+		_RememberStateTemp.assignCollectionValue(this.pathId, this.id, newValue);
+	}
+	toString(){
+		return this.getValue();
+	}
+	// toInteger(){
+	// 	return this.getValue();
+	// }
+}
+
+export class ListState extends Array {
 	parentElement = [];
 	values = [];
 	views = [];
+	uniqueValue = false;
+	isRemember = false;
+	objRemember;
 
-	at(index){
+	asUnique() {
+		this.uniqueValue = true;
+		this.values = this.values.map(val => {
+			return this.#fixValue(val)
+		});
+		return this;
+	}
+
+	asRemember(){
+	}
+
+	at(index) {
 		return this.values[index];
 	}
 
 	renderCallback = item => { return item };
 
-	constructor(...values){
-		super(...values);
+	constructor(isRemember = false, ...values) {
+		if(isRemember){
+			var objRemember = new RememberState(JSON.stringify(values));
+			values = JSON.parse(objRemember.valueOf());
+			super(...values);
+			this.isRemember = true;
+			this.objRemember = objRemember;
+		}else{
+			super(...values);
+		}
 		this.values = values;
 		this.length = values.length;
 	}
-	createItemView(parent, item, index){
+	set(newData) {
+		this.values = newData;
+		this.length = this.values.length;
+		super.values = newData;
+		this.renderView(true);
+	}
+	createItemView(parent, item, index) {
 		var renderedItem = this.renderCallback(item, index);
 		renderedItem.render(parent);
 		return renderedItem;
 	}
-	push(item){
+	push(item) {
+		if (this.uniqueValue)
+			item = this.#fixValue(item);
+
 		super.push(item);
 		this.values.push(item);
 		this.parentElement.map((parent, i) => {
-			this.newView(i, this.views[i], item);
+			this.newView(i, this.views[i], item, this.values.length - 1);
 			return parent;
-		})
+		});
+		// remember effect
+		if(this.isRemember){
+			this.objRemember.setState(JSON.stringify(this.values));
+		}
 	}
-	renderView(refresh = false){
-		if(refresh){
+	renderView(refresh = false) {
+		if (refresh) {
 			this.views = this.views.map(view => {
 				// if its HTML element
-					view.map(v => {
-						if(v instanceof JetzElement)
-							v.remove();
-						return [];
-					})
+				view.map(v => {
+					if (v instanceof JetzElement)
+						v.remove();
+					return [];
+				})
 				return [];
 			})
 		}
 		this.views.map((view, i) => {
-			this.values.forEach(_item => {
-				this.newView(i, view, _item)
+			this.values.forEach((_item, j) => {
+				this.newView(i, view, _item, j)
 			})
 			return view;
 		});
 	}
-	newView(index, view, content){
-		var renderedItem = this.createItemView(this.parentElement[index], content, this.length-1);
+	newView(index, view, content, _index) {
+		var renderedItem = this.createItemView(this.parentElement[index], content, _index);
 		view.push(renderedItem);
 		this.parentElement[index].append(renderedItem);
 	}
-	remove(item){
+	remove(item) {
 		const index = this.values.indexOf(item);
 		this.removeAt(index);
 	}
-	removeAt(index){
+	removeAt(index) {
 		this.values.splice(index, 1);
 		this.views = this.views.map((view, i) => {
 			view[index].remove();
@@ -548,15 +865,23 @@ export class ListState extends Array{
 			return view;
 		});
 		this.splice(index, 1);
+		// trigger state
+		Jetz.triggerByState();
 	}
-	get(index){
-		return this.values[index];
+	get(index) {
+		if (typeof index == 'number') {
+			return this.values[index];
+		} else if (typeof index == 'string') {
+			if (index == 'length') return this.length;
+		} else {
+
+		}
 	}
-	map(callback){
+	map(callback) {
 		this.values = this.values.map(callback);
 		this.renderView(true);
 	}
-	assignParent(parent){
+	assignParent(parent) {
 		// new stack view
 		this.views.push([]);
 		this.parentElement.push([]);
@@ -568,64 +893,158 @@ export class ListState extends Array{
 			this.views[this.views.length - 1].push(renderedItem);
 		});
 	}
-	toState(){
+	setViews(views) {
+		this.views = views;
+		if (views.length > 0)
+			this.parentElement = views[0].parent;
+	}
+	toState() {
 		this.values = this.values.map(value => stateOf(value));
 		return this;
 	}
-	*[Symbol.iterator](){
+	#fixValue(value) {
+		if (typeof value === 'string') {
+			return new UniqueString(value);
+		} else if (typeof value === 'number') {
+			return new UniqueNumber(value);
+		} else {
+			return value;
+		}
+	}
+	take(to) {
+		return this.values.take(to)
+	}
+	find(searchCallback = value => true) {
+		return this.values.filter(searchCallback);
+	}
+	*[Symbol.iterator]() {
 		yield* this.values;
 	}
 }
-
-export function listOf(...items){
-	return new ListState(...items);
+export function listOf(...items) {
+	return new ListState(false, ...items);
+	// return new Proxy(items, {
+	// 	listState: new ListState(...items),
+	// 	get(target, p, receiver) {
+	// 		if (typeof p == 'string' && p == 'listState') {
+	// 			return this.listState;
+	// 		}
+	// 		return this.listState[p];
+	// 	},
+	// 	set(target, i, value, receiver) {
+	// 		target[i] = value;
+	// 		if (i == 'parentElement') {
+	// 			console.log(value)
+	// 			return false;
+	// 		} else {
+	// 			console.log('setted', target)
+	// 			this.listState.push(target);
+	// 		}
+	// 		return true;
+	// 	}
+	// });
 }
-export function loop(collections, render = (item, index = 0) => { return item; }){
-	if(collections instanceof ListState)
+
+export function sequenceOf(...items) {
+	let listState = new ListState(false, ...items);
+	return listState.asUnique();
+}
+export function loop(collections, render = (item, index = 0) => { return item; }) {
+	if (collections instanceof ListState){
 		collections.renderCallback = render;
-	else{
+	}else {
 		let rendered = [];
 		for (let index = 0; index < collections.length; index++) {
 			const item = collections[index];
 			rendered.push(render(item, index));
 		}
+		collections.listState.setViews([rendered]);
 		return rendered;
 	}
 	return collections;
 }
-
-function stateOf(value, handler = { get(value){ return value } }){
-	const optDefaultProxy = {
-		get(obj, prop){
-			let outValue = handler.get(obj[prop]);
-			return outValue ?? obj[prop];
-		},
-		set(obj, prop, value){
-			obj.setState(value);
-			return true;
+export function createList(length, callbackItem = (index) => { return index; }) {
+	var dataList = [];
+	for (let index = 0; index < length; index++) {
+		dataList.push(callbackItem(index));
+	}
+	return dataList;
+}
+function rememberOf(value) {
+	let instance = null;
+	if (typeof value === 'object' && !(value instanceof Array) && !(value instanceof JetzElement)) {
+		for (const prop in value) {
+			if (Object.hasOwnProperty.call(value, prop)) {
+				const propValue = value[prop];
+				value[prop] = rememberOf(propValue);
+			}
 		}
-	};
-	let optProxy = optDefaultProxy
-	if(typeof value === 'object' && !(value instanceof JetzElement)){
+		instance = value;
+	} else if(value instanceof Array){
+		instance = new ListState(true, ...value);
+	}else {
+		const optDefaultProxy = {
+			get(obj, prop) {
+				return obj.getValue();
+			},
+			set(obj, value) {
+				obj.setState(value);
+				return true;
+			}
+		};
+		let objState = new RememberState(value, optDefaultProxy);
+		// custom function string
+		instance = objState;
+	}
+	return instance;
+}
+let PageSession = {
+	setItem(key, value) {
+	},
+	getItem(key) {
+
+	}
+}
+function stateOf(value, handler = { get(value) { return value } }) {
+	let instance = null;
+	if (typeof value === 'object' && !(value instanceof JetzElement)) {
 		for (const prop in value) {
 			if (Object.hasOwnProperty.call(value, prop)) {
 				const propValue = value[prop];
 				value[prop] = stateOf(propValue);
 			}
 		}
-		return value;
-	}else{
-		let objState = new State(value);
-		let proxy = new Proxy(objState, optProxy);
-		
+		value.toObject = function () {
+			let _obj = {};
+			for (const key in value) {
+				if (Object.hasOwnProperty.call(value, key)) {
+					const element = value[key];
+					_obj[key] = element.value;
+				}
+			}
+			delete _obj['toObject'];
+			return _obj;
+		}
+		instance = value;
+	} else {
+		const optDefaultProxy = {
+			get(obj) {
+				let outValue = handler.get(obj);
+				return outValue ?? obj[prop];
+			},
+			set(obj, value) {
+				obj.setState(value);
+				return true;
+			}
+		};
+		let objState = new State(value, optDefaultProxy);
 		// custom function string
-
-		return proxy;
+		instance = objState;
 	}
+	return instance;
 }
-
-function mergeObject(obj1, ...obj2){
-	if(obj2 === undefined || obj2 == null) obj2 = [];
+function mergeObject(obj1, ...obj2) {
+	if (obj2 === undefined || obj2 == null) obj2 = [];
 	obj2.push(obj1);
 	var newObj = {};
 	for (const i in obj2) {
@@ -634,81 +1053,233 @@ function mergeObject(obj1, ...obj2){
 			if (Object.hasOwnProperty.call(obj, prop)) {
 				const value = obj[prop];
 				// check prop in newobj
-				if(Object.hasOwnProperty.call(newObj, prop)){
+				if (Object.hasOwnProperty.call(newObj, prop)) {
 					const value2 = newObj[prop];
 					// check datatype
-					if(Array.isArray(value)){
-						newObj[prop] = (Array.isArray(value2)) ? 
-										value.push(...value2) : value.push(value2);
-					}else if(Array.isArray(value2)){
-						newObj[prop] = (Array.isArray(value)) ? 
-										value2.push(...value) : value.push(value);
-					}else{
-						if(Array.isArray(newObj[prop])){
+					if (Array.isArray(value)) {
+						if (Array.isArray(value2))
+							value.push(...value2)
+						else
+							value.push(value2);
+						newObj[prop] = value;
+					} else if (Array.isArray(value2)) {
+						if (Array.isArray(value))
+							value2.push(...value)
+						else
+							value2.push(value);
+						newObj[prop] = value2;
+					} else {
+						if (Array.isArray(newObj[prop])) {
 							newObj[prop].push(value2);
-						}else{
+						} else {
 							newObj[prop] = [newObj[prop], value];
 						}
 					}
-				}else{
+				} else {
 					newObj[prop] = value;
 				}
-			}else{
+			} else {
 				newObj[prop] = obj[prop];
 			}
 		}
 	}
 	return newObj;
 }
+class Raw {
+	#content;
+	constructor(content) {
+		this.#content = content;
+	}
+	get() {
+		return this.#content;
+	}
+	set(content) {
+		this.#content = content;
+	}
+	valueOf() {
+		return this.#content;
+	}
+}
+class AttrSpecial {
+	value;
+	element;
 
-function createElement(tag, ...args) {
-	args = flatMap(args);
-	let attr = {};
-	if (args.length > 0) {
-		args = args.filter(( arg, position ) => {
-			if (typeof arg === "object") {
-				if (arg instanceof JetzElement) {
-					return true;
-				}else if(arg instanceof State){
-					return true;
-				}else if(arg instanceof ListState){
-					return true;
-				}else if(arg instanceof Component){
-					return true;
-				} else {
-					// skipped
-					attr = mergeObject(arg, attr);
-					return false;
-				}
+	beforeNode; // 0
+	afterNode; // 1
+	parentNode; // 2
+
+	positionElement;
+
+	_else;
+	_elseIf = [];
+
+	isDefined = false;
+
+	constructor(element, value) {
+		this.value = value;
+		this.element = element;
+	}
+
+	initContainer() {
+		if (!this.isDefined) {
+			if (this.element.o.previousSibling) {
+				this.beforeNode = this.element.o.previousSibling;
+				this.positionElement = 0;
+			} else if (this.element.o.nextElementSibling) {
+				this.afterNode = this.element.o.nextElementSibling;
+				this.positionElement = 1;
+			} else {
+				this.parentNode = this.element.o.parentNode;
+				this.positionElement = 2;
 			}
-			return true;
-		});
-		if (typeof args[0] === "object") {
-			if(args[0].constructor.name === 'Object'){
-				console.log(args[0].constructor.name === 'Object')
-				attr = args[0];
-				args = args.slice(1);
-			}
+			this.isDefined = true;
 		}
 	}
-	return new JetzElement(tag, attr, ...args);
+	addElseIf(elseIf) {
+		this._elseIf.push(elseIf);
+	}
+
+	hide() {
+		this.initContainer();
+		this.element.remove();
+	}
+	show() {
+		this.initContainer();
+		if (this.positionElement == 0) {
+			this.beforeNode.after(this.element.o);
+		}
+	}
+}
+class If extends AttrSpecial {
+	triggerResult;
+	lastCondition;
+	constructor(element, value) {
+		super(element, value);
+	}
+	trigger() {
+		let condition = this.value.call();
+		this.triggerResult = condition;
+
+		if (condition != null) {
+			if (this.lastCondition == condition) return;
+		}
+
+		this.show();
+
+		let parentIf = this;
+		let elseIfCondition = false;
+		let elseCondition = false;
+
+		this._elseIf.forEach((__elseIf, i) => {
+			__elseIf.setParentIf(parentIf);
+			__elseIf.initContainer();
+			__elseIf.trigger();
+			if (!elseIfCondition) {
+				elseIfCondition = __elseIf.triggerResult;
+			}
+			if (__elseIf.triggerResult && !condition) {
+				elseCondition = false;
+				__elseIf.show();
+			} else {
+				__elseIf.hide();
+			}
+		});
+		if (!condition)
+			this.hide();
+		if (this._else) {
+			this._else.setParentIf(this);
+			this._else.initContainer();
+			this._else.hide();
+
+			if (!elseIfCondition && !condition) {
+				elseCondition = true;
+			}
+			if (elseCondition) {
+				this._else.show();
+			}
+		}
+		this.lastCondition = condition;
+	}
+}
+class ElseIf extends AttrSpecial {
+	parentIfCondition;
+	positionElement;
+	constructor(element, value) {
+		super(element, value);
+	}
+	setParentIf(parentIf) {
+		this.beforeNode = parentIf.beforeNode;
+		this.afterNode = parentIf.afterNode;
+		this.parentNode = parentIf.parentNode;
+		this.positionElement = parentIf.positionElement;
+	}
+	initContainer() {
+	}
+	trigger() {
+		return this.triggerResult = this.value();
+	}
 }
 
-class Dispacher{
-    #actionDispatch;
-    constructor(callback = action => {}){
-        this.#actionDispatch = callback;
-    }
-    dispatch(action){
-        console.info('Called dispacher', this)
-        return this.#actionDispatch(action);
-    }
+class Else {
+	element;
+	currentIf;
+
+	parentIfCondition;
+	positionElement;
+
+	initContainer() {
+		if (this.parentIfCondition.positionElement == 0) {
+			this.beforeNode = this.parentIfCondition.beforeNode;
+		} else if (this.parentIfCondition.positionElement == 1) {
+			this.afterNode = this.parentIfCondition.afterNode;
+		} else {
+			this.parentNode = this.parentIfCondition.parentNode;
+		}
+		this.positionElement = this.parentIfCondition.positionElement;
+	}
+	setParentIf(parentIf) {
+		this.parentIfCondition = parentIf;
+	}
+
+	constructor(element, currentIf) {
+		this.element = element;
+		this.currentIf = currentIf;
+	}
+
+	hide() {
+		if (this.positionElement == 0) {
+			this.element.remove();
+		}
+	}
+	show() {
+		if (this.positionElement == 0) {
+			this.beforeNode.after(this.element.getElement());
+		} else if (this.positionElement == 1) {
+			// console.log('after');
+		} else {
+			// console.log('parent');
+		}
+	}
 }
 
-class Component {
-	render(){
-		return null;
-	};
+class StateListener {
+	targetParent;
+	targetPrev;
+	attachPrev(element){
+		this.targetPrev = element;
+	}
+	attachParent(element){
+		this.targetParent = element;
+	}
 }
 
-export { JetzElement, Jetz, Dispacher, Component, createElement, stateOf, _ };
+function listen(fn){
+  return StateListener(fn);
+}
+const _if = boolCallback => ({ if: boolCallback })
+const _elseif = boolCallback => ({ elseif: boolCallback })
+const _else = { else: null };
+const html = content => new Raw(content);
+const _show = _if;
+
+export { Jetz, Dispatcher, Component, JetzElement, createElement, rememberOf, stateOf, _show, _else, _elseif, _if, html, listen };

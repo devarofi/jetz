@@ -1,6 +1,6 @@
 import { Dispacher, Jetz, stateOf } from "../../lib/jetz";
 import { addScript } from "../../lib/helper";
-import { a, div, p, li, span, b } from "../../lib/ui"
+import { a, div, p, li, span, b } from "../../lib/jetz-ui"
 import { btnDropdown, dropdown, mBtnLight, mCol12, mCol2, mCol6, mContainer, mRow, navBar, preloaderCircular } from "../materialize/material-components"
 import { aboutComponent } from "./about";
 import { contactComponent } from "./contact";

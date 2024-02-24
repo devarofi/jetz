@@ -1,5 +1,5 @@
 import { stateOf } from "../../lib/jetz";
-import { b, div, h2, p } from "../../lib/ui";
+import { b, div, h2, p } from "../../lib/jetz-ui";
 import { mBtnLight, mCol12, mInputTextField, mRow } from "../materialize/material-components";
 
 class User {

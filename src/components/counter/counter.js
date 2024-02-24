@@ -1,5 +1,5 @@
 import { listOf, loop, stateOf } from "../../lib/jetz";
-import { button, div, hr, inputText, li, main, ul } from "../../lib/ui";
+import { button, div, hr, inputText, li, main, ul } from "../../lib/jetz-ui";
 
 
 let cartState = listOf();
