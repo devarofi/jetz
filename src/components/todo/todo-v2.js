@@ -1,7 +1,10 @@
 import { Component, listOf, loop, stateOf } from "../../lib/jetz";
 import { button, div, h2, hr, inputText, li, span, ul } from "../../lib/jetz-ui";
+<<<<<<< HEAD
+=======
 
 // Example with a component class
+>>>>>>> 3190bc74bb3bf63893911a7f4fefd4ff5c9d7758
 
 class ToDoV2 extends Component {
     constructor(){
