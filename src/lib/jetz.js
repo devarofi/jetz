@@ -808,6 +808,9 @@ export class ListState extends Array {
 		super.values = newData;
 		this.renderView(true);
 	}
+	empty() {
+		this.set([]);
+	}
 	createItemView(parent, item, index) {
 		var renderedItem = this.renderCallback(item, index);
 		renderedItem.render(parent);
