@@ -808,6 +808,9 @@ export class ListState extends Array {
 		super.values = newData;
 		this.renderView(true);
 	}
+	clear(){
+		this.empty();
+	}
 	empty() {
 		this.set([]);
 	}
