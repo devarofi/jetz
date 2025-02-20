@@ -813,19 +813,22 @@ export class ListState extends Array {
 		renderedItem.render(parent);
 		return renderedItem;
 	}
-	push(item) {
-		if (this.uniqueValue)
-			item = this.#fixValue(item);
+	push(...items) {
+		for (let _i = 0; _i < items.length; _i++) {
+			const item = items[_i];
 
-		super.push(item);
-		this.values.push(item);
-		this.parentElement.map((parent, i) => {
-			this.newView(i, this.views[i], item, this.values.length - 1);
-			return parent;
-		});
-		// remember effect
-		if(this.isRemember){
-			this.objRemember.setState(JSON.stringify(this.values));
+			if (this.uniqueValue)
+				item = this.#fixValue(item);
+			super.push(item);
+			this.values.push(item);
+			this.parentElement.map((parent, i) => {
+				this.newView(i, this.views[i], item, this.values.length - 1);
+				return parent;
+			});
+			// remember effect
+			if (this.isRemember) {
+				this.objRemember.setState(JSON.stringify(this.values));
+			}
 		}
 	}
 	renderView(refresh = false) {
