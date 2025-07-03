@@ -25,7 +25,6 @@ export class Router {
 		} else {
 			window.addEventListener('popstate', (e) => {
 				this.#fallbackNavigateListener(window.location.href);
-				console.log('gabisa cuy', e);
 			});
 		}
 	}
