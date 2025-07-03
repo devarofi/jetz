@@ -5,8 +5,12 @@ export class Router {
 	#varname = '$route';
 	#stateTarget;
 	#routes;
+	#navigationObserver;
 
 	constructor(...route) {
+		if ('navigation' in window) {
+			this.#navigationObserver = window.navigation;
+		}
 		if (Array.isArray(route)) {
 			this.#routes = route.flat(1);
 		} else {
@@ -14,13 +18,23 @@ export class Router {
 		}
 	}
 	#initialNavigateListener() {
-		navigation.addEventListener("navigate", (event) => {
-			const { pathname } = new URL(event.destination.url);
-			const pathDestination = pathname;
-			const routeDestination = this.#fixRoutename(pathDestination);
-			const savedParams = this.#getSavedParams(routeDestination);
-			this.#navigate(routeDestination, savedParams);
-		});
+		if ('navigation' in window) {
+			this.#navigationObserver.addEventListener("navigate", (event) => {
+				this.#fallbackNavigateListener(event.destination.url);
+			});
+		} else {
+			window.addEventListener('popstate', (e) => {
+				this.#fallbackNavigateListener(window.location.href);
+				console.log('gabisa cuy', e);
+			});
+		}
+	}
+	#fallbackNavigateListener(url) {
+		const { pathname } = new URL(url);
+		const pathDestination = pathname;
+		const routeDestination = this.#fixRoutename(pathDestination);
+		const savedParams = this.#getSavedParams(routeDestination);
+		this.#navigate(routeDestination, savedParams);
 	}
 	#fixRoutename(route) {
 		if (route[0] === '/' && route.length > 1)
@@ -44,9 +58,17 @@ export class Router {
 		window.history.pushState('', '', route_name);
 		// scroll to top page
 		window.scroll(0, 0);
+		this.#fallbackNavigationSupport();
+	}
+	#fallbackNavigationSupport() {
+		if (this.#navigationObserver == null) {
+			this.#fallbackNavigateListener(window.location.href);
+		}
+		console.log(window.location.href);
 	}
 	back() {
-		window.history.back()
+		window.history.back();
+		this.#fallbackNavigationSupport();
 	}
 	#saveParams(routename, params) {
 		if (params != null) {
