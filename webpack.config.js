@@ -1,13 +1,12 @@
 let path = require('path');
 let HtmlWebpackPlugin = require('html-webpack-plugin');
-const { LibManifestPlugin } = require('webpack');
 const { WebpackManifestPlugin } = require('webpack-manifest-plugin');
 
 module.exports = {
+    mode: 'development',
     entry: './index.js',
-    mode:'production',
     output: {
-        publicPath:'/public',
+        // publicPath:'/public',
         filename: 'bundle.js',
         path: path.resolve(__dirname, 'dist')
     },
@@ -18,8 +17,8 @@ module.exports = {
                 use: ['style-loader', 'css-loader']
             },
             {
-              test: /\.(png|svg|jpg|jpeg|gif)$/i,
-              type: 'asset/resource',
+                test: /\.(png|svg|jpg|jpeg|gif)$/i,
+                type: 'asset/resource',
             },
         ]
     },
