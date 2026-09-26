@@ -86,6 +86,10 @@ const probe = () => page.evaluate(() => {
 		productCards: document.querySelectorAll('#product-grid > div').length,
 		landingFooterPosition: styleOf('#landing-page > footer', 'position'),
 		demoFooterHidden: styleOf('#app > main > footer', 'display') === 'none',
+		welcomePage: document.querySelector('#welcome-page') !== null,
+		welcomeExamples: document.querySelectorAll('.welcome-example-link').length,
+		todoPage: document.querySelector('#todo-page') !== null,
+		todoTasks: document.querySelectorAll('.todo-task').length,
 	};
 });
 
@@ -108,13 +112,59 @@ assert('/landing renders all 6 product cards', landing.productCards, 6);
 assert('/landing footer flows with the page', landing.landingFooterPosition, 'static');
 assertTrue('/landing hides the demo shell footer', landing.demoFooterHidden);
 
-// --- the legacy demo pages keep the shell styling --------------------------
-section('/: centered demo shell');
+// --- the home page is a full-page welcome layout ---------------------------
+section('/: framework welcome page');
 const home = await open('/');
-assert('/ home shell is the centered flex container', home.appDisplay, 'flex');
-assert('/ home keeps the shell font', home.bodyFont, '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif');
-assertTrue('/ home renders its heading', home.h1Text !== 'NO H1');
+assert('/ home uses the full-page shell', home.appDisplay, 'block');
+assert('/ home uses its welcome typography', home.bodyFont, '"Avenir Next", "Segoe UI", sans-serif');
+assertTrue('/ home renders the welcome page', home.welcomePage);
+assertTrue('/ home introduces Jetz', home.h1Text.includes('Build interfaces'));
+assert('/ home offers both interactive examples', home.welcomeExamples, 2);
+await page.click('.welcome-example-link');
+await page.waitForFunction(() => location.pathname === '/open-todo');
+assert('/ home task-list link navigates through the router', new URL(page.url()).pathname, '/open-todo');
 
+// --- Todo CRUD and reactive search ----------------------------------------
+section('/open-todo: task management');
+const todo = await open('/open-todo');
+assertTrue('/open-todo renders the task workspace', todo.todoPage);
+assert('/open-todo starts with three example tasks', todo.todoTasks, 3);
+
+await page.type('[aria-label="Search tasks"]', 'reactive');
+const searchMatches = await page.$$eval('.todo-task', rows => rows.filter(row => getComputedStyle(row).display !== 'none').length);
+assert('/open-todo search filters tasks as you type', searchMatches, 1);
+await page.$eval('.todo-search', input => {
+	input.value = '';
+	input.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+await page.type('[aria-label="New task title"]', 'Draft release notes');
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => document.querySelectorAll('.todo-task').length === 4);
+assert('/open-todo creates tasks with Enter', await page.$$eval('.todo-task', rows => rows.length), 4);
+
+await page.click('.todo-task:nth-child(4) .todo-icon-button');
+await page.$eval('.todo-task:nth-child(4) .todo-task__editor', input => {
+	input.focus();
+	input.value = 'Write release notes';
+	input.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.keyboard.press('Enter');
+assert('/open-todo saves inline edits', await page.$eval('.todo-task:nth-child(4) .todo-task__title', title => title.textContent), 'Write release notes');
+
+await page.click('.todo-task:first-child input[type="checkbox"]');
+assertTrue('/open-todo marks a task complete', (await page.$eval('.todo-task:first-child', row => row.textContent)).includes('Completed'));
+await page.click('.todo-filter:nth-child(3)');
+assert('/open-todo filters completed tasks', await page.$$eval('.todo-task', rows => rows.filter(row => getComputedStyle(row).display !== 'none').length), 2);
+await page.click('.todo-filter:first-child');
+await page.click('.todo-task:nth-child(4) .todo-icon-button--delete');
+assert('/open-todo deletes tasks', await page.$$eval('.todo-task', rows => rows.length), 3);
+await page.click('.todo-clear-button');
+assert('/open-todo clears completed tasks', await page.$$eval('.todo-task', rows => rows.length), 1);
+await page.click('.todo-task:first-child .todo-icon-button--delete');
+assert('/open-todo shows an empty state after the final delete', await page.$eval('.todo-empty strong', heading => heading.textContent), "You're all caught up.");
+
+// --- the legacy demo pages keep the centered shell styling -----------------
 section('/counter: centered demo shell');
 const counter = await open('/counter');
 assert('/counter shell is the centered flex container', counter.appDisplay, 'flex');

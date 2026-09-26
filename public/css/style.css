@@ -1,15 +1,12 @@
 /* ---------------------------------------------------------------------------
    Demo shell styles.
 
-   These rules style the small demo pages (home / counter / todo) that are
-   vertically centered inside #app.
+    These rules style compact demo pages (such as counter) that are vertically
+    centered inside #app.
 
-   They are explicitly scoped away from full-page layouts - currently the
-   landing page (src/components/landing/landing.js) - because that page is
-   converted from its own template and must keep the template's styling
-   (Tailwind + the Inter font). Without the scoping, the shell's
-   `#app { height: 90vh; justify-content: center }` pushed the landing hero
-   off-screen and the `*` reset forced the wrong font.
+    Full-page layouts provide their own scoped styling. Without the scoping,
+    the shell's `#app { height: 90vh; justify-content: center }` would constrain
+    those pages.
    --------------------------------------------------------------------------- */
 
 /* --- shell layout --------------------------------------------------------- */
@@ -21,9 +18,10 @@ div#app {
     text-align: center;
     flex-direction: column;
 }
-/* a full-page layout starts at the top of the document instead of being centered */
+/* full-page layouts start at the top instead of being centered */
 div#app:has(#landing-page),
-div#app:has(#calculator-page) {
+div#app:has(#calculator-page),
+div#app:has(#todo-page) {
     display: block;
     height: auto;
     min-height: 100vh;
@@ -31,9 +29,10 @@ div#app:has(#calculator-page) {
     align-items: stretch;
     justify-content: flex-start;
 }
-/* the demo footer is not part of the landing or calculator pages */
+/* the compact demo footer is not part of full-page routes */
 div#app:has(#landing-page) > main > footer,
-div#app:has(#calculator-page) > main > footer {
+div#app:has(#calculator-page) > main > footer,
+div#app:has(#todo-page) > main > footer {
     display: none;
 }
 
@@ -43,21 +42,20 @@ body {
     padding: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
-/* skip `body`/`html` (they own the font that the landing page overrides) and the
-   full-page subtrees, which are reset by Tailwind's preflight instead */
-*:not(#landing-page, #landing-page *, #calculator-page, #calculator-page *, body, html) {
+/* Skip `body`/`html` and full-page subtrees, which provide their own styles. */
+*:not(#landing-page, #landing-page *, #calculator-page, #calculator-page *, #welcome-page, #welcome-page *, #todo-page, #todo-page *, body, html) {
     padding: 0;
     margin: 0;
     text-decoration: none;
 }
 
 /* --- element defaults (legacy pages only) --------------------------------- */
-h1:not(#landing-page *, #calculator-page *) {
+h1:not(#landing-page *, #calculator-page *, #todo-page *) {
     margin-bottom: 24px;
     font-size: 42px;
     font-weight: 300;
 }
-footer:not(#landing-page *, #calculator-page *) {
+footer:not(#landing-page *, #calculator-page *, #todo-page *) {
     position: absolute;
     bottom: 20px;
     color: #a9a9a9;
@@ -65,10 +63,10 @@ footer:not(#landing-page *, #calculator-page *) {
     left: 0;
     right: 0;
 }
-p:not(#landing-page *, #calculator-page *) {
+p:not(#landing-page *, #calculator-page *, #todo-page *) {
     margin-bottom: 50px;
 }
-button:not(#landing-page *, #calculator-page *) {
+button:not(#landing-page *, #calculator-page *, #todo-page *) {
     margin: 12px;
     padding: 8px 12px;
     border-radius: 8px;
@@ -76,17 +74,430 @@ button:not(#landing-page *, #calculator-page *) {
     cursor: pointer;
     transition: 220ms;
 }
-button:not(#landing-page *, #calculator-page *):hover {
+button:not(#landing-page *, #calculator-page *, #todo-page *):hover {
     background: #e5e5e5;
 }
-a:not(#landing-page *, #calculator-page *):hover {
+a:not(#landing-page *, #calculator-page *, #todo-page *):hover {
     color: #166aad;
 }
-pre:not(#landing-page *, #calculator-page *) {
+pre:not(#landing-page *, #calculator-page *, #todo-page *) {
     text-align: left;
 }
-input[type="text"]:not(#landing-page *, #calculator-page *) {
+input[type="text"]:not(#landing-page *, #calculator-page *, #todo-page *) {
     padding: 8px 12px;
     border-radius: 8px;
     border: 1px solid grey;
+}
+
+/* --- Jetz welcome page --------------------------------------------------- */
+body:has(#welcome-page) {
+    --welcome-ink: #1d2921;
+    --welcome-muted: #68736a;
+    --welcome-paper: #f7f8f2;
+    --welcome-line: #dce2d7;
+    --welcome-green: #c7f36b;
+    --welcome-red: #ed6b50;
+    background-color: var(--welcome-paper);
+    background-image: linear-gradient(#e9ede5 1px, transparent 1px), linear-gradient(90deg, #e9ede5 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--welcome-ink);
+    font-family: 'Avenir Next', 'Segoe UI', sans-serif;
+}
+div#app:has(#welcome-page) {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    text-align: left;
+}
+div#app:has(#welcome-page) > main > footer {
+    display: none;
+}
+#welcome-page {
+    width: 100%;
+    min-height: 100vh;
+    overflow: hidden;
+}
+#welcome-page a {
+    color: inherit;
+    text-decoration: none;
+}
+#welcome-page a:hover {
+    color: inherit;
+}
+.welcome-header,
+.welcome-hero,
+.welcome-capabilities,
+.welcome-examples,
+.welcome-bottom {
+    width: min(1120px, calc(100% - 64px));
+    margin-inline: auto;
+}
+.welcome-header {
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--welcome-line);
+}
+.welcome-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.welcome-brand img {
+    display: block;
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+}
+.welcome-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 14px;
+    font-weight: 650;
+}
+.welcome-nav a span,
+.welcome-action--text span {
+    color: var(--welcome-red);
+}
+.welcome-hero {
+    display: grid;
+    grid-template-columns: 1fr 0.92fr;
+    align-items: center;
+    gap: 64px;
+    padding-block: 92px 104px;
+}
+.welcome-copy {
+    max-width: 530px;
+}
+.welcome-kicker,
+.welcome-overline {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: #50634e;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.welcome-kicker-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--welcome-red);
+}
+#welcome-page h1 {
+    max-width: 550px;
+    margin: 20px 0 22px;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 62px;
+    line-height: 1.03;
+    font-weight: 500;
+}
+.welcome-headline-accent {
+    display: block;
+    color: #567631;
+    font-style: italic;
+}
+.welcome-copy > p,
+.welcome-example-copy > p {
+    max-width: 460px;
+    margin: 0;
+    color: var(--welcome-muted);
+    font-size: 16px;
+    line-height: 1.75;
+}
+.welcome-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 30px;
+}
+.welcome-action {
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 14px;
+    font-weight: 700;
+}
+.welcome-action--primary {
+    padding: 0 19px;
+    background: var(--welcome-ink);
+    color: #fff !important;
+    transition: background 160ms ease, transform 160ms ease;
+}
+.welcome-action--primary:hover {
+    background: #40513f;
+    transform: translateY(-2px);
+}
+.welcome-action--primary span {
+    color: var(--welcome-green);
+}
+.welcome-action--text {
+    gap: 8px;
+}
+.welcome-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 42px;
+    color: #707a70;
+    font-size: 11px;
+}
+.welcome-code-panel {
+    min-width: 0;
+    background: #202b23;
+    color: #f4f5e9;
+    box-shadow: 12px 14px 0 #dce8c8;
+    transform: rotate(1deg);
+}
+.welcome-code-topbar {
+    height: 48px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding-inline: 17px;
+    border-bottom: 1px solid #39453c;
+    color: #b9c4b8;
+}
+.welcome-code-dots {
+    display: flex;
+    gap: 5px;
+}
+.welcome-code-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #71826c;
+}
+.welcome-code-dots span:first-child {
+    background: var(--welcome-red);
+}
+.welcome-code-dots span:nth-child(2) {
+    background: #e5bd5c;
+}
+.welcome-code-dots span:last-child {
+    background: #9cc36a;
+}
+.welcome-code-topbar small {
+    font-family: Consolas, monospace;
+    font-size: 11px;
+}
+.welcome-code-label {
+    justify-self: end;
+    color: var(--welcome-green);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+.welcome-code {
+    overflow-x: auto;
+    padding: 25px 22px 21px;
+    color: #dce6d9;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.85;
+    tab-size: 2;
+    white-space: pre;
+}
+.welcome-code-foot {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 20px;
+    border-top: 1px solid #39453c;
+    color: #b9c4b8;
+    font-size: 10px;
+}
+.welcome-code-foot span {
+    color: var(--welcome-green);
+    font-size: 9px;
+}
+.welcome-capabilities {
+    padding-block: 43px 68px;
+    border-top: 1px solid var(--welcome-line);
+}
+.welcome-section-heading h2,
+.welcome-example-copy h2 {
+    margin: 13px 0 0;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 30px;
+    line-height: 1.2;
+    font-weight: 500;
+}
+.welcome-feature-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 33px;
+    border-top: 1px solid var(--welcome-line);
+    border-bottom: 1px solid var(--welcome-line);
+}
+.welcome-feature {
+    min-height: 168px;
+    padding: 20px 26px 20px 0;
+}
+.welcome-feature + .welcome-feature {
+    padding-left: 26px;
+    border-left: 1px solid var(--welcome-line);
+}
+.welcome-feature-number {
+    color: var(--welcome-red);
+    font-family: Consolas, monospace;
+    font-size: 11px;
+}
+.welcome-feature h2 {
+    margin: 15px 0 7px;
+    font-size: 17px;
+    font-weight: 750;
+}
+.welcome-feature p {
+    max-width: 280px;
+    margin: 0;
+    color: var(--welcome-muted);
+    font-size: 13px;
+    line-height: 1.65;
+}
+.welcome-examples {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 64px;
+    padding-block: 45px 68px;
+    border-top: 1px solid var(--welcome-line);
+}
+.welcome-example-copy h2 {
+    max-width: 390px;
+}
+.welcome-example-copy > p {
+    margin-top: 11px;
+    font-size: 14px;
+}
+.welcome-example-links {
+    border-top: 1px solid var(--welcome-line);
+}
+.welcome-example-link {
+    min-height: 72px;
+    display: grid;
+    grid-template-columns: 35px 1fr 24px;
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: 12px;
+    border-bottom: 1px solid var(--welcome-line);
+}
+.welcome-example-link > span:first-child {
+    grid-row: 1 / 3;
+    color: var(--welcome-red);
+    font-family: Consolas, monospace;
+    font-size: 11px;
+}
+.welcome-example-link strong {
+    font-size: 14px;
+}
+.welcome-example-link > span:nth-of-type(2) {
+    grid-column: 2;
+    color: var(--welcome-muted);
+    font-size: 11px;
+    margin-top: 4px;
+}
+.welcome-example-link > span:last-child {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    color: var(--welcome-red);
+}
+.welcome-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-block: 21px 30px;
+    border-top: 1px solid var(--welcome-line);
+    color: var(--welcome-muted);
+    font-size: 11px;
+}
+.welcome-bottom p {
+    margin: 0;
+}
+.welcome-bottom a {
+    color: var(--welcome-ink) !important;
+    font-weight: 700;
+}
+@media (max-width: 760px) {
+    .welcome-header,
+    .welcome-hero,
+    .welcome-capabilities,
+    .welcome-examples,
+    .welcome-bottom {
+        width: min(100% - 40px, 560px);
+    }
+    .welcome-header {
+        height: 70px;
+    }
+    .welcome-hero {
+        grid-template-columns: 1fr;
+        gap: 44px;
+        padding-block: 63px 74px;
+    }
+    #welcome-page h1 {
+        font-size: 48px;
+    }
+    .welcome-code-panel {
+        transform: none;
+    }
+    .welcome-code {
+        padding-inline: 16px;
+        font-size: 11px;
+    }
+    .welcome-feature-list {
+        grid-template-columns: 1fr;
+    }
+    .welcome-feature,
+    .welcome-feature + .welcome-feature {
+        min-height: 0;
+        padding: 18px 0;
+        border-left: 0;
+    }
+    .welcome-feature + .welcome-feature {
+        border-top: 1px solid var(--welcome-line);
+    }
+    .welcome-feature h2 {
+        margin-top: 9px;
+    }
+    .welcome-examples {
+        grid-template-columns: 1fr;
+        gap: 25px;
+    }
+}
+@media (max-width: 420px) {
+    .welcome-header,
+    .welcome-hero,
+    .welcome-capabilities,
+    .welcome-examples,
+    .welcome-bottom {
+        width: calc(100% - 32px);
+    }
+    #welcome-page h1 {
+        font-size: 42px;
+    }
+    .welcome-actions {
+        gap: 14px;
+    }
+    .welcome-action--primary {
+        padding-inline: 14px;
+    }
+    .welcome-meta {
+        gap: 6px;
+        font-size: 10px;
+    }
+    .welcome-bottom {
+        gap: 15px;
+        flex-wrap: wrap;
+    }
 }
