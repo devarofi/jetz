@@ -17,7 +17,7 @@ export const MyTest = div(css`preview-card`,
       task => li(css`task-row`,
         div(css`inline`,
         inputCheckbox({ bind: task.done }),
-        p(css`task-number ${() => task.done ? 'completed' : ''}`, "TASK ", task.id, ' - ', task.title),
+        p(css`task-number ${() => task.done.value ? 'completed' : ''}`, "TASK ", task.id, ' - ', task.title),
         ),
         inputText({
           bind: task.title,
