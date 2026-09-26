@@ -20,6 +20,7 @@ export function Home(){
         }),
         a( href`https://github.com/devarofi/jetz`, 'Get started'),
         br(),
-        link('open-todo', button('Open ToDo'))
+        link('open-todo', button('Open ToDo')),
+        link('calculator', button('Open Calculator'))
     )
 }

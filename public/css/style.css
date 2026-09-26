@@ -1,9 +1,18 @@
-* {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    padding: 0;
-    margin: 0;
-    text-decoration: none;
-}
+/* ---------------------------------------------------------------------------
+   Demo shell styles.
+
+   These rules style the small demo pages (home / counter / todo) that are
+   vertically centered inside #app.
+
+   They are explicitly scoped away from full-page layouts - currently the
+   landing page (src/components/landing/landing.js) - because that page is
+   converted from its own template and must keep the template's styling
+   (Tailwind + the Inter font). Without the scoping, the shell's
+   `#app { height: 90vh; justify-content: center }` pushed the landing hero
+   off-screen and the `*` reset forced the wrong font.
+   --------------------------------------------------------------------------- */
+
+/* --- shell layout --------------------------------------------------------- */
 div#app {
     display: flex;
     justify-content: center;
@@ -12,12 +21,43 @@ div#app {
     text-align: center;
     flex-direction: column;
 }
-h1 {
+/* a full-page layout starts at the top of the document instead of being centered */
+div#app:has(#landing-page),
+div#app:has(#calculator-page) {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    text-align: left;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+/* the demo footer is not part of the landing or calculator pages */
+div#app:has(#landing-page) > main > footer,
+div#app:has(#calculator-page) > main > footer {
+    display: none;
+}
+
+/* --- base reset ----------------------------------------------------------- */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+/* skip `body`/`html` (they own the font that the landing page overrides) and the
+   full-page subtrees, which are reset by Tailwind's preflight instead */
+*:not(#landing-page, #landing-page *, #calculator-page, #calculator-page *, body, html) {
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+/* --- element defaults (legacy pages only) --------------------------------- */
+h1:not(#landing-page *, #calculator-page *) {
     margin-bottom: 24px;
     font-size: 42px;
     font-weight: 300;
 }
-footer {
+footer:not(#landing-page *, #calculator-page *) {
     position: absolute;
     bottom: 20px;
     color: #a9a9a9;
@@ -25,10 +65,10 @@ footer {
     left: 0;
     right: 0;
 }
-p {
+p:not(#landing-page *, #calculator-page *) {
     margin-bottom: 50px;
 }
-button {
+button:not(#landing-page *, #calculator-page *) {
     margin: 12px;
     padding: 8px 12px;
     border-radius: 8px;
@@ -36,16 +76,16 @@ button {
     cursor: pointer;
     transition: 220ms;
 }
-button:hover {
+button:not(#landing-page *, #calculator-page *):hover {
     background: #e5e5e5;
 }
-a:hover {
+a:not(#landing-page *, #calculator-page *):hover {
     color: #166aad;
 }
-pre {
+pre:not(#landing-page *, #calculator-page *) {
     text-align: left;
 }
-input[type="text"] {
+input[type="text"]:not(#landing-page *, #calculator-page *) {
     padding: 8px 12px;
     border-radius: 8px;
     border: 1px solid grey;

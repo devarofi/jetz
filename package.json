@@ -1,5 +1,5 @@
 {
-  "name": "jetz",
+  "name": "@daevsoft/jetz",
   "version": "1.0.0",
   "description": "A composable javascript framework",
   "main": "index.js",
@@ -22,32 +22,33 @@
   },
   "private": true,
   "scripts": {
-    "start": "npx webpack server",
-    "build": "webpack build -- --config webpack.prod.js",
-    "watch": "webpack build -- --config webpack.dev.js",
-    "test": "karma start test.conf.js"
+    "start": "rspack serve",
+    "build": "rspack build --mode production",
+    "watch": "rspack build --watch --mode development",
+    "test": "pnpm test:unit && pnpm test:smoke && pnpm test:pages",
+    "test:unit": "vitest run",
+    "test:smoke": "rspack build --config test/smoke/rspack.smoke.config.js && node test/smoke/run.mjs",
+    "test:pages": "rspack build --mode production && node test/pages.mjs"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/devarofi/jetz.git"
   },
   "author": "",
-  "license": "ISC",
+    "license": "ISC",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/devarofi/jetz/issues"
   },
   "homepage": "https://github.com/devarofi/jetz#readme",
   "devDependencies": {
-    "css-loader": "^6.7.1",
-    "file-loader": "^6.2.0",
-    "html-webpack-plugin": "^5.5.0",
-    "puppeteer": "^19.7.4",
-    "style-loader": "^3.3.1",
-    "webpack": "^5.74.0",
-    "webpack-cli": "^4.10.0",
-    "webpack-dev-server": "^4.11.1",
-    "webpack-manifest-plugin": "^5.0.0",
-    "webpack-merge": "^5.8.0",
-    "webpack-nano": "^1.1.1"
+    "@rspack/cli": "^2.2.6",
+    "@rspack/core": "^2.2.6",
+    "@rspack/dev-server": "^2.2.1",
+    "html-rspack-plugin": "^6.1.11",
+    "jsdom": "^30.1.0",
+    "puppeteer": "^19.11.1",
+    "vitest": "^5.0.1",
+    "webpack-manifest-plugin": "^5.0.1"
   }
 }

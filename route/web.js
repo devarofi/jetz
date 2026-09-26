@@ -1,11 +1,16 @@
-import { counter } from "../src/components/counter/counter";
-
-const { Home } = require("../src/components/home/home-component");
-const { ToDo } = require("../src/components/todo/Todo");
-const { route } = require("../src/lib/jetz-router");
+// Route table — import every route component here.
+import { route } from "../src/lib/jetz-router.js";
+import { Landing } from "../src/components/landing/landing.js";
+import { Home } from "../src/components/home/home-component.js";
+import { ToDo } from "../src/components/todo/Todo.js";
+import { counter } from "../src/components/counter/counter.js";
+import { Calculator } from "../src/components/calculator/calculator.js";
 
 export let routeWeb = [
     route('/', Home),
+    route('landing', Landing),
     route('open-todo', ToDo),
-    route('counter', counter)
-]
+    route('counter', counter),
+    route('calculator', Calculator)
+];
+

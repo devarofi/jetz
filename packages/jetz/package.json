@@ -1,0 +1,65 @@
+{
+  "name": "@daevsoft/jetz",
+  "version": "1.0.1",
+  "description": "A composable javascript framework",
+  "license": "ISC",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devarofi/jetz.git"
+  },
+  "bugs": {
+    "url": "https://github.com/devarofi/jetz/issues"
+  },
+  "homepage": "https://github.com/devarofi/jetz#readme",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./jetz": {
+      "types": "./src/jetz.d.ts",
+      "import": "./src/jetz.js"
+    },
+    "./ui": {
+      "types": "./src/jetz-ui.d.ts",
+      "import": "./src/jetz-ui.js"
+    },
+    "./router": {
+      "types": "./src/jetz-router.d.ts",
+      "import": "./src/jetz-router.js"
+    },
+    "./session": {
+      "types": "./src/jetz-session.d.ts",
+      "import": "./src/jetz-session.js"
+    },
+    "./middleware": {
+      "types": "./src/middleware.d.ts",
+      "import": "./src/middleware.js"
+    },
+    "./test": {
+      "types": "./src/jetz-test.d.ts",
+      "import": "./src/jetz-test.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run",
+    "check-exports": "node ./scripts/check-exports.mjs"
+  },
+  "peerDependencies": {},
+  "devDependencies": {
+    "vitest": "^5.0.1",
+    "jsdom": "^30.1.0"
+  }
+}

@@ -1,5 +1,5 @@
-import { rememberOf, stateOf } from "../../lib/jetz";
-import { button, div, id, inputText, main, p, text } from "../../lib/jetz-ui";
+import { rememberOf, stateOf } from "../../lib/jetz.js";
+import { button, div, id, inputText, main, p, text } from "../../lib/jetz-ui.js";
 
 let count = rememberOf(0);
 let count2 = rememberOf(0);

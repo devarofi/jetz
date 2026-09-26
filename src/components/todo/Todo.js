@@ -1,13 +1,13 @@
-import { Jetz, listOf, loop, stateOf } from '../../lib/jetz';
-import { button, div, inputText, li, placeholder, ul } from '../../lib/jetz-ui';
+import { Jetz, listOf, loop, stateOf } from '../../lib/jetz.js';
+import { button, div, inputText, li, placeholder, ul } from '../../lib/jetz-ui.js';
 
 let todoList = listOf();
 
-function TodoLists(){
+function TodoLists() {
     return ul(
         loop(todoList, todo => {
             return li(todo.text, button('Delete', {
-                onclick(){
+                onclick() {
                     todoList.remove(todo);
                 }
             }))
@@ -15,14 +15,14 @@ function TodoLists(){
     )
 }
 
-export function ToDo(){
+export function ToDo() {
     let newTodo = stateOf('');
     return div(
         inputText(placeholder`Input New Todo`, {
-            bind:newTodo
+            bind: newTodo
         }),
         button('Add', {
-            onclick(){
+            onclick() {
                 todoList.push({
                     id: Math.random(),
                     text: newTodo.value
@@ -32,7 +32,7 @@ export function ToDo(){
         }),
         TodoLists,
         button('Back', {
-            onclick(){
+            onclick() {
                 Jetz.$route.back()
             }
         })

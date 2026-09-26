@@ -1,0 +1,5 @@
+allowBuilds:
+  puppeteer: set this to true or false
+
+packages:
+  - 'packages/*'

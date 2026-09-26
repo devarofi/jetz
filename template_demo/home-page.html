@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DigiStore - Premium Digital Assets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+
+        .modal-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 300ms ease-out, transform 300ms ease-out;
+        }
+
+        .modal-leave {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .modal-leave-active {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 200ms ease-in, transform 200ms ease-in;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5', // Indigo 600
+                        primaryHover: '#4338ca', // Indigo 700
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-gray-50 text-gray-800 antialiased relative">
+
+    <nav class="fixed w-full z-40 top-0 start-0 border-b border-gray-200 glass-effect">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between p-4">
+            <a href="#" class="flex items-center space-x-2">
+                <div
+                    class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                    D</div>
+                <span
+                    class="self-center text-2xl font-bold whitespace-nowrap tracking-tight text-gray-900">DigiStore</span>
+            </a>
+
+            <!-- Mobile menu button -->
+            <button id="mobile-menu-btn" type="button"
+                class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                aria-controls="navbar-sticky" aria-expanded="false">
+                <span class="sr-only">Open main menu</span>
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+
+            <!-- Nav Links & Actions -->
+            <div class="items-center justify-between hidden w-full md:flex md:w-auto md:order-1" id="navbar-sticky">
+                <ul
+                    class="flex flex-col p-4 md:p-0 mt-4 font-medium border border-gray-100 rounded-lg md:space-x-8 md:flex-row md:mt-0 md:border-0">
+                    <li>
+                        <a href="#"
+                            class="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-primary md:p-0 transition-colors">Discover</a>
+                    </li>
+                    <li>
+                        <a href="#"
+                            class="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-primary md:p-0 transition-colors">Categories</a>
+                    </li>
+                    <li>
+                        <a href="#"
+                            class="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-primary md:p-0 transition-colors">My
+                            Assets</a>
+                    </li>
+                </ul>
+
+                <div
+                    class="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0 md:ml-8 border-t md:border-t-0 pt-4 md:pt-0 border-gray-200">
+                    <button onclick="openCheckout()"
+                        class="relative text-gray-600 hover:text-primary transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-cart-shopping text-xl"></i>
+                        <span class="md:hidden font-medium">Cart</span>
+                        <span id="cart-badge"
+                            class="absolute -top-2 -right-2 md:-right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                    </button>
+                    <a href="#"
+                        class="text-gray-900 hover:text-primary font-medium text-sm transition-colors w-full md:w-auto text-center">Login</a>
+                    <a href="#"
+                        class="text-white bg-gray-900 hover:bg-gray-800 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors shadow-sm w-full md:w-auto">Sign
+                        Up</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-gray-900 mb-6 leading-tight">
+            The marketplace for <br class="hidden md:block" />
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">premium digital
+                assets</span>
+        </h1>
+        <p class="mt-4 max-w-2xl text-lg text-gray-600 mx-auto mb-10">
+            Discover high-quality source code, UI kits, e-books, and design resources created by top professionals.
+            Instant access, lifetime updates.
+        </p>
+
+        <!-- Search Bar -->
+        <div class="max-w-2xl mx-auto relative shadow-lg rounded-full">
+            <div class="absolute inset-y-0 start-0 flex items-center ps-5 pointer-events-none">
+                <i class="fa-solid fa-search text-gray-400"></i>
+            </div>
+            <input type="search" id="default-search"
+                class="block w-full p-4 ps-12 text-sm text-gray-900 border border-gray-300 rounded-full bg-white focus:ring-primary focus:border-primary focus:outline-none"
+                placeholder="Search for 'React Template', 'Figma UI Kit'..." required>
+            <button type="submit"
+                class="text-white absolute end-2.5 bottom-2.5 bg-primary hover:bg-primaryHover focus:ring-4 focus:outline-none focus:ring-indigo-300 font-medium rounded-full text-sm px-6 py-2 transition-colors">Search</button>
+        </div>
+
+        <!-- Filter Pills -->
+        <div class="flex flex-wrap justify-center gap-3 mt-8">
+            <button
+                class="px-4 py-2 rounded-full bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors">All
+                Products</button>
+            <button
+                class="px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">UI
+                Kits (Figma)</button>
+            <button
+                class="px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">Source
+                Code</button>
+            <button
+                class="px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">E-Books
+                & PDFs</button>
+            <button
+                class="px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">Templates</button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="flex justify-between items-end mb-8">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Trending Now</h2>
+                <p class="text-gray-500 mt-1">Our most popular digital products this week.</p>
+            </div>
+            <a href="#" class="text-primary hover:text-primaryHover font-medium text-sm hidden sm:block">View all <i
+                    class="fa-solid fa-arrow-right ml-1"></i></a>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="product-grid">
+            <!-- Product Cards will be injected by JS -->
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 mt-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="md:flex md:items-center md:justify-between">
+                <div class="flex justify-center md:justify-start items-center mb-6 md:mb-0 space-x-2">
+                    <div
+                        class="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                        D</div>
+                    <span class="text-xl font-bold text-gray-900">DigiStore</span>
+                </div>
+                <div class="flex justify-center space-x-6 md:order-2 text-gray-400">
+                    <a href="#" class="hover:text-gray-500"><span class="sr-only">Twitter</span><i
+                            class="fa-brands fa-twitter text-xl"></i></a>
+                    <a href="#" class="hover:text-gray-500"><span class="sr-only">GitHub</span><i
+                            class="fa-brands fa-github text-xl"></i></a>
+                    <a href="#" class="hover:text-gray-500"><span class="sr-only">Dribbble</span><i
+                            class="fa-brands fa-dribbble text-xl"></i></a>
+                </div>
+                <div class="mt-8 md:mt-0 md:order-1 text-center md:text-left text-sm text-gray-500">
+                    &copy; 2026 DigiStore, Inc. All rights reserved. Delivering digital excellence.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <div id="checkout-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog"
+        aria-modal="true">
+        <!-- Background backdrop -->
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity backdrop-blur-sm" id="modal-backdrop"
+            onclick="closeCheckout()"></div>
+
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <!-- Modal panel -->
+                <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl modal-enter"
+                    id="modal-panel">
+
+                    <!-- Close Button -->
+                    <button type="button" onclick="closeCheckout()"
+                        class="absolute top-4 right-4 text-gray-400 hover:text-gray-500 focus:outline-none bg-gray-100 hover:bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+
+                    <div class="bg-white px-4 pb-4 pt-5 sm:p-8 sm:pb-6">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-2xl font-bold leading-6 text-gray-900 mb-6" id="modal-title">Complete
+                                    your purchase</h3>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <!-- Order Summary -->
+                                    <div>
+                                        <h4 class="font-semibold text-gray-900 mb-4 border-b pb-2">Order Summary</h4>
+                                        <div id="checkout-items" class="space-y-4 mb-4 min-h-[100px]">
+                                            <!-- Items injected via JS -->
+                                        </div>
+                                        <div
+                                            class="border-t pt-4 flex justify-between items-center font-bold text-lg text-gray-900">
+                                            <span>Total</span>
+                                            <span id="checkout-total">$0.00</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Payment Details -->
+                                    <div class="bg-gray-50 p-5 rounded-xl border border-gray-100">
+                                        <h4 class="font-semibold text-gray-900 mb-4">Payment Details</h4>
+
+                                        <!-- Delivery Note -->
+                                        <div
+                                            class="mb-5 bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex gap-3 items-start">
+                                            <i class="fa-solid fa-cloud-arrow-down text-primary mt-1"></i>
+                                            <p class="text-xs text-indigo-900">
+                                                <strong>Instant Digital Delivery.</strong> <br>
+                                                Upon payment, a download link will be emailed to you immediately. Files
+                                                will also be permanently available in your <a href="#"
+                                                    class="underline font-semibold hover:text-primary">My Assets</a>
+                                                tab.
+                                            </p>
+                                        </div>
+
+                                        <form id="payment-form" onsubmit="processPayment(event)">
+                                            <div class="space-y-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email
+                                                        Address</label>
+                                                    <input type="email" required
+                                                        class="w-full rounded-md border-gray-300 border p-2.5 text-sm focus:ring-primary focus:border-primary outline-none"
+                                                        placeholder="you@example.com">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">Card
+                                                        Details</label>
+                                                    <div class="relative">
+                                                        <input type="text" required
+                                                            class="w-full rounded-md border-gray-300 border p-2.5 pl-10 text-sm focus:ring-primary focus:border-primary outline-none"
+                                                            placeholder="0000 0000 0000 0000">
+                                                        <i
+                                                            class="fa-regular fa-credit-card absolute left-3 top-3 text-gray-400"></i>
+                                                    </div>
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-4">
+                                                    <input type="text" required
+                                                        class="rounded-md border-gray-300 border p-2.5 text-sm focus:ring-primary focus:border-primary outline-none"
+                                                        placeholder="MM/YY">
+                                                    <input type="text" required
+                                                        class="rounded-md border-gray-300 border p-2.5 text-sm focus:ring-primary focus:border-primary outline-none"
+                                                        placeholder="CVC">
+                                                </div>
+                                            </div>
+                                            <button type="submit"
+                                                class="mt-6 w-full text-white bg-gray-900 hover:bg-gray-800 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-3 text-center transition-colors shadow-lg flex justify-center items-center gap-2">
+                                                <i class="fa-solid fa-lock text-xs"></i> Pay Securely
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="fixed inset-0 z-[60] hidden" aria-labelledby="modal-title" role="dialog"
+        aria-modal="true">
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity backdrop-blur-sm"></div>
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center">
+                <div
+                    class="relative transform overflow-hidden rounded-2xl bg-white p-8 text-center shadow-xl transition-all w-full max-w-sm">
+                    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mb-4">
+                        <i class="fa-solid fa-check text-2xl text-green-600"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
+                    <p class="text-sm text-gray-500 mb-6">
+                        Thank you for your purchase. We've sent the files to your email. You can also download them
+                        anytime from your <strong>My Assets</strong> dashboard.
+                    </p>
+                    <button onclick="closeSuccess()"
+                        class="w-full text-white bg-primary hover:bg-primaryHover font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors">
+                        Go to My Assets
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock Product Data
+        const products = [
+            { id: 1, title: "SaaS Pro UI Kit", type: "Figma File", author: "UI Ninja", price: 49.00, rating: 4.9, img: "https://placehold.co/600x400/4f46e5/ffffff?text=Figma+UI+Kit", icon: "fa-brands fa-figma" },
+            { id: 2, title: "Advanced React Patterns", type: "E-Book (PDF)", author: "Code Master", price: 29.00, rating: 4.8, img: "https://placehold.co/600x400/111827/ffffff?text=React+E-Book", icon: "fa-solid fa-file-pdf" },
+            { id: 3, title: "E-Commerce Backend API", type: "Source Code (Node.js)", author: "Backend Bros", price: 79.00, rating: 5.0, img: "https://placehold.co/600x400/059669/ffffff?text=Node.js+API", icon: "fa-solid fa-code" },
+            { id: 4, title: "Moody Lightroom Presets", type: "Design Assets", author: "Photo Magic", price: 15.00, rating: 4.7, img: "https://placehold.co/600x400/db2777/ffffff?text=LR+Presets", icon: "fa-solid fa-image" },
+            { id: 5, title: "Startup Pitch Deck", type: "Presentation (PPTX)", author: "Biz Templates", price: 25.00, rating: 4.6, img: "https://placehold.co/600x400/ea580c/ffffff?text=Pitch+Deck", icon: "fa-solid fa-file-powerpoint" },
+            { id: 6, title: "Ultimate 3D Icon Pack", type: "Design Assets", author: "3D Wizards", price: 35.00, rating: 4.9, img: "https://placehold.co/600x400/8b5cf6/ffffff?text=3D+Icons", icon: "fa-solid fa-cubes" },
+        ];
+
+        let cart = [];
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            renderProducts();
+
+            // Mobile Menu Toggle
+            const btn = document.getElementById('mobile-menu-btn');
+            const menu = document.getElementById('navbar-sticky');
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('hidden');
+            });
+        });
+
+        // Render Products to Grid
+        function renderProducts() {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = '';
+
+            products.forEach(p => {
+                const card = `
+                    <div class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-shadow duration-300 border border-gray-100 overflow-hidden flex flex-col group">
+                        <div class="relative overflow-hidden aspect-[3/2]">
+                            <img src="${p.img}" alt="${p.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <div class="absolute top-3 left-3 bg-white/90 backdrop-blur text-xs font-semibold px-2.5 py-1 rounded-full text-gray-800 flex items-center gap-1 shadow-sm">
+                                <i class="${p.icon} text-gray-600"></i> ${p.type}
+                            </div>
+                        </div>
+                        <div class="p-5 flex-1 flex flex-col">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-lg font-bold text-gray-900 line-clamp-1 group-hover:text-primary transition-colors">${p.title}</h3>
+                            </div>
+                            <div class="flex items-center text-sm text-gray-500 mb-4">
+                                <span>By ${p.author}</span>
+                                <span class="mx-2">•</span>
+                                <span class="flex items-center text-yellow-500 text-xs">
+                                    <i class="fa-solid fa-star mr-1"></i> ${p.rating}
+                                </span>
+                            </div>
+                            <div class="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">
+                                <span class="text-xl font-bold text-gray-900">$${p.price.toFixed(2)}</span>
+                                <button onclick="addToCart(${p.id})" class="text-primary hover:text-white border border-primary hover:bg-primary font-medium rounded-lg text-sm px-4 py-2 transition-colors focus:ring-4 focus:outline-none focus:ring-indigo-100">
+                                    Add to Cart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+
+        // Cart Logic
+        function addToCart(id) {
+            const product = products.find(p => p.id === id);
+            cart.push(product);
+            updateCartBadge();
+
+            // Simple visual feedback
+            const badge = document.getElementById('cart-badge');
+            badge.classList.add('scale-125');
+            setTimeout(() => badge.classList.remove('scale-125'), 200);
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cart-badge');
+            badge.textContent = cart.length;
+            if (cart.length > 0) {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Checkout Modal Logic
+        function openCheckout() {
+            if (cart.length === 0) {
+                alert("Your cart is empty! Add some digital products first."); // Fallback if user bypasses UI, though generally discouraged. In context, better to show empty state.
+                return;
+            }
+
+            const modal = document.getElementById('checkout-modal');
+            const panel = document.getElementById('modal-panel');
+
+            // Render Cart Items
+            const itemsContainer = document.getElementById('checkout-items');
+            itemsContainer.innerHTML = '';
+            let total = 0;
+
+            cart.forEach((item, index) => {
+                total += item.price;
+                itemsContainer.innerHTML += `
+                    <div class="flex justify-between items-center text-sm">
+                        <div class="flex items-center gap-3 truncate pr-4">
+                            <div class="w-10 h-10 rounded bg-gray-100 flex-shrink-0 overflow-hidden">
+                                <img src="${item.img}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="truncate">
+                                <p class="font-medium text-gray-900 truncate">${item.title}</p>
+                                <p class="text-gray-500 text-xs">${item.type}</p>
+                            </div>
+                        </div>
+                        <span class="font-semibold text-gray-900 flex-shrink-0">$${item.price.toFixed(2)}</span>
+                    </div>
+                `;
+            });
+
+            document.getElementById('checkout-total').innerText = `$${total.toFixed(2)}`;
+
+            modal.classList.remove('hidden');
+            // Small delay to allow display block to apply before transition
+            setTimeout(() => {
+                panel.classList.remove('modal-leave', 'modal-leave-active');
+                panel.classList.add('modal-enter', 'modal-enter-active');
+            }, 10);
+        }
+
+        function closeCheckout() {
+            const modal = document.getElementById('checkout-modal');
+            const panel = document.getElementById('modal-panel');
+
+            panel.classList.remove('modal-enter', 'modal-enter-active');
+            panel.classList.add('modal-leave', 'modal-leave-active');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200); // match transition duration
+        }
+
+        // Mock Payment Process
+        function processPayment(e) {
+            e.preventDefault();
+
+            // Simulate processing
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...`;
+            btn.disabled = true;
+
+            setTimeout(() => {
+                // Success
+                closeCheckout();
+                cart = []; // Empty cart
+                updateCartBadge();
+
+                // Show Success Modal
+                document.getElementById('success-modal').classList.remove('hidden');
+
+                // Reset button
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                e.target.reset();
+            }, 1500);
+        }
+
+        function closeSuccess() {
+            document.getElementById('success-modal').classList.add('hidden');
+        }
+
+        // Initial setup
+        updateCartBadge();
+    </script>
+</body>
+
+</html>
