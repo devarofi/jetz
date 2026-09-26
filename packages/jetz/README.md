@@ -453,35 +453,6 @@ div(
 )
 ```
 
-#### Forms and Inputs
-
-Use `form`, `label`, `select`, `option`, `textarea`, and the other standard form element factories directly. `input` accepts any native type through its attributes; named helpers such as `inputEmail`, `inputCheckbox`, and `inputDate` set a specific type for you. The helper's type is fixed, while other attributes remain configurable.
-
-```javascript
-import {
-  button, form, inputCheckbox, inputEmail, inputPassword,
-  label, option, select, textarea
-} from "jetz/ui";
-
-const ProfileForm = form({
-  onsubmit(event) {
-    event.preventDefault();
-  }
-},
-  label("Email", inputEmail({ name: "email", required: true })),
-  label("Password", inputPassword({ name: "password", required: true })),
-  label("Timezone", select({ name: "timezone" },
-    option({ value: "utc" }, "UTC"),
-    option({ value: "local" }, "Local time")
-  )),
-  label(inputCheckbox({ name: "updates" }), "Send me updates"),
-  label("Bio", textarea({ name: "bio", rows: 4 })),
-  button({ type: "submit" }, "Save profile")
-);
-```
-
-Named input helpers are provided for all standard input types: `inputButton`, `inputCheckbox`, `inputColor`, `inputDate`, `inputDateTimeLocal`, `inputEmail`, `inputFile`, `inputHidden`, `inputImage`, `inputMonth`, `inputNumber`, `inputPassword`, `inputRadio`, `inputRange`, `inputReset`, `inputSearch`, `inputSubmit`, `inputTel`, `inputText`, `inputTime`, `inputUrl`, and `inputWeek`.
-
 ---
 
 ### 2. Components (Functions & Classes)
@@ -1035,6 +1006,31 @@ function AppShell() {
 
 Jetz.mount(AppShell(), document.body);
 ```
+
+#### Route SEO Metadata
+
+Attach a `head` callback to a route to update the document title and metadata whenever that route is activated. Return one head element or an array of elements; Jetz removes the previously managed route elements while preserving unrelated tags already in `<head>`.
+
+```javascript
+import { Router, route } from "jetz/router";
+import { title, meta } from "jetz/ui";
+
+const appRouter = new Router(
+  route("/", HomeView),
+  route("/about", {
+    component: AboutView,
+    head: () => [
+      title("About Jetz"),
+      meta({
+        name: "description",
+        content: "Learn about the Jetz framework."
+      })
+    ]
+  })
+);
+```
+
+This keeps metadata current during client-side navigation. For search and social crawlers that need metadata in the initial HTML response, use server-side rendering or prerendering as well; client-side updates alone cannot add tags to the response already delivered by the server.
 
 #### Link Helpers
 

@@ -5,6 +5,16 @@ export interface RouteDefinition {
     path: string;
     component: any;
     middlewares?: (typeof Middleware | Middleware | any)[];
+    head?: (params?: Record<string, any> | null) => RouteHeadContent;
+}
+
+export type RouteHeadEntry = JetzElement | HTMLElement;
+export type RouteHeadContent = RouteHeadEntry | RouteHeadEntry[];
+
+export interface RouteOptions {
+    component: any;
+    middlewares?: (typeof Middleware | Middleware | any)[];
+    head?: (params?: Record<string, any> | null) => RouteHeadContent;
 }
 
 /**
@@ -37,6 +47,7 @@ export declare class Router {
  * @param component - Component class, function, or JetzElement
  * @param middlewares - Array of Middleware classes/instances
  */
+export declare function route(path: string, options: RouteOptions): RouteDefinition;
 export declare function route(
     path: string,
     component: any,

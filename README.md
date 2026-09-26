@@ -1007,6 +1007,31 @@ function AppShell() {
 Jetz.mount(AppShell(), document.body);
 ```
 
+#### Route SEO Metadata
+
+Attach a `head` callback to a route to update the document title and metadata whenever that route is activated. Return one head element or an array of elements; Jetz removes the previously managed route elements while preserving unrelated tags already in `<head>`.
+
+```javascript
+import { Router, route } from "jetz/router";
+import { title, meta } from "jetz/ui";
+
+const appRouter = new Router(
+  route("/", HomeView),
+  route("/about", {
+    component: AboutView,
+    head: () => [
+      title("About Jetz"),
+      meta({
+        name: "description",
+        content: "Learn about the Jetz framework."
+      })
+    ]
+  })
+);
+```
+
+This keeps metadata current during client-side navigation. For search and social crawlers that need metadata in the initial HTML response, use server-side rendering or prerendering as well; client-side updates alone cannot add tags to the response already delivered by the server.
+
 #### Link Helpers
 
 * `asLink("/path", params)`: Event modifier to navigate to a route on click.

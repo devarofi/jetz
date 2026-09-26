@@ -6,6 +6,7 @@ export class Router {
 	#stateTarget;
 	#routes;
 	#navigationObserver;
+	#routeHeadNodes = [];
 
 	constructor(...route) {
 		if ('navigation' in window) {
@@ -93,19 +94,38 @@ export class Router {
 		for (let i = 0; i < this.#routes.length; i++) {
 			const route = this.#routes[i];
 
-			if (route.path === routename) {
+			if (this.#fixRoutename(route.path) === routename) {
 				let _next = true;
 				if (route.middlewares && route.middlewares.length != 0) {
 					_next = this.verifyMiddlewares(route.middlewares, params);
 				}
 				if (_next === true) {
 					this.#saveParams(routename, params);
+					this.#applyRouteHead(route, params);
 					return toElement(route.component, params)
 				} else {
 					return _next;
 				}
 			}
 		}
+	}
+	#applyRouteHead(route, params) {
+		this.#routeHeadNodes.forEach(node => node.remove());
+		this.#routeHeadNodes = [];
+		if (typeof route.head !== 'function') return;
+
+		const headContent = route.head(params);
+		const entries = (Array.isArray(headContent) ? headContent.flat(Infinity) : [headContent])
+			.filter(entry => entry instanceof JetzElement || entry instanceof HTMLElement);
+		entries.forEach(entry => {
+			let node = entry;
+			if (entry instanceof JetzElement) {
+				entry.render();
+				node = entry.getElement();
+			}
+			document.head.append(node);
+			this.#routeHeadNodes.push(node);
+		});
 	}
 	verifyMiddlewares(middlewares, params) {
 		let _next = false;
@@ -169,10 +189,20 @@ function toElement(component, params = null) {
 	}
 }
 
-export function route(path, component, middlewares = []) {
+
+export function route(path, componentOrOptions, middlewares = []) {
+	if (componentOrOptions != null && typeof componentOrOptions === 'object' &&
+		Object.prototype.hasOwnProperty.call(componentOrOptions, 'component')) {
+		return {
+			path,
+			component: componentOrOptions.component,
+			middlewares: componentOrOptions.middlewares ?? [],
+			head: componentOrOptions.head
+		};
+	}
 	return {
-		path: path,
-		component: component,
+		path,
+		component: componentOrOptions,
 		middlewares
 	}
 }

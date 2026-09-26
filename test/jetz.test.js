@@ -7,6 +7,7 @@ import {
 } from '../src/lib/jetz.js';
 import { aria_, base, body, css, data_, div, head, htmlElement, link, meta, search, slot, span, p, ul, li, a, button, href, style, styleElement, title } from '../src/lib/jetz-ui.js';
 import * as ui from '../src/lib/jetz-ui.js';
+import { Router, route } from '../src/lib/jetz-router.js';
 
 const mount = (element) => {
 	const target = document.createElement('div');
@@ -57,6 +58,46 @@ describe('typed input factories', () => {
 
 		expect(rendered.map(element => element.type)).toEqual(inputs.map(([, type]) => type));
 		expect(rendered.every(element => element.name === 'field')).toBe(true);
+	});
+});
+
+describe('route head metadata', () => {
+	it('sets metadata on navigation and replaces only prior route metadata', () => {
+		window.history.replaceState({}, '', '/');
+		const router = new Router(
+			route('/', {
+				component: () => div('Home'),
+				head: () => [title('Home'), meta({ name: 'description', content: 'Home page' })]
+			}),
+			route('/about', {
+				component: () => div('About'),
+				head: () => [
+					title('About Jetz'),
+					meta({ name: 'description', content: 'Learn about the Jetz framework.' })
+				]
+			})
+		);
+		router.install(Jetz);
+
+		expect(document.title).toBe('Home');
+		expect(document.head.querySelector('meta[name="description"]').content).toBe('Home page');
+		router.to('/about');
+		expect(document.title).toBe('About Jetz');
+		expect(document.head.querySelectorAll('meta[name="description"]')).toHaveLength(1);
+		expect(document.head.querySelector('meta[name="description"]').content)
+			.toBe('Learn about the Jetz framework.');
+		router.to('/');
+		expect(document.title).toBe('Home');
+		expect(document.head.querySelector('meta[name="description"]').content).toBe('Home page');
+		document.head.querySelector('meta[name="description"]')?.remove();
+		document.title = '';
+	});
+
+	it('keeps the legacy positional route signature', () => {
+		const component = () => div('legacy');
+		const definition = route('/legacy', component);
+		expect(definition.component).toBe(component);
+		expect(definition.middlewares).toEqual([]);
 	});
 });
 
