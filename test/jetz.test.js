@@ -5,7 +5,8 @@ import {
 	html, ifElse, listen, listOf, loop, onCreate, onDestroy, onMount, onUpdate,
 	range, rememberOf, sequenceOf, stateOf
 } from '../src/lib/jetz.js';
-import { div, span, p, ul, li } from '../src/lib/jetz-ui.js';
+import { aria_, base, body, css, data_, div, head, htmlElement, link, meta, search, slot, span, p, ul, li, a, button, href, style, styleElement, title } from '../src/lib/jetz-ui.js';
+import * as ui from '../src/lib/jetz-ui.js';
 
 const mount = (element) => {
 	const target = document.createElement('div');
@@ -31,6 +32,34 @@ describe('render', () => {
 	});
 });
 
+describe('HTML document elements', () => {
+	it('provides factories for document and metadata tags', () => {
+		const elements = [htmlElement(), head(), body(), title(), base(), link(), meta(), styleElement(), search(), slot()];
+		expect(elements.map(element => element.tagName)).toEqual([
+			'html', 'head', 'body', 'title', 'base', 'link', 'meta', 'style', 'search', 'slot'
+		]);
+	});
+});
+
+describe('typed input factories', () => {
+	it('creates every standard input type and preserves other attributes', () => {
+		const inputs = [
+			[ui.inputButton, 'button'], [ui.inputCheckbox, 'checkbox'], [ui.inputColor, 'color'],
+			[ui.inputDate, 'date'], [ui.inputDateTimeLocal, 'datetime-local'], [ui.inputEmail, 'email'],
+			[ui.inputFile, 'file'], [ui.inputHidden, 'hidden'], [ui.inputImage, 'image'],
+			[ui.inputMonth, 'month'], [ui.inputNumber, 'number'], [ui.inputPassword, 'password'],
+			[ui.inputRadio, 'radio'], [ui.inputRange, 'range'], [ui.inputReset, 'reset'],
+			[ui.inputSearch, 'search'], [ui.inputSubmit, 'submit'], [ui.inputTel, 'tel'],
+			[ui.inputText, 'text'], [ui.inputTime, 'time'], [ui.inputUrl, 'url'], [ui.inputWeek, 'week']
+		];
+		const target = mount(div(inputs.map(([factory]) => factory({ type: 'text', name: 'field' }))));
+		const rendered = [...target.querySelectorAll('input')];
+
+		expect(rendered.map(element => element.type)).toEqual(inputs.map(([, type]) => type));
+		expect(rendered.every(element => element.name === 'field')).toBe(true);
+	});
+});
+
 describe('stateOf', () => {
 	it('binds a state to a child and updates the DOM', () => {
 		const count = stateOf(0);
@@ -51,6 +80,84 @@ describe('stateOf', () => {
 		s.unsubscribe(fn);
 		s.setState(2);
 		expect(fn).not.toHaveBeenCalled();
+	});
+});
+
+describe('reactive css classes', () => {
+	it('updates a class when a callback interpolation reads state', () => {
+		const task = stateOf({ done: false, title: 'Review the API' });
+		const target = mount(li(
+			css`task-number ${() => task.done.value ? 'completed' : ''}`,
+			task.title
+		));
+		const item = target.querySelector('li');
+
+		expect(item.className).toBe('task-number');
+		task.done.value = true;
+		expect(item.className).toBe('task-number completed');
+		task.done.value = false;
+		expect(item.className).toBe('task-number');
+		expect(item.textContent).toBe('Review the API');
+	});
+});
+
+describe('reactive attributes', () => {
+	it('updates state-backed helper, prefixed, and callback attributes', () => {
+		const path = stateOf('/start');
+		const label = stateOf('Initial label');
+		const status = stateOf('open');
+		const title = stateOf('Initial title');
+		const busy = stateOf(false);
+		const target = mount(a(
+			href(() => path.value),
+			aria_({ label, busy }),
+			data_({ status }),
+			{ title: () => title.value },
+			'link'
+		));
+		const link = target.querySelector('a');
+
+		expect(link.getAttribute('href')).toBe('/start');
+		expect(link.getAttribute('aria-label')).toBe('Initial label');
+		expect(link.getAttribute('aria-busy')).toBe('false');
+		expect(link.getAttribute('data-status')).toBe('open');
+		expect(link.getAttribute('title')).toBe('Initial title');
+
+		path.value = '/next';
+		label.value = 'Updated label';
+		busy.value = true;
+		status.value = 'done';
+		title.value = 'Updated title';
+		expect(link.getAttribute('href')).toBe('/next');
+		expect(link.getAttribute('aria-label')).toBe('Updated label');
+		expect(link.getAttribute('aria-busy')).toBe('true');
+		expect(link.getAttribute('data-status')).toBe('done');
+		expect(link.getAttribute('title')).toBe('Updated title');
+	});
+
+	it('updates style properties from callback dependencies', () => {
+		const color = stateOf('red');
+		const target = mount(div(style({ color: () => color.value })));
+		const box = target.querySelector('div');
+
+		expect(box.style.color).toBe('red');
+		color.value = 'blue';
+		expect(box.style.color).toBe('blue');
+	});
+
+	it('adds and removes boolean attributes when their state changes', () => {
+		const disabled = stateOf(false);
+		const target = mount(button({ disabled }, 'Save'));
+		const saveButton = target.querySelector('button');
+
+		expect(saveButton.disabled).toBe(false);
+		expect(saveButton.hasAttribute('disabled')).toBe(false);
+		disabled.value = true;
+		expect(saveButton.disabled).toBe(true);
+		expect(saveButton.hasAttribute('disabled')).toBe(true);
+		disabled.value = false;
+		expect(saveButton.disabled).toBe(false);
+		expect(saveButton.hasAttribute('disabled')).toBe(false);
 	});
 });
 

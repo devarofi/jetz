@@ -1,3 +1,6 @@
+import type { Router } from './jetz-router.js';
+import type { JetzSession } from './jetz-session.js';
+
 /**
  * Core reactive State container.
  * Calling `stateOf(value)` returns an instance of `State<T>`.
@@ -366,8 +369,8 @@ export declare function createList<T>(count: number, factory: (index: number) =>
  */
 export declare const Jetz: {
     version: string;
-    $route?: any;
-    $session?: any;
+    $route?: Router;
+    $session?: JetzSession;
 
     /** Mounts a JetzElement or Component into a DOM container. */
     mount(app: any, container: HTMLElement | string, options?: { onStart?: () => void; onLoad?: () => void }): void;
@@ -381,5 +384,5 @@ export declare const Jetz: {
     /** Installs a plugin (e.g. Router, JetzSession). */
     use(plugin: any): void;
 
-    [key: string]: any;
+    [key: string]: unknown;
 };

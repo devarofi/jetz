@@ -11,6 +11,21 @@ const Obj = {
 		return !Obj.isEmpty(target);
 	}
 }
+const booleanAttributes = new Set([
+	'allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'controls',
+	'default', 'defer', 'disabled', 'formnovalidate', 'hidden', 'inert', 'ismap',
+	'itemscope', 'loop', 'multiple', 'muted', 'nomodule', 'novalidate', 'open',
+	'playsinline', 'readonly', 'required', 'reversed', 'selected'
+]);
+const booleanAttributeProperties = {
+	allowfullscreen: 'allowFullscreen',
+	formnovalidate: 'formNoValidate',
+	itemscope: 'itemScope',
+	ismap: 'isMap',
+	nomodule: 'noModule',
+	playsinline: 'playsInline',
+	readonly: 'readOnly'
+};
 NodeList.prototype.last = function () {
 	return this[this.length - 1];
 }
@@ -410,8 +425,9 @@ class JetzElement {
 	#addStyle(styles) {
 		for (const key in styles) {
 			if (Object.hasOwnProperty.call(styles, key)) {
-				const value = styles[key];
-				if (typeof (value) === 'object' && (value instanceof State || value.prototype instanceof State)) {
+				let value = styles[key];
+				if (typeof value === 'function') value = computed(value);
+				if (value instanceof State) {
 					const styleState = new StyleState(this.o.style, key, value);
 					value.addContainer(styleState);
 					this.o.style[key] = value.value;
@@ -660,36 +676,58 @@ class JetzElement {
 		return this;
 	}
 	addAttr(attrName, attrValue) {
+		if (typeof attrValue === 'function') {
+			attrValue = computed(attrValue);
+		}
 		if (attrName === 'class') {
-			this.addClass(attrValue);
-		} else {
-			if (attrName === 'value' && attrValue == null) {
-				this.o.value = attrValue;
-				return this;
+			if (attrValue instanceof State) {
+				this.#setClassAttribute(attrValue.getValue());
+				attrValue.subscribe(value => this.#setClassAttribute(value));
+			} else {
+				this.addClass(attrValue);
 			}
-			// is state
-			if (attrValue !== null && (attrValue instanceof State || attrValue.prototype instanceof State)) {
-				let newAttr = this.o.getAttributeNode(attrName);
-				if (newAttr == null) {
-					newAttr = document.createAttribute(attrName);
-					this.o.setAttributeNode(newAttr);
-				}
-				if (attrName === 'value') {
-					this.o.value = attrValue.getValue();
-				} else {
-					newAttr.nodeValue = attrValue.getValue();
-				}
-				attrValue.addContainer(newAttr);
+		} else {
+			if (attrValue instanceof State) {
+				const update = value => this.#setAttributeValue(attrName, value);
+				update(attrValue.getValue());
+				attrValue.subscribe(update);
 			} else if (typeof attrValue === 'object') {
-				if (attrValue.constructor.prototype instanceof JetzArgument) {
+				if (attrValue !== null && attrValue.constructor.prototype instanceof JetzArgument) {
 					attrValue.setElement(this);
 					attrValue.onAssigned();
 				}
 			} else {
-				this.o.setAttribute(attrName, attrValue);
+				this.#setAttributeValue(attrName, attrValue);
 			}
 		}
 		return this;
+	}
+	#setAttributeValue(attrName, value) {
+		if (attrName === 'value') {
+			this.o.value = value;
+			if (value == null) this.o.removeAttribute(attrName);
+			else this.o.setAttribute(attrName, value);
+			return;
+		}
+		if (booleanAttributes.has(attrName.toLowerCase())) {
+			const enabled = Boolean(value);
+			if (enabled) this.o.setAttribute(attrName, attrName);
+			else this.o.removeAttribute(attrName);
+			const property = booleanAttributeProperties[attrName.toLowerCase()] || attrName.toLowerCase();
+			if (property in this.o) this.o[property] = enabled;
+			return;
+		}
+		this.o.setAttribute(attrName, value);
+	}
+	#setClassAttribute(value) {
+		const values = Array.isArray(value) ? flatMap(value) : [value];
+		const className = values
+			.filter(item => item != null && item !== false)
+			.flatMap(item => String(item).split(/\s+/))
+			.filter(Boolean)
+			.join(' ');
+		if (className) this.o.setAttribute('class', className);
+		else this.o.removeAttribute('class');
 	}
 	addClass(value) {
 		if (typeof (this.o) === 'undefined') {

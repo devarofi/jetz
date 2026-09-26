@@ -587,6 +587,52 @@ const tax = computed(() => subtotal.value * 0.1);
 const grandTotal = computed(() => subtotal.value + tax.value);
 ```
 
+#### Reactive Classes
+
+Use a callback interpolation when part of a class depends on state. `css` evaluates that callback as a computed value and updates the element's class attribute when the state changes:
+
+```javascript
+import { listOf, loop, stateOf } from "jetz";
+import { css, li, ul } from "jetz/ui";
+
+const tasks = listOf(
+  stateOf({ id: 201, done: true, title: "Sketch the onboarding flow" }),
+  stateOf({ id: 202, done: false, title: "Review the component API" })
+);
+
+const TaskList = ul(loop(tasks, task => li(
+  css`task-number ${() => task.done.value ? "completed" : ""}`,
+  task.title
+)));
+```
+
+The callback must read `task.done.value`; an expression like `${task.done ? "completed" : ""}` is evaluated before `css` receives it and cannot track future changes. Static classes remain ordinary tagged templates, for example `css`task-number completed``.
+
+#### Reactive Attributes
+
+Attribute helpers keep `State` values instead of converting them to strings early. You can also pass a callback to an attribute or style property; its `.value` reads are tracked and the DOM updates when they change:
+
+```javascript
+import { stateOf } from "jetz";
+import { a, aria_, data_, button, href, style } from "jetz/ui";
+
+const destination = stateOf("/tasks");
+const saving = stateOf(false);
+const color = stateOf("crimson");
+
+const Link = a(href(destination), "Tasks");
+const SaveButton = button({ disabled: saving }, "Save");
+const Status = a(
+  aria_({ busy: saving }),
+  data_({ destination }),
+  { title: () => `Open ${destination.value}` },
+  "Status"
+);
+const Swatch = a(style({ color: () => color.value }), "Preview");
+```
+
+HTML boolean attributes such as `disabled` are added for `true` and removed for `false`. `aria-*` and `data-*` values remain strings, so a false state becomes `"false"` rather than removing the attribute.
+
 ---
 
 ### 5. Side-Effects (`effect`)

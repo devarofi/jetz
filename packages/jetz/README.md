@@ -453,6 +453,35 @@ div(
 )
 ```
 
+#### Forms and Inputs
+
+Use `form`, `label`, `select`, `option`, `textarea`, and the other standard form element factories directly. `input` accepts any native type through its attributes; named helpers such as `inputEmail`, `inputCheckbox`, and `inputDate` set a specific type for you. The helper's type is fixed, while other attributes remain configurable.
+
+```javascript
+import {
+  button, form, inputCheckbox, inputEmail, inputPassword,
+  label, option, select, textarea
+} from "jetz/ui";
+
+const ProfileForm = form({
+  onsubmit(event) {
+    event.preventDefault();
+  }
+},
+  label("Email", inputEmail({ name: "email", required: true })),
+  label("Password", inputPassword({ name: "password", required: true })),
+  label("Timezone", select({ name: "timezone" },
+    option({ value: "utc" }, "UTC"),
+    option({ value: "local" }, "Local time")
+  )),
+  label(inputCheckbox({ name: "updates" }), "Send me updates"),
+  label("Bio", textarea({ name: "bio", rows: 4 })),
+  button({ type: "submit" }, "Save profile")
+);
+```
+
+Named input helpers are provided for all standard input types: `inputButton`, `inputCheckbox`, `inputColor`, `inputDate`, `inputDateTimeLocal`, `inputEmail`, `inputFile`, `inputHidden`, `inputImage`, `inputMonth`, `inputNumber`, `inputPassword`, `inputRadio`, `inputRange`, `inputReset`, `inputSearch`, `inputSubmit`, `inputTel`, `inputText`, `inputTime`, `inputUrl`, and `inputWeek`.
+
 ---
 
 ### 2. Components (Functions & Classes)
@@ -586,6 +615,52 @@ const subtotal = computed(() => price.value * qty.value);
 const tax = computed(() => subtotal.value * 0.1);
 const grandTotal = computed(() => subtotal.value + tax.value);
 ```
+
+#### Reactive Classes
+
+Use a callback interpolation when part of a class depends on state. `css` evaluates that callback as a computed value and updates the element's class attribute when the state changes:
+
+```javascript
+import { listOf, loop, stateOf } from "jetz";
+import { css, li, ul } from "jetz/ui";
+
+const tasks = listOf(
+  stateOf({ id: 201, done: true, title: "Sketch the onboarding flow" }),
+  stateOf({ id: 202, done: false, title: "Review the component API" })
+);
+
+const TaskList = ul(loop(tasks, task => li(
+  css`task-number ${() => task.done.value ? "completed" : ""}`,
+  task.title
+)));
+```
+
+The callback must read `task.done.value`; an expression like `${task.done ? "completed" : ""}` is evaluated before `css` receives it and cannot track future changes. Static classes remain ordinary tagged templates, for example `css`task-number completed``.
+
+#### Reactive Attributes
+
+Attribute helpers keep `State` values instead of converting them to strings early. You can also pass a callback to an attribute or style property; its `.value` reads are tracked and the DOM updates when they change:
+
+```javascript
+import { stateOf } from "jetz";
+import { a, aria_, data_, button, href, style } from "jetz/ui";
+
+const destination = stateOf("/tasks");
+const saving = stateOf(false);
+const color = stateOf("crimson");
+
+const Link = a(href(destination), "Tasks");
+const SaveButton = button({ disabled: saving }, "Save");
+const Status = a(
+  aria_({ busy: saving }),
+  data_({ destination }),
+  { title: () => `Open ${destination.value}` },
+  "Status"
+);
+const Swatch = a(style({ color: () => color.value }), "Preview");
+```
+
+HTML boolean attributes such as `disabled` are added for `true` and removed for `false`. `aria-*` and `data-*` values remain strings, so a false state becomes `"false"` rather than removing the attribute.
 
 ---
 

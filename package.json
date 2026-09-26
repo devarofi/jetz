@@ -1,6 +1,6 @@
 {
   "name": "@daevsoft/jetz",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A composable javascript framework",
   "main": "index.js",
   "exports": {

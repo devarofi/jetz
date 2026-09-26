@@ -1,4 +1,4 @@
-import { createElement } from './jetz.js'
+import { computed, createElement, State } from './jetz.js'
 
 // ---------- factories (deduplicate the repetitive helpers below) ----------
 
@@ -6,7 +6,29 @@ import { createElement } from './jetz.js'
 const elementOf = tag => (...args) => createElement(tag, ...args);
 
 /** Creates an attribute helper: value => ({ [key]: value }) */
-const attrOf = key => value => ({ [key]: value.toString() });
+const attrOf = key => value => ({
+    [key]: value instanceof State || typeof value === 'function' ? value : value.toString()
+});
+
+function cssValue(value) {
+    if (typeof value === 'function') value = value();
+    if (value instanceof State) value = value.value;
+    return value ?? '';
+}
+
+/** Creates a class attribute, supporting reactive tagged-template interpolations. */
+export function css(value, ...values) {
+    if (Array.isArray(value) && Object.hasOwn(value, 'raw')) {
+        const strings = value;
+        const render = () => strings.reduce((className, part, index) => {
+            return className + part + (index < values.length ? cssValue(values[index]) : '');
+        }, '');
+        const isReactive = values.some(item => typeof item === 'function' || item instanceof State);
+        return { class: isReactive ? computed(render) : render() };
+    }
+    if (typeof value === 'function') return { class: computed(value) };
+    return { class: value };
+}
 
 /** Creates an event-attribute helper: callback => ({ [event]: callback }) */
 const listenerOf = event => callback => ({ [event]: callback });
@@ -45,7 +67,6 @@ export const type = attrOf('type');
 export const role = attrOf('role');
 export const tabindex = attrOf('tabindex');
 export const value = attrOf('value');
-export const css = attrOf('class');
 export const style = styles => ({ style: styles });
 export const data_ = objData => prefixedAttrs('data-', objData);
 export const aria_ = objAria => prefixedAttrs('aria-', objAria);
@@ -67,8 +88,43 @@ export function text(...content) {
 
 // ---------- elements ----------
 
-export const inputText = (...args) => createElement('input', { type: 'text' }, ...args);
-export const inputNumber = (...args) => createElement('input', { type: 'number' }, ...args);
+const inputOf = inputType => (...args) => {
+    const element = createElement('input', ...args);
+    element.attributes.type = inputType;
+    return element;
+};
+
+export const inputButton = inputOf('button');
+export const inputCheckbox = inputOf('checkbox');
+export const inputColor = inputOf('color');
+export const inputDate = inputOf('date');
+export const inputDateTimeLocal = inputOf('datetime-local');
+export const inputEmail = inputOf('email');
+export const inputFile = inputOf('file');
+export const inputHidden = inputOf('hidden');
+export const inputImage = inputOf('image');
+export const inputMonth = inputOf('month');
+export const inputNumber = inputOf('number');
+export const inputPassword = inputOf('password');
+export const inputRadio = inputOf('radio');
+export const inputRange = inputOf('range');
+export const inputReset = inputOf('reset');
+export const inputSearch = inputOf('search');
+export const inputSubmit = inputOf('submit');
+export const inputTel = inputOf('tel');
+export const inputText = inputOf('text');
+export const inputTime = inputOf('time');
+export const inputUrl = inputOf('url');
+export const inputWeek = inputOf('week');
+
+export const htmlElement = elementOf('html');
+export const head = elementOf('head');
+export const body = elementOf('body');
+export const title = elementOf('title');
+export const base = elementOf('base');
+export const link = elementOf('link');
+export const meta = elementOf('meta');
+export const styleElement = elementOf('style');
 
 export const address = elementOf('address');
 export const article = elementOf('article');
@@ -136,6 +192,7 @@ export const embed = elementOf('embed');
 export const object = elementOf('object');
 export const param = elementOf('param');
 export const source = elementOf('source');
+export const search = elementOf('search');
 export const canvas = elementOf('canvas');
 export const script = elementOf('script');
 export const noscript = elementOf('noscript');
@@ -168,6 +225,7 @@ export const details = elementOf('details');
 export const dialog = elementOf('dialog');
 export const menu = elementOf('menu');
 export const summary = elementOf('summary');
+export const slot = elementOf('slot');
 export const template = elementOf('template');
 export const blockquote = elementOf('blockquote');
 export const iframe = elementOf('iframe');
