@@ -48,7 +48,11 @@ export function middleware(middlewares, ...routes) {
             console.warn('Jetz middleware: skipped non-object route entry', route);
             return;
         }
-        const existing = Array.isArray(route.middlewares) ? route.middlewares : [];
+        const existing = route.middlewares == null
+            ? []
+            : Array.isArray(route.middlewares)
+                ? route.middlewares.flat(Infinity)
+                : [route.middlewares];
         route.middlewares = [...existing, ...list.filter(m => !existing.includes(m))];
     });
     return routes;

@@ -1032,6 +1032,52 @@ const appRouter = new Router(
 
 This keeps metadata current during client-side navigation. For search and social crawlers that need metadata in the initial HTML response, use server-side rendering or prerendering as well; client-side updates alone cannot add tags to the response already delivered by the server.
 
+#### Dynamic Route Parameters
+
+Use `:name` for a dynamic path segment. Captured values are URL-decoded and passed to the route component, middleware, and `head` callback. Exact static paths take precedence over dynamic matches.
+
+```javascript
+const router = new Router(
+  route("/order/:orderId/message", {
+    component: ({ orderId }) => div(`Messages for order ${orderId}`),
+    head: ({ orderId }) => title(`Messages for order ${orderId}`)
+  })
+);
+
+router.to("/order/A%2012/message"); // orderId is "A 12"
+```
+
+#### Nested Route Groups
+
+Use `group()` to share a path prefix and middleware across nested routes. `route()` continues to define individual endpoints:
+
+```javascript
+import { Jetz } from "jetz";
+import { Router, group, route } from "jetz/router";
+
+const routes = [
+  route("/", Home),
+  group("/admin", {
+    middlewares: AuthGuard,
+    routes: [
+      route("/", Dashboard),
+      group("/users", {
+        middlewares: [AdminGuard, RoleGuard],
+        routes: [
+          route("/", UserList),
+          route("/:id", UserDetail)
+        ]
+      })
+    ]
+  })
+];
+
+const router = new Router(routes);
+Jetz.use(router);
+```
+
+The nested paths resolve to `/admin`, `/admin/users`, and `/admin/users/:id`. Parent middleware runs before child middleware, so the user detail route runs `AuthGuard`, `AdminGuard`, then `RoleGuard`.
+
 #### Link Helpers
 
 * `asLink("/path", params)`: Event modifier to navigate to a route on click.
@@ -1058,15 +1104,31 @@ class AuthGuard extends Middleware {
   }
 }
 
+class AdminGuard extends Middleware {
+  next(params, _continue) {
+    const user = JSON.parse(sessionStorage.getItem("user") || "null");
+    if (user?.role !== "admin") {
+      return this.deny("Administrator access is required");
+    }
+    return true;
+  }
+}
+
 const router = new Router(
   route("/", HomeView),
-  // Wrap protected routes with middleware:
+  // Every guard must return true for navigation to proceed.
+  middleware([AuthGuard, AdminGuard],
+    route("/admin", AdminView)
+  ),
+  // Multiple routes can share one middleware too.
   middleware(AuthGuard,
     route("/dashboard", DashboardView),
     route("/settings", SettingsView)
   )
 );
 ```
+
+Middleware arrays run in order. Navigation stops at the first guard that denies it, so `/admin` requires both authentication and the administrator role.
 
 ---
 

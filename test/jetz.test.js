@@ -7,7 +7,8 @@ import {
 } from '../src/lib/jetz.js';
 import { aria_, base, body, css, data_, div, head, htmlElement, link, meta, search, slot, span, p, ul, li, a, button, href, style, styleElement, title } from '../src/lib/jetz-ui.js';
 import * as ui from '../src/lib/jetz-ui.js';
-import { Router, route } from '../src/lib/jetz-router.js';
+import { Router, group, route } from '../src/lib/jetz-router.js';
+import { Middleware } from '../src/lib/middleware.js';
 
 const mount = (element) => {
 	const target = document.createElement('div');
@@ -98,6 +99,111 @@ describe('route head metadata', () => {
 		const definition = route('/legacy', component);
 		expect(definition.component).toBe(component);
 		expect(definition.middlewares).toEqual([]);
+	});
+});
+
+describe('dynamic route paths', () => {
+	it('extracts named path segments and passes them to the component', () => {
+		window.history.replaceState({}, '', '/');
+		let receivedParams;
+		const router = new Router(
+			route('/', () => div('Home')),
+			route('/order/:orderId/message', {
+				component: params => {
+					receivedParams = params;
+					return div(`Order ${params.orderId}`);
+				}
+			})
+		);
+		router.install(Jetz);
+		router.to('/order/A%2012/message');
+		expect(receivedParams).toEqual({ orderId: 'A 12' });
+	});
+
+	it('prefers an exact static route over a dynamic match', () => {
+		window.history.replaceState({}, '', '/');
+		let selectedRoute;
+		const router = new Router(
+			route('/', () => div('Home')),
+			route('/products/:productId', {
+				component: () => {
+					selectedRoute = 'dynamic';
+					return div('Product');
+				}
+			}),
+			route('/products/new', {
+				component: () => {
+					selectedRoute = 'static';
+					return div('New product');
+				}
+			})
+		);
+		router.install(Jetz);
+		router.to('/products/new');
+		expect(selectedRoute).toBe('static');
+	});
+});
+
+describe('nested route groups', () => {
+	it('joins prefixes and runs inherited middleware before child middleware', () => {
+		window.history.replaceState({}, '', '/');
+		const calls = [];
+		let receivedParams;
+		class AuthGuard extends Middleware {
+			next(params) {
+				calls.push(['auth', params?.id]);
+				return true;
+			}
+		}
+		class AdminGuard extends Middleware {
+			next(params) {
+				calls.push(['admin', params?.id]);
+				return true;
+			}
+		}
+		class RoleGuard extends Middleware {
+			next(params) {
+				calls.push(['role', params?.id]);
+				return true;
+			}
+		}
+		const router = new Router([
+			route('/', () => div('Home')),
+			group('/admin', {
+				middlewares: AuthGuard,
+				routes: [
+					route('/', () => {
+						receivedParams = 'dashboard';
+						return div('Dashboard');
+					}),
+					group('/users', {
+						middlewares: [AdminGuard, RoleGuard],
+						routes: [
+							route('/', () => {
+								receivedParams = 'users';
+								return div('Users');
+							}),
+							route('/:id', params => {
+								receivedParams = params;
+								return div(`User ${params.id}`);
+							})
+						]
+					})
+				]
+			})
+		]);
+		router.install(Jetz);
+		router.to('/admin/users/42');
+		expect(receivedParams).toEqual({ id: '42' });
+		expect(calls).toEqual([['auth', '42'], ['admin', '42'], ['role', '42']]);
+		calls.length = 0;
+		router.to('/admin');
+		expect(receivedParams).toBe('dashboard');
+		expect(calls).toEqual([['auth', undefined]]);
+		calls.length = 0;
+		router.to('/admin/users');
+		expect(receivedParams).toBe('users');
+		expect(calls).toEqual([['auth', undefined], ['admin', undefined], ['role', undefined]]);
 	});
 });
 

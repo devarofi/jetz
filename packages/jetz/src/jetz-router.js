@@ -1,6 +1,30 @@
 import { Component, Jetz, JetzArgument, JetzElement, stateOf } from "./jetz.js";
 import { Middleware } from "./middleware.js";
 
+function middlewareList(middlewares) {
+	if (middlewares == null) return [];
+	return Array.isArray(middlewares) ? middlewares.flat(Infinity) : [middlewares];
+}
+
+function joinRoutePath(prefix, path) {
+	const segments = [prefix, path]
+		.flatMap(value => typeof value === 'string' ? value.split('/') : [])
+		.filter(Boolean);
+	return segments.length > 0 ? `/${segments.join('/')}` : '/';
+}
+
+function flattenRoutes(routes, prefix = '', inheritedMiddlewares = []) {
+	return routes.flat(Infinity).flatMap(entry => {
+		if (entry == null || typeof entry !== 'object') return [];
+		const path = joinRoutePath(prefix, entry.path);
+		const middlewares = [...inheritedMiddlewares, ...middlewareList(entry.middlewares)];
+		if (entry.kind === 'group') {
+			return flattenRoutes(entry.routes ?? [], path, middlewares);
+		}
+		return [{ ...entry, path, middlewares }];
+	});
+}
+
 export class Router {
 	#varname = '$route';
 	#stateTarget;
@@ -12,8 +36,7 @@ export class Router {
 		if ('navigation' in window) {
 			this.#navigationObserver = window.navigation;
 		}
-		// rest param is always an array; flatten nested route arrays too
-		this.#routes = route.flat(Infinity);
+		this.#routes = flattenRoutes(route);
 	}
 	#initialNavigateListener() {
 		if ('navigation' in window) {
@@ -55,7 +78,7 @@ export class Router {
 	to(route_name, params) {
 		route_name = this.#fixRoutename(route_name);
 		this.#saveParams(route_name, params);
-		window.history.pushState('', '', route_name);
+		window.history.pushState('', '', route_name === '/' ? '/' : `/${route_name}`);
 		// scroll to top page
 		window.scroll(0, 0);
 		this.#fallbackNavigationSupport();
@@ -91,23 +114,52 @@ export class Router {
 		return this.#stateTarget;
 	}
 	#getPath(routename, params) {
-		for (let i = 0; i < this.#routes.length; i++) {
-			const route = this.#routes[i];
+		const exactRoute = this.#routes.find(route => this.#fixRoutename(route.path) === routename);
+		const candidates = exactRoute
+			? [exactRoute, ...this.#routes.filter(route => route !== exactRoute)]
+			: this.#routes;
+		for (let i = 0; i < candidates.length; i++) {
+			const route = candidates[i];
+			const pathParams = this.#matchPath(route.path, routename);
 
-			if (this.#fixRoutename(route.path) === routename) {
+			if (pathParams !== null) {
+				const resolvedParams = Object.keys(pathParams).length > 0
+					? { ...(params && typeof params === 'object' ? params : {}), ...pathParams }
+					: params;
 				let _next = true;
 				if (route.middlewares && route.middlewares.length != 0) {
-					_next = this.verifyMiddlewares(route.middlewares, params);
+					_next = this.verifyMiddlewares(route.middlewares, resolvedParams);
 				}
 				if (_next === true) {
-					this.#saveParams(routename, params);
-					this.#applyRouteHead(route, params);
-					return toElement(route.component, params)
+					this.#saveParams(routename, resolvedParams);
+					this.#applyRouteHead(route, resolvedParams);
+					return toElement(route.component, resolvedParams)
 				} else {
 					return _next;
 				}
 			}
 		}
+	}
+	#matchPath(routePath, targetPath) {
+		const routeSegments = this.#fixRoutename(routePath).split('/').filter(Boolean);
+		const targetSegments = this.#fixRoutename(targetPath).split('/').filter(Boolean);
+		if (routeSegments.length !== targetSegments.length) return null;
+
+		const params = {};
+		for (let index = 0; index < routeSegments.length; index++) {
+			const routeSegment = routeSegments[index];
+			const targetSegment = targetSegments[index];
+			if (routeSegment.startsWith(':') && routeSegment.length > 1) {
+				try {
+					params[routeSegment.slice(1)] = decodeURIComponent(targetSegment);
+				} catch {
+					return null;
+				}
+			} else if (routeSegment !== targetSegment) {
+				return null;
+			}
+		}
+		return params;
 	}
 	#applyRouteHead(route, params) {
 		this.#routeHeadNodes.forEach(node => node.remove());
@@ -205,6 +257,11 @@ export function route(path, componentOrOptions, middlewares = []) {
 		component: componentOrOptions,
 		middlewares
 	}
+}
+
+/** Groups child routes under a path prefix and inherited middleware. */
+export function group(path, { middlewares = [], routes = [] } = {}) {
+	return { kind: 'group', path, middlewares, routes };
 }
 
 export function link(routename, element, params = null) {

@@ -1,19 +1,33 @@
 import { JetzElement, State } from './jetz.js';
 import { Middleware } from './middleware.js';
 
+export type RouteMiddleware = typeof Middleware | Middleware;
+export type RouteMiddlewareOption = RouteMiddleware | RouteMiddleware[];
+
 export interface RouteDefinition {
+    /** Route path; segments prefixed with `:` capture decoded path parameters. */
     path: string;
     component: any;
-    middlewares?: (typeof Middleware | Middleware | any)[];
+    middlewares?: RouteMiddlewareOption;
     head?: (params?: Record<string, any> | null) => RouteHeadContent;
 }
 
+export interface RouteGroup {
+    kind: 'group';
+    path: string;
+    middlewares?: RouteMiddlewareOption;
+    routes: RouteInput[];
+}
+
+export type RouteInput = RouteDefinition | RouteGroup | RouteInput[];
+
 export type RouteHeadEntry = JetzElement | HTMLElement;
 export type RouteHeadContent = RouteHeadEntry | RouteHeadEntry[];
+export type RouteParams = Record<string, string>;
 
 export interface RouteOptions {
     component: any;
-    middlewares?: (typeof Middleware | Middleware | any)[];
+    middlewares?: RouteMiddlewareOption;
     head?: (params?: Record<string, any> | null) => RouteHeadContent;
 }
 
@@ -22,7 +36,7 @@ export interface RouteOptions {
  * Handles path resolution, parameters, browser history, and route guards.
  */
 export declare class Router {
-    constructor(...routes: (RouteDefinition | RouteDefinition[])[]);
+    constructor(...routes: RouteInput[]);
 
     /** Navigate to a named route with optional parameters. */
     to(routeName: string, params?: Record<string, any> | null): void;
@@ -53,6 +67,15 @@ export declare function route(
     component: any,
     middlewares?: (typeof Middleware | Middleware | any)[]
 ): RouteDefinition;
+
+/**
+ * Groups routes under a shared path prefix and inherited middleware.
+ * Middleware from outer groups runs before middleware from inner groups and leaves.
+ */
+export declare function group(
+    path: string,
+    options?: { middlewares?: RouteMiddlewareOption; routes?: RouteInput[] }
+): RouteGroup;
 
 /**
  * Attaches router navigation to an existing JetzElement on click.
