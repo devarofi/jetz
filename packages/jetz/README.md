@@ -1,33 +1,1312 @@
-# Jetz
+<div align="center">
+  <img src="./public/img/logo/small.png" alt="Jetz Logo" width="140" />
+  <h1>Jetz</h1>
+  <p><strong>Composable JavaScript Framework for building reactive web interfaces with declarative JavaScript.</strong></p>
 
-A composable javascript framework.
+  <p>
+    <a href="https://github.com/devarofi/jetz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-ISC-blue.svg" alt="License: ISC" /></a>
+    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.0.0-emerald.svg" alt="Version 1.0.0" /></a>
+    <a href="https://github.com/devarofi/jetz/actions"><img src="https://img.shields.io/badge/tests-passing-brightgreen.svg" alt="Tests" /></a>
+    <a href="https://rspack.dev"><img src="https://img.shields.io/badge/bundled_with-Rspack-orange.svg" alt="Rspack" /></a>
+  </p>
 
-## Install
+  <p>
+    <a href="#quick-start">Quick Start</a> •
+    <a href="#why-jetz">Why Jetz?</a> •
+    <a href="#jetz-in-60-seconds">60 Seconds</a> •
+    <a href="#core-concepts">Core Concepts</a> •
+    <a href="#application-features">App Features</a> •
+    <a href="#real-world-example">Calculator Example</a> •
+    <a href="#api-quick-reference">API Reference</a>
+  </p>
+</div>
 
-```sh
-npm install jetz
-# or
-pnpm add jetz
-```
+---
 
-## Usage
+Build modern, reactive web interfaces using clean JavaScript composition — **without JSX, build-time compilation flags, or complex template languages**.
 
-```js
-import { Jetz, stateOf } from 'jetz';
-import { div, button, find } from 'jetz/ui';
-import { Router, route } from 'jetz/router';
+Inspired by the composable, declarative paradigm of Jetpack Compose, Jetz brings that elegance directly to web developers using native JavaScript functions and direct, lightweight DOM updates.
+
+```javascript
+import { Jetz, stateOf } from "@daevsoft/jetz";
+import { div, p, button } from "@daevsoft/jetz/ui";
 
 const count = stateOf(0);
-Jetz.mount(div('Count : ', count, button('Click me', { onclick() { count.value++; } })), find('#app'));
+
+const App = div(
+  p("Count: ", count),
+  button("Increment", {
+    onclick: () => count.setState(count.value + 1)
+  })
+);
+
+Jetz.mount(App, document.body);
 ```
 
-## Entry points
+```bash
+pnpm add @daevsoft/jetz
+# or
+npm install @daevsoft/jetz
+```
 
-- `jetz` — core: `Jetz`, state, components, conditionals, lifecycle, utilities
-- `jetz/ui` — element factories, attribute/event helpers, `find`/`findAll`, `text`
-- `jetz/router` — `Router`, `route()`, `link()`
-- `jetz/session` — `JetzSession`, `sessionOf()`
-- `jetz/middleware` — `Middleware`, `middleware()`
-- `jetz/test` — `JTest` DOM test helper
+---
 
-See the [main README](../../README.md) for the full API documentation.
+## Table of Contents
+
+- [Why Jetz?](#why-jetz)
+- [Jetz in 60 Seconds](#jetz-in-60-seconds)
+- [Feature Overview](#feature-overview)
+- [Thinking in Jetz](#thinking-in-jetz)
+- [Jetz vs Traditional DOM](#jetz-vs-traditional-dom)
+- [Why No JSX or Templates?](#why-no-jsx-or-templates)
+- [When Should I Use Jetz?](#when-should-i-use-jetz)
+- [Quick Start](#quick-start)
+  - [Installation](#1-installation)
+  - [Minimal Setup with Rspack](#2-minimal-setup-tutorial-with-rspack)
+- [Learning Path](#learning-path)
+- [Core Concepts](#core-concepts)
+  - [1. Elements & UI Composition](#1-elements--ui-composition)
+  - [2. Components (Functions & Classes)](#2-components-functions--classes)
+  - [3. Reactive State (`stateOf`, `rememberOf`)](#3-reactive-state-stateof-rememberof)
+  - [4. Computed State (`computed`)](#4-computed-state-computed)
+  - [5. Side-Effects (`effect`)](#5-side-effects-effect)
+  - [6. Reactive Collections (`listOf`, `sequenceOf`)](#6-reactive-collections-listof-sequenceof)
+  - [7. Keyed List Reconciliation (`loop`)](#7-keyed-list-reconciliation-loop)
+  - [8. Conditional Rendering (`_if`, `_elseif`, `_else`, `ifElse`)](#8-conditional-rendering-_if-_elseif-_else-ifelse)
+  - [9. Component Lifecycle](#9-component-lifecycle)
+  - [10. Two-Way Data Binding (`bind`)](#10-two-way-data-binding-bind)
+  - [11. Reactive Listeners (`listen`)](#11-reactive-listeners-listen)
+  - [12. DOM Utilities & Helper Methods](#12-dom-utilities--helper-methods)
+- [From Small UI to Complete Application](#from-small-ui-to-complete-application)
+- [Application Features](#application-features)
+  - [Router & Link Navigation](#router--link-navigation)
+  - [Route Middlewares](#route-middlewares)
+  - [Session Storage (`JetzSession`, `sessionOf`)](#session-storage-jetzsession-sessionof)
+  - [Dispatcher Pattern](#dispatcher-pattern)
+  - [Script & Raw HTML Injection](#script--raw-html-injection)
+  - [Prototype Extensions & Array Helpers](#prototype-extensions--array-helpers)
+- [Real-World Example: Calculator](#real-world-example-calculator)
+- [Architecture Overview](#architecture-overview)
+- [API Quick Reference](#api-quick-reference)
+- [Testing](#testing)
+- [Development & Build](#development--build)
+- [Publishing](#publishing)
+- [License & Community](#license--community)
+
+---
+
+## Why Jetz?
+
+Web interfaces frequently force developers to pick between two extremes:
+1. **Low-level Imperative DOM APIs:** Manual `createElement`, verbose event listeners, and brittle DOM state synchronization.
+2. **Heavyweight Toolchains:** Mandatory JSX compilers, virtual DOM diffing overhead, and specialized templating syntax.
+
+**Jetz offers a third way:** declarative, composable JavaScript with reactive state management, without leaving standard JavaScript.
+
+```text
+Traditional DOM Code:
+create element → configure element → query element → append element → manually mutate element
+
+Jetz Paradigm:
+describe UI → compose components → declare reactive state → DOM updates automatically
+```
+
+### Core Philosophy
+
+* **UI = JavaScript Composition:** Build DOM trees with simple, readable function calls (`div`, `button`, `p`).
+* **State = Reactive:** State values notify bound elements directly; no virtual-DOM diffing passes required.
+* **Components = Composable:** Package UI into pure functions or reusable classes with full lifecycle hooks.
+* **DOM = Direct and Lightweight:** Clean abstraction over native elements that preserves direct element access when needed.
+
+---
+
+## Jetz in 60 Seconds
+
+The entire Jetz mental model comes down to four basic steps:
+
+```javascript
+import { Jetz, stateOf } from "@daevsoft/jetz";
+import { div, h1, button } from "@daevsoft/jetz/ui";
+
+// 1. Create reactive state
+const count = stateOf(0);
+
+// 2. Compose your UI tree
+const App = div(
+  h1("Interactive Counter"),
+  
+  // 3. React to state: pass state directly or update it on event
+  button("Clicked ", count, " times", {
+    onclick() {
+      count.value++; // automatically triggers fine-grained DOM update
+    }
+  })
+);
+
+// 4. Mount to your HTML document
+Jetz.mount(App, document.body);
+```
+
+No build step required to parse custom syntax. That is valid, executable JavaScript out of the box.
+
+---
+
+## Feature Overview
+
+| Feature | Built-in API | What It Solves |
+|---|---|---|
+| **Declarative UI** | `div`, `span`, `button`, `inputText`, ... | Compose HTML elements cleanly with nested function calls. |
+| **Components** | Functions or `extends Component` | Reusable UI units with input parameters and private state. |
+| **Reactive State** | `stateOf(value)` | Fine-grained single-value state with subscribers and watchers. |
+| **Remembered State** | `rememberOf(key, value)` | State synchronized with `localStorage` across page reloads. |
+| **Derived State** | `computed(fn)` | Auto-tracked computed values with zero manual dependency arrays. |
+| **Side-Effects** | `effect(fn)` | Auto-tracking effects with instant execution and disposal cleanup. |
+| **Reactive Lists** | `listOf()`, `sequenceOf()` | Observable arrays with chainable methods (`push`, `remove`, `sort`). |
+| **Keyed Reconciliation** | `loop(list, keyFn, renderFn)` | O(1) DOM element recycling and minimal mutations on array changes. |
+| **Conditional UI** | `_if`, `_elseif`, `_else`, `ifElse` | Declarative, reactive conditional rendering without wrapper divs. |
+| **Component Lifecycle** | `onCreate`, `onMount`, `onUpdate`, `onDestroy` | Deterministic setup and teardown for function and class components. |
+| **Two-Way Binding** | `{ bind: state }` | Instant two-way synchronization between input elements and state. |
+| **Dynamic Routing** | `Router`, `route`, `link`, `asLink` | Client-side SPA routing with browser history and parameters. |
+| **Route Guards** | `Middleware`, `middleware` | Async/sync navigation guards with reason-based denials. |
+| **Session State** | `JetzSession`, `sessionOf` | Reactive key-value store automatically backed by `sessionStorage`. |
+| **Dispatcher** | `Dispatcher` | Flux-like action dispatching for clean architecture. |
+| **DOM Utilities** | `find`, `findAll`, `.attr()`, `.addClass()`, ... | Fluent helper methods on every element before and after mounting. |
+
+---
+
+## Thinking in Jetz
+
+Adopting Jetz is a smooth shift from manual DOM plumbing to declarative composition:
+
+```text
+HTML markup                      ───►   JavaScript composition functions
+Manual createElement / append    ───►   Nested function hierarchies
+Manual DOM innerText updates     ───►   Reactive stateOf and computed values
+Spaghetti event listeners        ───►   Inline declarative handler objects
+Full list re-renders             ───►   Keyed loop reconciliation
+Complex external build configs   ───►   Standard ES Modules and standard JS
+```
+
+---
+
+## Jetz vs Traditional DOM
+
+### Traditional Imperative DOM
+
+```javascript
+// Verbose, error-prone, manual synchronization
+const container = document.createElement("div");
+container.className = "card";
+
+const counterText = document.createElement("p");
+let count = 0;
+counterText.textContent = `Count: ${count}`;
+
+const btn = document.createElement("button");
+btn.textContent = "Increment";
+btn.addEventListener("click", () => {
+  count++;
+  counterText.textContent = `Count: ${count}`; // Manual sync required
+});
+
+container.appendChild(counterText);
+container.appendChild(btn);
+document.body.appendChild(container);
+```
+
+### With Jetz
+
+```javascript
+// Declarative, reactive, clean composition
+import { Jetz, stateOf } from "jetz";
+import { div, p, button, css } from "jetz/ui";
+
+const count = stateOf(0);
+
+const Card = div(css`card`,
+  p("Count: ", count),
+  button("Increment", {
+    onclick: () => count.value++
+  })
+);
+
+Jetz.mount(Card, document.body);
+```
+
+The difference: In Jetz, the relationship between state and UI is declared once. When state changes, only the exact bound text node or attribute updates.
+
+---
+
+## Why No JSX or Templates?
+
+Many modern frameworks rely on JSX or custom template compilers (`.vue`, `.svelte`, `.html`). Jetz intentionally uses standard JavaScript functions:
+
+* **Zero Build Overhead for Syntax:** You can run Jetz in modern browsers, prototyping tools, or standard ESM setups without requiring Babel, SWC, or TypeScript JSX transforms just to render an element.
+* **Full Power of JavaScript:** Functions are just functions. Variables, loops, closures, conditionals, arrays, and standard language features work directly without templateDSL constraints.
+* **Transparent DOM Mapping:** `div(...)` creates a `JetzElement` that wraps and produces real DOM elements directly. There are no hidden virtual DOM reconciliation layers getting between you and the browser.
+* **Composable by Nature:** Passing elements, components, or UI fragments as parameters, returning them from helpers, or composing them dynamically is as natural as writing regular JavaScript functions.
+
+---
+
+## When Should I Use Jetz?
+
+### Great Fit For:
+* **Interactive Web Apps & SPAs:** Full routing, state, session, and lifecycle built into a lightweight package.
+* **Dashboards & Internal Tools:** Rapid prototyping and clean UI creation without heavy build tooling.
+* **Component-Driven Frontends:** Teams and developers who prefer the clarity of functional composition over JSX.
+* **Performance-Sensitive Micro-UIs:** Situations where virtual-DOM runtime overhead and large bundle sizes are unwanted.
+
+### When to Consider Alternatives:
+* Projects where the engineering team is strictly mandated to use JSX/TSX syntax.
+* Content-heavy static sites with zero interactivity (where plain static HTML/SSG is sufficient).
+
+---
+
+## Quick Start
+
+### 1. Installation
+
+Install Jetz and the Rspack bundler tools:
+
+```bash
+# Using pnpm
+pnpm add @daevsoft/jetz
+pnpm add -D @rspack/core @rspack/cli
+
+# Using npm
+npm install @daevsoft/jetz
+npm install -D @rspack/core @rspack/cli
+```
+
+---
+
+### 2. Minimal Setup Tutorial with Rspack
+
+Here is a minimal, complete single-page application setup with Rspack and Jetz routing:
+
+#### Directory Structure
+
+```text
+my-jetz-app/
+├── index.html
+├── index.js
+├── rspack.config.js
+├── package.json
+└── src/
+    ├── app.js
+    └── home.js
+```
+
+#### A. Bundler Configuration (`rspack.config.js`)
+
+```javascript
+import { rspack } from "@rspack/core";
+
+export default {
+  entry: "./index.js",
+  plugins: [
+    new rspack.HtmlRspackPlugin({
+      template: "./index.html",
+    }),
+  ],
+  devServer: {
+    hot: false,
+  },
+};
+```
+
+#### B. HTML Entry (`index.html`)
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jetz App</title>
+</head>
+<body>
+  <div id="app"></div>
+</body>
+</html>
+```
+
+#### C. App Shell Component (`src/app.js`)
+
+```javascript
+import { Jetz } from "@daevsoft/jetz";
+import { main } from "@daevsoft/jetz/ui";
+
+export const App = () => {
+    return main(
+        Jetz.$route.browser()
+    );
+};
+```
+
+#### D. Home Page View (`src/home.js`)
+
+```javascript
+import { css, div } from "@daevsoft/jetz/ui";
+
+export const Home = () => {
+    return div(css`text-gray-500`, "Hello World");
+};
+```
+
+#### E. Main Entry Point (`index.js`)
+
+```javascript
+import { Jetz } from "@daevsoft/jetz";
+import { route, Router } from "@daevsoft/jetz/router";
+import { Home } from "./src/home.js";
+import { App } from "./src/app.js";
+
+const router = new Router([
+    route('/', Home)
+]);
+
+Jetz.use(router);
+
+Jetz.mount(App, '#app');
+```
+
+#### F. Run the Development Server
+
+Add this script to your `package.json`:
+
+```json
+{
+  "type": "module",
+  "scripts": {
+    "dev": "rspack serve",
+    "build": "rspack build"
+  }
+}
+```
+
+Then start the server:
+
+```bash
+npm run dev
+# or
+npx rspack serve
+```
+
+---
+
+## Learning Path
+
+Follow this structured guide to master Jetz step by step:
+
+1. [Elements & UI Composition](#1-elements--ui-composition) — Learn how HTML tags map to functions
+2. [Components](#2-components-functions--classes) — Functional and class-based components
+3. [Reactive State](#3-reactive-state-stateof-rememberof) — State management with `stateOf` and `rememberOf`
+4. [Computed State](#4-computed-state-computed) — Auto-tracked derived values with `computed`
+5. [Side-Effects](#5-side-effects-effect) — Reactive watchers with `effect`
+6. [Reactive Collections](#6-reactive-collections-listof-sequenceof) — Arrays with `listOf` and `sequenceOf`
+7. [Keyed List Reconciliation](#7-keyed-list-reconciliation-loop) — Fast list rendering with `loop`
+8. [Conditional Rendering](#8-conditional-rendering-_if-_elseif-_else-ifelse) — Declarative branch switching
+9. [Component Lifecycle](#9-component-lifecycle) — `onCreate`, `onMount`, `onUpdate`, `onDestroy`
+10. [Two-Way Binding](#10-two-way-data-binding-bind) — Synchronizing form inputs
+11. [Reactive Listeners](#11-reactive-listeners-listen) — Dynamic styling & DOM reactions with `listen`
+12. [DOM Utilities](#12-dom-utilities--helper-methods) — Fluent element manipulation helpers
+13. [Router & Middleware](#router--link-navigation) — Multi-page SPA navigation
+14. [Session Storage](#session-storage-jetzsession-sessionof) — Tab-persistent state
+
+---
+
+## Core Concepts
+
+### 1. Elements & UI Composition
+
+Every HTML5 element is exported as a composable JavaScript function from `jetz/ui`:
+
+```javascript
+import { div, h1, p, span, button, a, img, css } from "jetz/ui";
+
+const Banner = div(
+  h1("Fast, Declarative UI"),
+  p("Composable JavaScript functions represent elements:"),
+  span("No templates. No JSX."),
+  button("Get Started", {
+    onclick: () => alert("Welcome!")
+  })
+);
+```
+
+#### Syntax Flexibility
+
+Element functions accept arguments in any natural order:
+* **Strings & Numbers:** Rendered as child text nodes.
+* **Child Elements:** Appended directly into the parent.
+* **Objects:** Configured as attributes, properties, or event handlers.
+* **CSS Helpers:** Tagged template `css\`class-name\`` or style objects.
+* **Reactive States:** Automatically bind their text content.
+
+```javascript
+div(
+  css`card active`,              // classes
+  { id: "hero", role: "banner" }, // attributes
+  h2("Title"),                   // child element
+  "Text content"                 // text node
+)
+```
+
+---
+
+### 2. Components (Functions & Classes)
+
+You can define components in three ways: as variables, functions, or classes extending `Component`.
+
+#### A. Function Components (Recommended)
+
+Function components are simple JavaScript functions that return an element tree:
+
+```javascript
+import { div, h3, p, css } from "jetz/ui";
+
+export function UserCard(name, role) {
+  return div(css`user-card`,
+    h3(name),
+    p(role)
+  );
+}
+
+// Usage in parent:
+const Page = div(
+  UserCard("Alice", "Frontend Engineer"),
+  UserCard("Bob", "Product Designer")
+);
+```
+
+#### B. Class Components
+
+For complex stateful components or object-oriented architectures, extend `Component`:
+
+```javascript
+import { Component, stateOf } from "jetz";
+import { div, button } from "jetz/ui";
+
+export class CounterComponent extends Component {
+  count = stateOf(0);
+
+  increment() {
+    this.count.value++;
+  }
+
+  render() {
+    return div(
+      button("Clicked: ", this.count, {
+        onclick: () => this.increment() // use arrow function to preserve `this`
+      })
+    );
+  }
+}
+
+// Instantiate with `new` or `.new()`:
+const App = div(
+  new CounterComponent(),
+  CounterComponent.new()
+);
+```
+
+---
+
+### 3. Reactive State (`stateOf`, `rememberOf`)
+
+State in Jetz is created using `stateOf(initialValue)`.
+
+```javascript
+import { stateOf } from "jetz";
+import { div, button } from "jetz/ui";
+
+const counter = stateOf(0);
+
+// Reading & writing state
+console.log(counter.value); // 0
+counter.value = 10;         // updates value & triggers UI re-renders
+counter.setState(20);       // same as counter.value = 20
+
+// Manual subscriptions (if needed)
+const unsubscribe = counter.subscribe((newValue, oldValue) => {
+  console.log(`Changed from ${oldValue} to ${newValue}`);
+});
+```
+
+#### Persisting State with `rememberOf`
+
+`rememberOf(key, initialValue)` works like `stateOf`, but automatically syncs to `localStorage` and restores itself on page refresh:
+
+```javascript
+import { rememberOf } from "jetz";
+
+const theme = rememberOf("theme", "light");
+theme.value = "dark"; // automatically saved to localStorage
+
+// Arrays can also be remembered:
+const recentSearches = rememberOf("searches", []);
+recentSearches.push("JavaScript"); // persisted
+```
+
+---
+
+### 4. Computed State (`computed`)
+
+`computed(fn)` creates derived state that **automatically tracks its dependencies**.
+
+When any state accessed inside the computation function changes, the computed value re-evaluates automatically and updates all bound DOM elements:
+
+```javascript
+import { stateOf, computed } from "jetz";
+import { div, span, inputText } from "jetz/ui";
+
+const firstName = stateOf("Ada");
+const lastName = stateOf("Lovelace");
+
+// Automatically tracks `firstName` and `lastName`
+const fullName = computed(() => `${firstName.value} ${lastName.value}`);
+
+const UserProfile = div(
+  span("Full Name: ", fullName), // Updates whenever firstName or lastName changes
+  inputText({ bind: firstName, placeholder: "First name" }),
+  inputText({ bind: lastName, placeholder: "Last name" })
+);
+```
+
+#### Chaining Computed States
+
+Computed states are fully reactive states and can depend on other computed states:
+
+```javascript
+const price = stateOf(100);
+const qty = stateOf(2);
+
+const subtotal = computed(() => price.value * qty.value);
+const tax = computed(() => subtotal.value * 0.1);
+const grandTotal = computed(() => subtotal.value + tax.value);
+```
+
+---
+
+### 5. Side-Effects (`effect`)
+
+`effect(fn)` runs an imperative side-effect function that automatically discovers its dependencies by intercepting `.value` reads.
+
+It re-executes whenever any accessed state changes, and returns a `dispose` function:
+
+```javascript
+import { stateOf, effect } from "jetz";
+
+const counter = stateOf(0);
+
+// Executes immediately, then re-runs on every counter change:
+const dispose = effect(() => {
+  document.title = `Count: ${counter.value}`;
+});
+
+// Dynamic conditional tracking:
+const loggingEnabled = stateOf(true);
+const status = stateOf("idle");
+
+effect(() => {
+  if (loggingEnabled.value) {
+    console.log("Current status:", status.value); // tracks status only when loggingEnabled is true
+  }
+});
+
+// Clean up when no longer needed:
+dispose();
+```
+
+---
+
+### 6. Reactive Collections (`listOf`, `sequenceOf`)
+
+For dynamic arrays, Jetz provides reactive collections via `listOf()` and `sequenceOf()`. They return a reactive `ListState` instance:
+
+```javascript
+import { listOf } from "jetz";
+import { ul, li, button, div } from "jetz/ui";
+
+const todos = listOf("Learn Jetz", "Build an App");
+
+const TodoApp = div(
+  ul(
+    todos.map(item => li(item))
+  ),
+  button("Add Todo", {
+    onclick() {
+      todos.push(`Task ${todos.size + 1}`);
+    }
+  })
+);
+```
+
+#### Complete `ListState` API
+
+| Method / Property | Description |
+|---|---|
+| `list.push(...items)` | Append one or more items (triggers re-render) |
+| `list.set(newArray)` | Replace all items in the list (chainable) |
+| `list.map(fn)` | Transform items to elements (chainable) |
+| `list.insertAt(index, ...items)` | Insert items at a specific index |
+| `list.remove(item)` | Remove an item by value |
+| `list.removeAt(index)` | Remove item at specific index |
+| `list.sort((a, b) => ...)` | Sort items in place (chainable) |
+| `list.filter(predicate)` | Returns a plain filtered JavaScript array |
+| `list.clear()` | Empty the collection |
+| `list.size` | Returns item count |
+| `list.values` | Direct reference to underlying array |
+| `list.first()` / `list.last()` | Convenience accessors for boundary items |
+
+---
+
+### 7. Keyed List Reconciliation (`loop`)
+
+When rendering large collections, full list re-rendering can be costly. Jetz provides **keyed reconciliation** through the 3-argument form of `loop()`:
+
+```javascript
+import { listOf, loop } from "jetz";
+import { ul, li, button, div } from "jetz/ui";
+
+const users = listOf(
+  { id: 101, name: "Alice" },
+  { id: 102, name: "Bob" }
+);
+
+const UserList = ul(
+  loop(
+    users,
+    user => user.id,         // Key selector: unique identifier
+    user => li(user.name)    // Render function
+  )
+);
+```
+
+#### Why Keys Matter
+
+```text
+Without Keys (classic loop):
+1000 items ──(1 item modified)──► Re-render all 1000 DOM elements
+
+With Keys:
+1000 items ──(1 item modified)──► Re-render ONLY the 1 modified DOM element
+```
+
+The classic 2-argument form `loop(list, renderFn)` remains available for backward compatibility.
+
+---
+
+### 8. Conditional Rendering (`_if`, `_elseif`, `_else`, `ifElse`)
+
+Jetz supports declarative conditional rendering without creating unnecessary wrapper elements.
+
+#### A. Multi-Branch Conditionals (`_if`, `_elseif`, `_else`)
+
+```javascript
+import { stateOf, _if, _elseif, _else } from "jetz";
+import { div, button } from "jetz/ui";
+
+const tab = stateOf("home");
+
+const Content = div(
+  div(_if(() => tab.value === "home"), "Welcome to the Homepage"),
+  div(_elseif(() => tab.value === "profile"), "Your Profile Details"),
+  div(_else, "Page Not Found"),
+
+  button("Switch", {
+    onclick: () => tab.setState(tab.value === "home" ? "profile" : "home")
+  })
+);
+```
+
+#### B. Inline Two-Branch Conditionals (`ifElse`)
+
+`ifElse(conditionFn, trueBranch, falseBranch)` evaluates inline and swaps content seamlessly in place:
+
+```javascript
+import { stateOf, ifElse } from "jetz";
+import { div, span, button } from "jetz/ui";
+
+const isLoggedIn = stateOf(false);
+
+const Nav = div(
+  ifElse(
+    () => isLoggedIn.value,
+    () => span("Welcome back!"),
+    () => button("Log In", { onclick: () => isLoggedIn.setState(true) })
+  )
+);
+```
+
+---
+
+### 9. Component Lifecycle
+
+Every Jetz component — whether function-based or class-based — supports four lifecycle stages:
+
+```text
+onCreate   ──►   onMount   ──►   onUpdate   ──►   onDestroy
+(before DOM)     (in DOM)        (state delta)    (removed)
+```
+
+| Lifecycle Hook | Timing & Purpose |
+|---|---|
+| `onCreate` | Executes once before rendering occurs. Ideal for initializing local variables and preparing state. |
+| `onMount` | Executes once immediately after the element is attached to the document. Safe to touch DOM, start timers, or fetch data. |
+| `onUpdate` | Executes whenever a bound state changes while the component is active in the DOM. |
+| `onDestroy` | Executes when the element is removed from DOM (e.g. route change, conditional removal, list delete, `unmount`). Ideal for clearing timers and subscriptions. |
+
+#### Lifecycle in Function Components
+
+```javascript
+import { onCreate, onMount, onUpdate, onDestroy, stateOf } from "jetz";
+import { div } from "jetz/ui";
+
+export function LiveClock() {
+  const time = stateOf(new Date().toLocaleTimeString());
+  let intervalId;
+
+  onCreate(() => console.log("Clock initializing..."));
+
+  onMount(() => {
+    intervalId = setInterval(() => {
+      time.setState(new Date().toLocaleTimeString());
+    }, 1000);
+  });
+
+  onUpdate(() => console.log("Clock updated to:", time.value));
+
+  onDestroy(() => {
+    clearInterval(intervalId);
+    console.log("Clock cleaned up.");
+  });
+
+  return div("Current Time: ", time);
+}
+```
+
+#### Lifecycle in Class Components
+
+```javascript
+import { Component, stateOf } from "jetz";
+import { div } from "jetz/ui";
+
+export class LiveClockClass extends Component {
+  time = stateOf("");
+  intervalId = null;
+
+  onMount() {
+    this.intervalId = setInterval(() => {
+      this.time.value = new Date().toLocaleTimeString();
+    }, 1000);
+  }
+
+  onDestroy() {
+    clearInterval(this.intervalId);
+  }
+
+  render() {
+    return div("Time: ", this.time);
+  }
+}
+```
+
+---
+
+### 10. Two-Way Data Binding (`bind`)
+
+Bind any `stateOf` instance directly to an input element using the `bind` property:
+
+```javascript
+import { stateOf } from "jetz";
+import { div, inputText, p } from "jetz/ui";
+
+const query = stateOf("");
+
+const SearchBox = div(
+  inputText({
+    bind: query, // Two-way binding: updates query.value on user input
+    placeholder: "Search documentation..."
+  }),
+  p("Searching for: ", query)
+);
+```
+
+Whenever the user types, `query.value` updates immediately. Conversely, setting `query.value = "something"` updates the input field's display value automatically.
+
+---
+
+### 11. Reactive Listeners (`listen`)
+
+`listen(callback)` registers an inline reactive effect tied directly to an element. It renders no DOM element of its own, executing once on mount and subsequently on every state change:
+
+```javascript
+import { stateOf, listen } from "jetz";
+import { div, button } from "jetz/ui";
+
+const count = stateOf(0);
+
+const Box = div(
+  "Current count: ", count,
+  // Automatically updates the parent div's CSS class as state changes:
+  listen(parent => {
+    parent.replaceClass(/count-\d+/, `count-${count.value}`);
+  }),
+  button("+1", { onclick: () => count.value++ })
+);
+```
+
+---
+
+### 12. DOM Utilities & Helper Methods
+
+Every `JetzElement` wraps an `HTMLElement` and provides a fluent chainable API that works both before and after mounting:
+
+```javascript
+import { div, find, findAll } from "jetz/ui";
+
+const box = div("Hello World", { "data-role": "card" });
+
+// Attributes & Data
+box.attr("data-role");             // Read attribute
+box.addAttr("title", "Greetings"); // Set attribute
+box.removeAttr("title");          // Remove attribute
+box.data("role");                  // Read data-* property
+
+// Styling & Classes
+box.setStyle({ color: "blue" });   // Apply inline styles
+box.getStyle("color");             // Read style property
+box.addClass("active");            // Add class
+box.removeClass("active");         // Remove class
+box.toggleClass("active");         // Toggle class
+box.replaceClass("active", "idle");// Replace class
+
+// DOM Tree & State
+box.text("Updated Text");          // Replace text content
+box.disable(); box.enable();       // Toggle disabled state
+box.focus(); box.blur();           // Focus controls
+box.empty();                       // Remove all children
+box.remove();                      // Remove element from DOM
+
+// Global Finders
+const header = find("#main-header");      // Returns HTMLElement
+const items = findAll(".list-item");      // Returns Array<HTMLElement>
+```
+
+---
+
+## From Small UI to Complete Application
+
+Jetz is not just a DOM builder — it scales cleanly from a simple inline element to a full Single Page Application (SPA):
+
+```text
+1. Element
+   └─ div("Hello World")
+2. Component
+   └─ function Header(title) { return header(h1(title)); }
+3. Reactive State & Computed
+   └─ const count = stateOf(0); const double = computed(() => count.value * 2);
+4. Reactive Collections
+   └─ const items = listOf(); items.push(...)
+5. Lifecycle & Effects
+   └─ onMount(() => ...); effect(() => ...);
+6. Routing & Middleware
+   └─ new Router(route('/', Home), middleware(AuthGuard, route('/admin', Admin)))
+7. Session Storage
+   └─ const session = new JetzSession(); Jetz.use(session);
+8. Production Application
+   └─ Jetz.mount(App, document.body);
+```
+
+---
+
+## Application Features
+
+### Router & Link Navigation
+
+Jetz includes an integrated client-side SPA router:
+
+```javascript
+import { Jetz } from "jetz";
+import { Router, route, link, asLink, asBackLink, redirect } from "jetz/router";
+import { div, nav, main } from "jetz/ui";
+
+// Define view components
+const HomeView = () => div("Welcome Home");
+const AboutView = () => div("About Us");
+
+// Configure router
+const appRouter = new Router(
+  route("/", HomeView),
+  route("/about", AboutView)
+);
+
+// Install router into Jetz
+Jetz.use(appRouter);
+
+// Compose App Shell
+function AppShell() {
+  return main(
+    nav(
+      link("/", div("Home")),
+      link("/about", div("About"))
+    ),
+    // Mount router viewport:
+    Jetz.$route.browser()
+  );
+}
+
+Jetz.mount(AppShell(), document.body);
+```
+
+#### Link Helpers
+
+* `asLink("/path", params)`: Event modifier to navigate to a route on click.
+* `asBackLink`: Triggers `history.back()` on click.
+* `redirect("https://example.com")`: Programmatic full-page navigation.
+
+---
+
+### Route Middlewares
+
+Protect routes with custom middlewares extending `Middleware`:
+
+```javascript
+import { Router, route } from "jetz/router";
+import { Middleware, middleware } from "jetz/middleware";
+
+class AuthGuard extends Middleware {
+  next(params, _continue) {
+    const isAuthenticated = Boolean(localStorage.getItem("token"));
+    if (!isAuthenticated) {
+      return this.deny("User is not authenticated");
+    }
+    return true; // Allow navigation
+  }
+}
+
+const router = new Router(
+  route("/", HomeView),
+  // Wrap protected routes with middleware:
+  middleware(AuthGuard,
+    route("/dashboard", DashboardView),
+    route("/settings", SettingsView)
+  )
+);
+```
+
+---
+
+### Session Storage (`JetzSession`, `sessionOf`)
+
+Manage persistent browser session state backed by `sessionStorage`:
+
+```javascript
+import { Jetz } from "jetz";
+import { JetzSession, sessionOf } from "jetz/session";
+
+// 1. Create a managed session
+const session = new JetzSession({ user: null, theme: "dark" });
+Jetz.use(session); // Exposes Jetz.$session
+
+// Direct property mutations persist automatically:
+session.theme = "light";
+
+// Explicit key-value methods:
+session.set("user", { id: 1, name: "Alice" });
+session.get("user");      // { id: 1, name: "Alice" }
+session.has("user");      // true
+session.destroy();        // Clear storage and reset defaults
+
+// 2. Standalone reactive session proxy
+const localSession = sessionOf({ activeFilter: "all" });
+localSession.activeFilter = "completed"; // persisted
+```
+
+---
+
+### Dispatcher Pattern
+
+For applications requiring an explicit unidirectional data flow, Jetz includes `Dispatcher`:
+
+```javascript
+import { stateOf, Dispatcher } from "jetz";
+import { main, nav, ul, li } from "jetz/ui";
+
+const currentPage = stateOf("home");
+
+const dispatcher = new Dispatcher(action => {
+  switch (action) {
+    case "NAV_HOME":
+      currentPage.setState("home");
+      break;
+    case "NAV_ABOUT":
+      currentPage.setState("about");
+      break;
+  }
+});
+
+const App = main(
+  nav(
+    ul(
+      li("Home", { onclick: () => dispatcher.dispatch("NAV_HOME") }),
+      li("About", { onclick: () => dispatcher.dispatch("NAV_ABOUT") })
+    )
+  ),
+  currentPage
+);
+```
+
+---
+
+### Script & Raw HTML Injection
+
+```javascript
+import { addScript, html } from "jetz";
+import { div } from "jetz/ui";
+
+// Dynamically load an external script with callback
+addScript("https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js", {
+  async: true,
+  onload: () => console.log("Confetti library loaded!")
+});
+
+// Render raw HTML safely wrapped in a Raw element
+const RawBox = div(html("<strong>Formatted HTML snippet</strong>"));
+```
+
+---
+
+### Prototype Extensions & Array Helpers
+
+Jetz provides convenient lightweight utility extensions:
+
+```javascript
+import { range, flatMap, createList } from "jetz";
+
+range(1, 4);                     // [1, 2, 3, 4]
+flatMap([1, [2, [3]], 4]);       // [1, 2, 3, 4]
+createList(3, i => `Item ${i}`); // ['Item 0', 'Item 1', 'Item 2']
+
+// Extended prototypes:
+[10, 20, 30].last();             // 30
+[10, 20, 30].take(2);            // [10, 20]
+(3).range(6);                    // [3, 4, 5, 6]
+document.querySelectorAll("li").last(); // Last matched DOM node
+```
+
+---
+
+## Real-World Example: Calculator
+
+Here is how real Jetz applications compose state, collections, UI elements, and styling together.
+
+*(Adapted from the built-in [Calculator Demo](file:///c:/Labs/ai/codedev/src/components/calculator/calculator.js))*:
+
+```javascript
+import { Jetz, stateOf, listOf, loop } from "jetz";
+import { div, h1, button, span, css } from "jetz/ui";
+
+// 1. Reactive State & History Collection
+const display = stateOf("0");
+const history = listOf();
+let currentInput = "0";
+
+function inputDigit(digit) {
+  currentInput = currentInput === "0" ? digit : currentInput + digit;
+  display.value = currentInput;
+}
+
+function clearAll() {
+  currentInput = "0";
+  display.value = "0";
+}
+
+function evaluateResult() {
+  const result = String(eval(currentInput) || 0); // Simplified for illustration
+  history.push({ expr: currentInput, result });
+  currentInput = result;
+  display.value = result;
+}
+
+// 2. Composable UI Tree
+export function CalculatorApp() {
+  return div(
+    css`max-width: 380px; margin: 40px auto; padding: 20px; font-family: sans-serif;`,
+    h1("Jetz Calculator"),
+
+    // Screen display: bound to `display` state
+    div(
+      css`background: #1e293b; color: #fff; font-size: 32px; padding: 16px; text-align: right; border-radius: 8px;`,
+      display
+    ),
+
+    // Keypad Grid
+    div(
+      css`display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px;`,
+      button("7", { onclick: () => inputDigit("7") }),
+      button("8", { onclick: () => inputDigit("8") }),
+      button("9", { onclick: () => inputDigit("9") }),
+      button("C", { onclick: clearAll }),
+
+      button("4", { onclick: () => inputDigit("4") }),
+      button("5", { onclick: () => inputDigit("5") }),
+      button("6", { onclick: () => inputDigit("6") }),
+      button("=", { onclick: evaluateResult })
+    ),
+
+    // History Panel: reactive loop
+    div(
+      css`margin-top: 20px; border-top: 1px solid #ccc; padding-top: 12px;`,
+      span("History:"),
+      loop(history, item => item.expr, item => (
+        div(span(`${item.expr} = `), span(item.result))
+      ))
+    )
+  );
+}
+
+Jetz.mount(CalculatorApp(), document.body);
+```
+
+---
+
+## Architecture Overview
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                       Jetz Application                      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+       ┌───────────────────────┼───────────────────────┐
+       ▼                       ▼                       ▼
+┌──────────────┐       ┌──────────────┐       ┌──────────────┐
+│  Components  │       │   Reactive   │       │  App Layer   │
+│  & Elements  │       │    Engine    │       │              │
+├──────────────┤       ├──────────────┤       ├──────────────┤
+│ • div, p, ...│       │ • stateOf    │       │ • Router     │
+│ • Component  │       │ • computed   │       │ • Middleware │
+│ • Lifecycle  │       │ • effect     │       │ • Session    │
+│ • Binding    │       │ • listOf     │       │ • Dispatcher │
+│ • JetzElement│       │ • loop       │       │ • Plugins    │
+└──────┬───────┘       └──────┬───────┘       └──────┬───────┘
+       │                      │                      │
+       └──────────────────────┼──────────────────────┘
+                              ▼
+                 ┌─────────────────────────┐
+                 │    Direct DOM Render    │
+                 │ (No Virtual DOM Diffing)│
+                 └─────────────────────────┘
+```
+
+---
+
+## API Quick Reference
+
+### State & Reactivity
+* [`stateOf(initialValue)`](#3-reactive-state-stateof-rememberof): Create reactive single value.
+* [`rememberOf(key, initialValue)`](#3-reactive-state-stateof-rememberof): Reactive value persisted in `localStorage`.
+* [`computed(fn)`](#4-computed-state-computed): Auto-tracked derived state.
+* [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`).
+* [`listen(callback)`](#11-reactive-listeners-listen): Reactive inline listener attached to element.
+
+### Collections & Reconciliation
+* [`listOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive array with helper mutation methods.
+* [`sequenceOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive unique sequence array.
+* [`loop(list, keyFn, renderFn)`](#7-keyed-list-reconciliation-loop): Key-reconciled list rendering.
+
+### Conditional Rendering
+* [`_if(conditionFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Conditional branch render.
+* [`_elseif(conditionFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Alternate conditional branch.
+* [`_else`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Default branch.
+* [`ifElse(cond, trueFn, falseFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Inline two-way conditional.
+
+### Component & Lifecycle
+* [`Component`](#2-components-functions--classes): Base class for OOP-style components.
+* [`onCreate(fn)`](#9-component-lifecycle): Runs before initial render.
+* [`onMount(fn)`](#9-component-lifecycle): Runs after DOM attachment.
+* [`onUpdate(fn)`](#9-component-lifecycle): Runs on subsequent state changes.
+* [`onDestroy(fn)`](#9-component-lifecycle): Runs on DOM removal.
+
+### Routing & Session
+* [`Router`, `route`](#router--link-navigation): Dynamic SPA client routing.
+* [`link`, `asLink`, `asBackLink`](#router--link-navigation): Route navigation helpers.
+* [`Middleware`, `middleware`](#route-middlewares): Navigation guards.
+* [`JetzSession`, `sessionOf`](#session-storage-jetzsession-sessionof): Reactive session store.
+
+### Application & Utilities
+* [`Jetz.mount(App, container)`](#quick-start): Mount application to DOM.
+* [`Jetz.unmount(container)`](#12-dom-utilities--helper-methods): Cleanly teardown mounted elements.
+* [`Jetz.style(cssString)`](#quick-start): Inject dynamic `<style>` rules.
+* [`Jetz.use(plugin)`](#router--link-navigation): Install plugin (e.g. Router, Session).
+* [`find(selector)`, `findAll(selector)`](#12-dom-utilities--helper-methods): DOM query helpers.
+
+---
+
+## Testing
+
+Jetz is backed by three test suites covering all features, reactivity, and browser environments:
+
+```bash
+# 1. Fast unit suite (Vitest + jsdom)
+pnpm test:unit
+
+# 2. Browser smoke suite (Puppeteer / real Chrome & Edge)
+pnpm test:smoke
+
+# 3. Built pages assertion suite (Rspack bundle verification)
+pnpm test:pages
+
+# Run all suites together:
+pnpm test
+```
+
+---
+
+## Development & Build
+
+This repository is organized as a workspace with fast builds powered by [Rspack](https://rspack.dev):
+
+```bash
+# Install dependencies
+pnpm install
+
+# Watch mode for active development
+pnpm watch
+
+# Start local development server
+pnpm start
+
+# Create optimized production build
+pnpm build
+```
+
+---
+
+## Publishing
+
+The shippable npm package is located under `packages/jetz`:
+
+```bash
+cd packages/jetz
+
+# Validate exports and generate TypeScript stubs
+npm run check-exports
+
+# Publish package
+npm publish --access public
+```
+
+---
+
+## License & Community
+
+Jetz is open-source software licensed under the [ISC License](file:///c:/Labs/ai/codedev/LICENSE).
+
+* **Repository:** [https://github.com/devarofi/jetz](https://github.com/devarofi/jetz)
+* **Author:** [@daevsoft](https://github.com/devarofi)
+* **Issues & Feedback:** [GitHub Issues](https://github.com/devarofi/jetz/issues)
+
+If you find Jetz helpful, please give the repository a ⭐ on GitHub!

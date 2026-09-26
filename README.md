@@ -61,6 +61,8 @@ npm install @daevsoft/jetz
 - [Why No JSX or Templates?](#why-no-jsx-or-templates)
 - [When Should I Use Jetz?](#when-should-i-use-jetz)
 - [Quick Start](#quick-start)
+  - [Installation](#1-installation)
+  - [Minimal Setup with Rspack](#2-minimal-setup-tutorial-with-rspack)
 - [Learning Path](#learning-path)
 - [Core Concepts](#core-concepts)
   - [1. Elements & UI Composition](#1-elements--ui-composition)
@@ -264,74 +266,131 @@ Many modern frameworks rely on JSX or custom template compilers (`.vue`, `.svelt
 
 ### 1. Installation
 
-Install Jetz using your package manager of choice:
+Install Jetz and the Rspack bundler tools:
 
 ```bash
-# Using pnpm (recommended)
-pnpm add jetz
+# Using pnpm
+pnpm add @daevsoft/jetz
+pnpm add -D @rspack/core @rspack/cli
 
 # Using npm
-npm install jetz
-
-# Using yarn
-yarn add jetz
+npm install @daevsoft/jetz
+npm install -D @rspack/core @rspack/cli
 ```
 
-### 2. Create Your HTML Entry Point
+---
+
+### 2. Minimal Setup Tutorial with Rspack
+
+Here is a minimal, complete single-page application setup with Rspack and Jetz routing:
+
+#### Directory Structure
+
+```text
+my-jetz-app/
+├── index.html
+├── index.js
+├── rspack.config.js
+├── package.json
+└── src/
+    ├── app.js
+    └── home.js
+```
+
+#### A. Bundler Configuration (`rspack.config.js`)
+
+```javascript
+import { rspack } from "@rspack/core";
+
+export default {
+  entry: "./index.js",
+  plugins: [
+    new rspack.HtmlRspackPlugin({
+      template: "./index.html",
+    }),
+  ],
+  devServer: {
+    hot: false,
+  },
+};
+```
+
+#### B. HTML Entry (`index.html`)
 
 ```html
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Jetz App</title>
+  <title>Jetz App</title>
 </head>
 <body>
   <div id="app"></div>
-  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
 ```
 
-### 3. Build Your First Component
+#### C. App Shell Component (`src/app.js`)
 
 ```javascript
-// src/main.js
-import { Jetz, stateOf, computed } from "jetz";
-import { div, h1, p, button, inputText, css } from "jetz/ui";
+import { Jetz } from "@daevsoft/jetz";
+import { main } from "@daevsoft/jetz/ui";
 
-function WelcomeCard() {
-  const name = stateOf("Developer");
-  const greeting = computed(() => `Welcome to Jetz, ${name.value}!`);
-
-  return div(
-    css`padding: 24px; font-family: sans-serif; max-width: 400px;`,
-    h1("Hello Jetz"),
-    p(greeting),
-    inputText({
-      bind: name,
-      placeholder: "Enter your name...",
-      style: "padding: 8px; width: 100%; box-sizing: border-box; margin-bottom: 12px;"
-    }),
-    button("Reset", {
-      onclick: () => name.setState("Developer")
-    })
-  );
-}
-
-// 4. Mount to DOM
-Jetz.mount(WelcomeCard(), document.getElementById("app"));
+export const App = () => {
+    return main(
+        Jetz.$route.browser()
+    );
+};
 ```
 
-### 4. Run Development Server
+#### D. Home Page View (`src/home.js`)
 
-In this repository, the dev server is powered by Rspack:
+```javascript
+import { css, div } from "@daevsoft/jetz/ui";
+
+export const Home = () => {
+    return div(css`text-gray-500`, "Hello World");
+};
+```
+
+#### E. Main Entry Point (`index.js`)
+
+```javascript
+import { Jetz } from "@daevsoft/jetz";
+import { route, Router } from "@daevsoft/jetz/router";
+import { Home } from "./src/home.js";
+import { App } from "./src/app.js";
+
+const router = new Router([
+    route('/', Home)
+]);
+
+Jetz.use(router);
+
+Jetz.mount(App, '#app');
+```
+
+#### F. Run the Development Server
+
+Add this script to your `package.json`:
+
+```json
+{
+  "type": "module",
+  "scripts": {
+    "dev": "rspack serve",
+    "build": "rspack build"
+  }
+}
+```
+
+Then start the server:
 
 ```bash
-pnpm install
-pnpm start
+npm run dev
+# or
+npx rspack serve
 ```
 
 ---
