@@ -62,6 +62,30 @@ describe('typed input factories', () => {
 	});
 });
 
+describe('checkbox state binding', () => {
+	it('synchronizes checked state in both directions', () => {
+		const done = stateOf(false);
+		const target = mount(ui.inputCheckbox({ bind: done }));
+		const checkbox = target.querySelector('input');
+
+		expect(checkbox.checked).toBe(false);
+		checkbox.checked = true;
+		checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(done.value).toBe(true);
+		done.value = false;
+		expect(checkbox.checked).toBe(false);
+		done.value = true;
+		expect(checkbox.checked).toBe(true);
+
+		const genericDone = stateOf(false);
+		const genericTarget = mount(ui.input(ui.type('checkbox'), { bind: genericDone }));
+		const genericCheckbox = genericTarget.querySelector('input');
+		genericCheckbox.checked = true;
+		genericCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(genericDone.value).toBe(true);
+	});
+});
+
 describe('route head metadata', () => {
 	it('sets metadata on navigation and replaces only prior route metadata', () => {
 		window.history.replaceState({}, '', '/');

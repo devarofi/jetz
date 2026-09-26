@@ -606,7 +606,20 @@ const TaskList = ul(loop(tasks, task => li(
 )));
 ```
 
-The callback must read `task.done.value`; an expression like `${task.done ? "completed" : ""}` is evaluated before `css` receives it and cannot track future changes. Static classes remain ordinary tagged templates, for example `css`task-number completed``.
+The callback must read `task.done.value`; JavaScript treats `task.done` itself as a truthy State object. A plain ternary interpolation such as `${task.done ? "completed" : ""}` is evaluated before `css` receives it and is not reactive. Static classes remain ordinary tagged templates, for example `css`task-number completed``.
+
+You can also create the conditional class with `computed()` and interpolate that State directly:
+
+```javascript
+import { computed } from "jetz";
+
+const ComputedTaskList = ul(loop(tasks, task => li(
+  css`task-number ${computed(() => task.done.value ? "completed" : "")}`,
+  "TASK ", task.id, " - ", task.title
+)));
+```
+
+Create the computed value inside the `loop()` renderer when it depends on that row's `task`. Each row gets a computation that closes over its own task, and `css` updates that row's class whenever `task.done` changes.
 
 #### Reactive Attributes
 

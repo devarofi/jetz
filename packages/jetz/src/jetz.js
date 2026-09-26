@@ -417,6 +417,17 @@ class JetzElement {
 		}
 	}
 	#bindInputValue(stateTarget) {
+		const inputType = this.attributes.type ?? this.o.type;
+		if (this.o instanceof HTMLInputElement && inputType === 'checkbox') {
+			this.o.checked = Boolean(stateTarget.value);
+			this.#addListener('change', e => {
+				stateTarget.value = e.target.checked;
+			});
+			stateTarget.subscribe(value => {
+				this.o.checked = Boolean(value);
+			});
+			return;
+		}
 		this.#addListener('input', e => {
 			stateTarget.value = e.target.value
 		});
