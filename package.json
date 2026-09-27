@@ -1,23 +1,45 @@
 {
   "name": "@daevsoft/jetz",
-  "version": "1.0.2",
+  "version": "1.0.8",
   "description": "A composable javascript framework",
+  "types": "./packages/jetz/src/index.d.ts",
   "main": "index.js",
   "exports": {
     "./package.json": "./package.json",
-    ".": [
-      {
-        "import": "./src/lib/jetz.js",
-        "require": "./src/lib/jetz.js"
-      }
-    ],
+    ".": {
+      "types": "./packages/jetz/src/index.d.ts",
+      "import": "./src/lib/jetz.js",
+      "require": "./src/lib/jetz.js"
+    },
+    "./jetz": {
+      "types": "./packages/jetz/src/jetz.d.ts",
+      "import": "./src/lib/jetz.js",
+      "require": "./src/lib/jetz.js"
+    },
     "./ui": {
+      "types": "./packages/jetz/src/jetz-ui.d.ts",
       "import": "./src/lib/jetz-ui.js",
       "require": "./src/lib/jetz-ui.js"
     },
     "./router": {
+      "types": "./packages/jetz/src/jetz-router.d.ts",
       "import": "./src/lib/jetz-router.js",
       "require": "./src/lib/jetz-router.js"
+    },
+    "./session": {
+      "types": "./packages/jetz/src/jetz-session.d.ts",
+      "import": "./src/lib/jetz-session.js",
+      "require": "./src/lib/jetz-session.js"
+    },
+    "./middleware": {
+      "types": "./packages/jetz/src/middleware.d.ts",
+      "import": "./src/lib/middleware.js",
+      "require": "./src/lib/middleware.js"
+    },
+    "./test": {
+      "types": "./packages/jetz/src/jetz-test.d.ts",
+      "import": "./src/lib/jetz-test.js",
+      "require": "./src/lib/jetz-test.js"
     }
   },
   "private": true,
@@ -35,7 +57,7 @@
     "url": "git+https://github.com/devarofi/jetz.git"
   },
   "author": "",
-    "license": "ISC",
+  "license": "ISC",
   "type": "module",
   "bugs": {
     "url": "https://github.com/devarofi/jetz/issues"

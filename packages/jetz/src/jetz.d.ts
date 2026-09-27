@@ -1,12 +1,39 @@
 import type { Router } from './jetz-router.js';
 import type { JetzSession } from './jetz-session.js';
 
+export interface StateHandler<T> {
+    get(state: State<T>): T | undefined;
+    set(state: State<T>, value: T): boolean | void;
+}
+
+/** The recursively reactive shape produced by stateOf() and ListState.toState(). */
+export type Reactive<T> = T extends State<infer V>
+    ? State<V>
+    : T extends readonly unknown[]
+    ? { [K in keyof T]: Reactive<T[K]> } & { toObject(): unknown }
+    : T extends object
+    ? { [K in keyof T]: Reactive<T[K]> } & { toObject(): T }
+    : State<T>;
+
+/** The shape of an item stored in a remembered list. */
+export type RememberedListItem<T> = T extends object ? Reactive<T> : T;
+
+/** The shape returned by rememberOf(), recursively wrapping leaf values. */
+export type Remembered<T> = T extends readonly (infer Item)[]
+    ? ListState<RememberedListItem<Item>, Item>
+    : T extends object
+    ? { [K in keyof T]: Remembered<T[K]> }
+    : RememberState<T>;
+
 /**
  * Core reactive State container.
  * Calling `stateOf(value)` returns an instance of `State<T>`.
  */
 export declare class State<T = any> {
-    constructor(value: T, handler?: any);
+    constructor(value: T, handler?: StateHandler<T>);
+
+    /** DOM nodes and subscribers attached to this state. */
+    container: any[];
 
     /** The reactive value. Reading tracks dependencies in `computed` and `effect`; writing notifies subscribers. */
     value: T;
@@ -39,32 +66,61 @@ export declare class State<T = any> {
 export declare class RememberState<T = any> extends State<T> {
     id: string;
     pathId: string;
-    asRemember?(): this;
+
+    constructor(value: T, handler?: StateHandler<T>, key?: string);
 }
 
 /**
  * Reactive list collection supporting fine-grained and keyed reconciliation.
  */
-export declare class ListState<T = any> extends Array<T> {
+export declare class ListState<T = any, TInput = T> extends Array<T> {
     values: T[];
+    parentElement: JetzElement[];
+    views: any[][];
+    uniqueValue: boolean;
+    isRemember: boolean;
+    objRemember: RememberState<string> | undefined;
+
+    constructor(isRemember?: boolean, ...values: T[]);
 
     /** Number of items currently in the list. */
     readonly size: number;
 
     /** Appends items to the end of the collection and updates DOM. */
-    push(...items: T[]): number;
+    push(...items: Array<T | TInput>): number;
+
+    /** Converts string and number items to identity-preserving unique values. */
+    asUnique(): this;
+
+    /** Converts plain objects in the list into recursively reactive objects. */
+    toState(): ListState<Reactive<T>, TInput | T>;
+
+    /** Persists this list and rehydrates plain object records as reactive objects. */
+    asRemember(key?: string): ListState<RememberedListItem<T>, TInput | T>;
+
+    /** Returns the item at an index from the collection's values. */
+    at(index: number): T | undefined;
 
     /** Replaces all items with a new array. */
-    set(items: T[]): this;
+    set(items: Array<T | TInput>): this;
+
+    /** Replaces one item and updates rendered views and remembered data. */
+    replaceAt(index: number, item: T | TInput): this;
+
+    /** Replaces one item using its current value and index. */
+    updateAt(index: number, updater: (item: T, index: number) => T | TInput): this;
 
     /** Retrieve an item by index. */
     get(index: number | string): any;
 
-    /** Transforms items and updates views (chainable). */
-    map<U>(callback: (item: T, index: number) => U): this;
+    /** Returns a new array of mapped values without changing this list. */
+    map<U>(callback: (item: T, index: number, values: T[]) => U): U[];
+
+    /** Replaces each item with the callback result and updates rendered views. */
+    transform<U>(callback: (item: T, index: number, values: T[]) => U): ListState<U, U>;
 
     /** Inserts one or more items at the given index. */
-    insertAt(index: number, ...items: T[]): this;
+    insertAt(index: number, ...items: Array<T | TInput>): this;
 
     /** Removes an item by value equality. */
     remove(item: T): void;
@@ -93,8 +149,24 @@ export declare class ListState<T = any> extends Array<T> {
     /** Clears all items from the collection. */
     clear(): void;
 
-    /** Persists this list to localStorage under rememberOf storage driver. */
-    asRemember(key?: string): this;
+    /** Empties the list and updates its rendered views. */
+    empty(): this;
+
+    /** Applies the callback to each item and returns every matching item. */
+    find(predicate?: (item: T, index: number) => boolean): any;
+
+    /** Returns up to the first `count` values. */
+    take(count: number): T[];
+
+    /** Returns an iterator over the collection values. */
+    [Symbol.iterator](): IterableIterator<T>;
+
+    /** Internal list rendering and view management methods. */
+    renderView(refresh?: boolean): void;
+    assignParent(parent: JetzElement): void;
+    setViews(views: any[][]): void;
+    createItemView(parent: JetzElement, item: T, index: number): JetzElement;
+    newView(parentIndex: number, view: any[], content: T, itemIndex: number): void;
 }
 
 /**
@@ -108,14 +180,25 @@ export declare class JetzElement {
     attributes: Record<string, any>;
     children: any[];
     parent: JetzElement | null;
+    previousElement?: JetzElement;
+    position?: number;
+    childPosition: number;
+    renderPosition: number;
+    collectionConditionalChild: any[];
 
     constructor(tag: string, attributes?: Record<string, any>, ...children: any[]);
 
     /** Renders the element and its children into the given DOM parent. */
     render(parent?: any, renderPosition?: number): void;
 
+    /** Evaluates registered conditional children. */
+    triggerCondition(): void;
+
+    /** Sets the previous sibling used for insertion ordering. */
+    setPrevious(previous: JetzElement): void;
+
     /** Returns the rendered HTMLElement. */
-    getElement(): HTMLElement;
+    getElement(): HTMLElement | undefined;
 
     /** Hook invoked immediately after the element is rendered and mounted. */
     onRendered(callback?: (() => void) | null): this;
@@ -124,7 +207,7 @@ export declare class JetzElement {
     onStart(callback?: () => void): this;
 
     /** Reads an attribute value. */
-    attr(name: string): string | null;
+    attr(name: string): any;
 
     /** Adds or updates an attribute. */
     addAttr(name: string, value: any): this;
@@ -142,19 +225,19 @@ export declare class JetzElement {
     getStyle(prop: string): string;
 
     /** Adds one or more CSS class names. */
-    addClass(...names: string[]): this;
+    addClass(value: string | string[]): this;
 
     /** Removes one or more CSS class names. */
     removeClass(...names: string[]): this;
 
     /** Toggles a CSS class name. */
-    toggleClass(name: string): this;
+    toggleClass(name: string): void;
 
     /** Replaces a CSS class matching a string or regex. */
     replaceClass(target: string | RegExp, replacement: string): this;
 
-    /** Gets or sets the inner text of the element. */
-    text(content?: string): string | this;
+    /** Sets the element's text content. */
+    text(content: string): this;
 
     /** Gets or sets the input element's value. */
     value(val?: any): any;
@@ -163,7 +246,10 @@ export declare class JetzElement {
     empty(): this;
 
     /** Removes this element from the DOM. */
-    remove(): this;
+    remove(): void;
+
+    /** Fires destruction lifecycle hooks for this element and descendants. */
+    destroyLifecycle(): void;
 
     /** Disables the element. */
     disable(): this;
@@ -186,8 +272,11 @@ export declare class JetzElement {
     /** Returns the parent JetzElement if available. */
     getParent(): JetzElement | null;
 
+    /** Finds a rendered element by id and returns its JetzElement wrapper. */
+    findId(id: string): JetzElement | undefined;
+
     /** Gets or sets the element id. */
-    id(val?: string): string | this;
+    id(val: string): this;
 
     /** Appends children to this element. */
     append(child: any, ...children: any[]): this;
@@ -232,6 +321,7 @@ export declare class Dispatcher {
  */
 export declare class JetzArgument {
     element: any;
+    setElement(element: any): void;
     onAssigned(): void;
 }
 
@@ -254,7 +344,7 @@ export declare class Raw {
  * const count = stateOf(0);
  * count.value++;
  */
-export declare function stateOf<T>(value: T): State<T>;
+export declare function stateOf<T>(value: T, handler?: StateHandler<T>): Reactive<T>;
 
 /**
  * Creates a reactive state synchronized with `localStorage`. Supplying a key
@@ -263,9 +353,8 @@ export declare function stateOf<T>(value: T): State<T>;
  * @example
  * const theme = rememberOf('theme', 'light');
  */
-export declare function rememberOf<T>(key: string, value: T[]): ListState<T>;
-export declare function rememberOf<T>(key: string, value: T): RememberState<T>;
-export declare function rememberOf<T>(value: T): T extends any[] ? ListState<T[number]> : RememberState<T>;
+export declare function rememberOf<T>(key: string, value: T): Remembered<T>;
+export declare function rememberOf<T>(value: T): Remembered<T>;
 
 /**
  * Creates a derived reactive state that automatically tracks dependencies.
@@ -285,6 +374,9 @@ export declare function computed<T>(computeFn: () => T): State<T>;
  * });
  */
 export declare function effect(effectFn: () => void): () => void;
+
+/** Updates state immediately, then flushes subscribers, computed values, effects, and DOM once. */
+export declare function batch<T>(callback: () => T): T;
 
 /**
  * Creates a reactive collection (ListState).
@@ -372,6 +464,8 @@ export declare function createList<T>(count: number, factory: (index: number) =>
  */
 export declare const Jetz: {
     version: string;
+    readonly isMounting: boolean;
+    remountByAttr: JetzElement[];
     $route?: Router;
     $session?: JetzSession;
 
@@ -387,5 +481,38 @@ export declare const Jetz: {
     /** Installs a plugin (e.g. Router, JetzSession). */
     use(plugin: any): void;
 
+    /** Runs before mounted elements are rendered. */
+    onStart(callback?: () => void): void;
+
+    /** Runs after the first page render or after DOMContentLoaded. */
+    onLoad(callback?: () => void): void;
+
+    /** Triggers conditional updates and live component lifecycle sweeps. */
+    triggerByState(): void;
+
+    /** Registers a callback to run after the page's first render. */
+    addRenderedEffect(callback: () => void): void;
+
+    /** Runs callbacks registered during rendering after the initial mount. */
+    onFirstRenderPage(): void;
+
+    /** Returns whether an element can register a conditional remount. */
+    isAllowToRemount(element: JetzElement): boolean;
+
     [key: string]: unknown;
 };
+
+declare global {
+    interface Array<T> {
+        last(): T | undefined;
+        take(count: number): T[];
+    }
+
+    interface NodeListOf<TNode extends Node> {
+        last(): TNode | undefined;
+    }
+
+    interface Number {
+        range(to: number): number[];
+    }
+}

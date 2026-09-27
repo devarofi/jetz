@@ -385,8 +385,11 @@ function runMainSuite() {
 
 	todos.set(['alpha', 'beta']);
 	assert('set() replaces all items', itemsOf('#todo-ul .todo').join(','), 'alpha,beta');
-	todos.map(item => item.toUpperCase());
-	assert('map() transforms the items', itemsOf('#todo-ul .todo').join(','), 'ALPHA,BETA');
+	const mappedTodos = todos.map(item => item.toUpperCase());
+	assert('map() returns transformed values', mappedTodos.join(','), 'ALPHA,BETA');
+	assert('map() leaves the list unchanged', itemsOf('#todo-ul .todo').join(','), 'alpha,beta');
+	todos.transform(item => item.toUpperCase());
+	assert('transform() updates the items', itemsOf('#todo-ul .todo').join(','), 'ALPHA,BETA');
 	todos.insertAt(0, 'inserted');
 	assert('insertAt() inserts at the position', itemsOf('#todo-ul .todo').join(','), 'inserted,ALPHA,BETA');
 	todos.sort();

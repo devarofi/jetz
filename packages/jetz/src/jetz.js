@@ -11,6 +11,42 @@ const Obj = {
 		return !Obj.isEmpty(target);
 	}
 }
+
+function serializeRemembered(value) {
+	return JSON.stringify(value, (_key, item) => item instanceof State ? item.getValue() : item);
+}
+
+function isPlainRememberedObject(value) {
+	return value !== null
+		&& typeof value === 'object'
+		&& !Array.isArray(value)
+		&& !(value instanceof State)
+		&& !(value instanceof JetzElement)
+		&& (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+}
+
+function hydrateRememberedItem(item) {
+	return isPlainRememberedObject(item)
+		? stateOf(JSON.parse(serializeRemembered(item)))
+		: item;
+}
+
+function subscribeRememberedValues(value, onChange, seen = new Set()) {
+	if (value instanceof State) {
+		if (seen.has(value)) return;
+		seen.add(value);
+		value.subscribe(onChange);
+		subscribeRememberedValues(value.getValue(), onChange, seen);
+		return;
+	}
+	if (value === null || typeof value !== 'object' || seen.has(value)) return;
+	seen.add(value);
+	Object.keys(value).forEach(key => {
+		if (typeof value[key] !== 'function') {
+			subscribeRememberedValues(value[key], onChange, seen);
+		}
+	});
+}
 const booleanAttributes = new Set([
 	'allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'controls',
 	'default', 'defer', 'disabled', 'formnovalidate', 'hidden', 'inert', 'ismap',
@@ -164,6 +200,48 @@ let _activeLifecycle = null;
  * When set, any State.value read will register itself here.
  */
 let _trackingEffect = null;
+let _batchDepth = 0;
+let _isFlushingBatch = false;
+const _pendingBatchStates = new Map();
+const _pendingBatchComputations = new Set();
+const _pendingBatchEffects = new Set();
+
+function flushBatch() {
+	if (_batchDepth > 0 || _isFlushingBatch) return;
+	let hasStateChanges = false;
+	_isFlushingBatch = true;
+	try {
+		while (_pendingBatchStates.size || _pendingBatchComputations.size || _pendingBatchEffects.size) {
+			while (_pendingBatchStates.size || _pendingBatchComputations.size) {
+				const stateChanges = [..._pendingBatchStates.values()];
+				_pendingBatchStates.clear();
+				stateChanges.forEach(notify => {
+					hasStateChanges = true;
+					notify();
+				});
+				const computations = [..._pendingBatchComputations];
+				_pendingBatchComputations.clear();
+				computations.forEach(recompute => recompute());
+			}
+			const effects = [..._pendingBatchEffects];
+			_pendingBatchEffects.clear();
+			effects.forEach(run => run());
+		}
+	} finally {
+		_isFlushingBatch = false;
+	}
+	if (hasStateChanges) Jetz.triggerByState();
+}
+
+function batch(callback) {
+	_batchDepth++;
+	try {
+		return callback();
+	} finally {
+		_batchDepth--;
+		if (_batchDepth === 0) flushBatch();
+	}
+}
 /**
  * Registers a hook on the currently rendering component. Intended for
  * function components:
@@ -1059,6 +1137,16 @@ class State {
 	setState(newValue) {
 		const oldValue = this.#value;
 		this.#value = newValue;
+		if (_batchDepth > 0 || _isFlushingBatch) {
+			if (!_pendingBatchStates.has(this)) {
+				_pendingBatchStates.set(this, () => this.#notify(oldValue));
+			}
+			return;
+		}
+		this.#notify(oldValue);
+		Jetz.triggerByState();
+	}
+	#notify(oldValue) {
 		this.container = this.container.map(container => {
 			if (this.#value instanceof JetzElement) {
 				this.#value.render();
@@ -1076,7 +1164,6 @@ class State {
 			return container;
 		});
 		this.#subscribers.forEach(fn => fn(this.#value, oldValue));
-		Jetz.triggerByState();
 	}
 	#assignContainerValue(container, value) {
 		if (container instanceof HTMLElement) {
@@ -1221,12 +1308,24 @@ export class ListState extends Array {
 	_useKeyedReconciliation = false;
 	/** @internal maps key -> { item, view (JetzElement) } per parent */
 	_keyMaps = [];
+	#syncArray() {
+		super.splice(0, this.length, ...this.values);
+		this.length = this.values.length;
+	}
+	#commitValues(values) {
+		this.values = values;
+		this.#syncArray();
+		this.renderView(true);
+		if (this.isRemember) this.#persistRemembered();
+		return this;
+	}
 
 	asUnique() {
 		this.uniqueValue = true;
 		this.values = this.values.map(val => {
 			return this.#fixValue(val)
 		});
+		this.#syncArray();
 		return this;
 	}
 
@@ -1237,18 +1336,19 @@ export class ListState extends Array {
 	 */
 	asRemember(key) {
 		if (this.isRemember) return this;
-		const objRemember = new RememberState(JSON.stringify(this.values), undefined, key);
+		const objRemember = new RememberState(serializeRemembered(this.values), undefined, key);
 		const saved = JSON.parse(objRemember.valueOf());
-		// adopt persisted values, if any
-		if (JSON.stringify(saved) !== JSON.stringify(this.values)) {
-			this.values = saved;
-			super.splice(0, this.length, ...saved);
-			this.length = saved.length;
-			this.renderView(true);
-		}
 		this.isRemember = true;
 		this.objRemember = objRemember;
-		return this;
+		return this.#commitValues(saved.map(item => this.#prepareRememberedItem(item)));
+	}
+	#prepareRememberedItem(item) {
+		const prepared = hydrateRememberedItem(item);
+		subscribeRememberedValues(prepared, () => this.#persistRemembered());
+		return prepared;
+	}
+	#persistRemembered() {
+		this.objRemember.setState(serializeRemembered(this.values));
 	}
 
 	at(index) {
@@ -1259,8 +1359,8 @@ export class ListState extends Array {
 
 	constructor(isRemember = false, ...values) {
 		if (isRemember) {
-			var objRemember = new RememberState(JSON.stringify(values));
-			values = JSON.parse(objRemember.valueOf());
+			var objRemember = new RememberState(serializeRemembered(values));
+			values = JSON.parse(objRemember.valueOf()).map(hydrateRememberedItem);
 			super(...values);
 			this.isRemember = true;
 			this.objRemember = objRemember;
@@ -1269,16 +1369,15 @@ export class ListState extends Array {
 		}
 		this.values = values;
 		this.length = values.length;
+		if (this.isRemember) {
+			this.values.forEach(item => subscribeRememberedValues(item, () => this.#persistRemembered()));
+		}
 	}
 	set(newData) {
-		this.values = newData;
-		this.length = this.values.length;
-		this.renderView(true);
-		// remember effect
-		if (this.isRemember) {
-			this.objRemember.setState(JSON.stringify(this.values));
-		}
-		return this;
+		const values = this.isRemember
+			? newData.map(item => this.#prepareRememberedItem(item))
+			: newData;
+		return this.#commitValues(values);
 	}
 	clear() {
 		this.empty();
@@ -1303,6 +1402,8 @@ export class ListState extends Array {
 
 			if (this.uniqueValue)
 				item = this.#fixValue(item);
+			if (this.isRemember)
+				item = this.#prepareRememberedItem(item);
 			super.push(item);
 			this.values.push(item);
 			this.parentElement.map((parent, i) => {
@@ -1311,7 +1412,7 @@ export class ListState extends Array {
 			});
 			// remember effect
 			if (this.isRemember) {
-				this.objRemember.setState(JSON.stringify(this.values));
+				this.#persistRemembered();
 			}
 		}
 	}
@@ -1334,6 +1435,11 @@ export class ListState extends Array {
 				let prevNode = null;
 				newKeys.forEach((key, j) => {
 					let entry = keyMap.get(key);
+					if (entry && entry.item !== this.values[j]) {
+						if (entry.view instanceof JetzElement) entry.view.remove();
+						keyMap.delete(key);
+						entry = undefined;
+					}
 					if (!entry) {
 						// New item: create view
 						const rendered = this.createItemView(parent, this.values[j], j);
@@ -1396,13 +1502,20 @@ export class ListState extends Array {
 		if (index !== -1) this.removeAt(index);
 	}
 	removeAt(index) {
+		if (!Number.isInteger(index) || index < 0 || index >= this.values.length) return;
+		const removedItem = this.values[index];
 		this.values.splice(index, 1);
-		this.views = this.views.map((view, i) => {
-			view[index].remove();
+		this.views.forEach(view => {
+			view[index]?.remove?.();
 			view.splice(index, 1);
-			return view;
 		});
 		this.splice(index, 1);
+		this.#syncArray();
+		if (this._useKeyedReconciliation && this._keyFn) {
+			const removedKey = this._keyFn(removedItem);
+			this._keyMaps.forEach(keyMap => keyMap?.delete(removedKey));
+		}
+		if (this.isRemember) this.#persistRemembered();
 		// trigger state
 		Jetz.triggerByState();
 	}
@@ -1416,22 +1529,36 @@ export class ListState extends Array {
 		}
 	}
 	map(callback) {
-		this.values = this.values.map(callback);
-		this.renderView(true);
-		return this;
+		return this.values.map(callback);
+	}
+	transform(callback) {
+		const mapped = this.values.map(callback);
+		const values = this.isRemember
+			? mapped.map(item => this.#prepareRememberedItem(item))
+			: mapped;
+		return this.#commitValues(values);
+	}
+	replaceAt(index, item) {
+		if (!Number.isInteger(index) || index < 0 || index >= this.values.length) return this;
+		const value = this.isRemember ? this.#prepareRememberedItem(item) : item;
+		const values = this.values.slice();
+		values[index] = value;
+		return this.#commitValues(values);
+	}
+	updateAt(index, updater) {
+		if (!Number.isInteger(index) || index < 0 || index >= this.values.length) return this;
+		return this.replaceAt(index, updater(this.values[index], index));
 	}
 	insertAt(index, ...items) {
-		this.values.splice(index, 0, ...items);
-		this.splice(index, 0, ...items);
-		this.length = this.values.length;
-		this.renderView(true);
+		if (this.isRemember) items = items.map(item => this.#prepareRememberedItem(item));
+		const values = this.values.slice();
+		values.splice(index, 0, ...items);
+		this.#commitValues(values);
 		Jetz.triggerByState();
 		return this;
 	}
 	sort(compareFn) {
-		this.values.sort(compareFn);
-		this.renderView(true);
-		return this;
+		return this.#commitValues(this.values.slice().sort(compareFn));
 	}
 	filter(searchCallback) {
 		return this.values.filter(searchCallback);
@@ -1482,8 +1609,7 @@ export class ListState extends Array {
 			this.parentElement = views[0].parent;
 	}
 	toState() {
-		this.values = this.values.map(value => stateOf(value));
-		return this;
+		return this.#commitValues(this.values.map(value => stateOf(value)));
 	}
 	#fixValue(value) {
 		if (typeof value === 'string') {
@@ -2037,6 +2163,10 @@ function computed(computeFn) {
 	let _computing = false;
 	let _deps = new Set();
 	let _unsubs = [];
+	function scheduleTrack() {
+		if (_isFlushingBatch) _pendingBatchComputations.add(track);
+		else track();
+	}
 
 	function track() {
 		// Prevent circular recomputation
@@ -2061,11 +2191,8 @@ function computed(computeFn) {
 
 		// Subscribe to all discovered dependencies
 		_deps.forEach(dep => {
-			const listener = () => {
-				track();
-			};
-			dep.subscribe(listener);
-			_unsubs.push(() => dep.unsubscribe(listener));
+			dep.subscribe(scheduleTrack);
+			_unsubs.push(() => dep.unsubscribe(scheduleTrack));
 		});
 
 		return result;
@@ -2094,9 +2221,8 @@ function computed(computeFn) {
 		}
 
 		_deps.forEach(dep => {
-			const listener = () => { track(); };
-			dep.subscribe(listener);
-			_unsubs.push(() => dep.unsubscribe(listener));
+			dep.subscribe(scheduleTrack);
+			_unsubs.push(() => dep.unsubscribe(scheduleTrack));
 		});
 
 		derivedState.value = result;
@@ -2126,6 +2252,10 @@ function effect(effectFn) {
 	let _unsubs = [];
 	let _running = false;
 	let _disposed = false;
+	function scheduleRun() {
+		if (_isFlushingBatch) _pendingBatchEffects.add(run);
+		else run();
+	}
 
 	function run() {
 		if (_disposed || _running) return;
@@ -2148,9 +2278,8 @@ function effect(effectFn) {
 
 		// Subscribe to all discovered dependencies
 		_deps.forEach(dep => {
-			const listener = () => { run(); };
-			dep.subscribe(listener);
-			_unsubs.push(() => dep.unsubscribe(listener));
+			dep.subscribe(scheduleRun);
+			_unsubs.push(() => dep.unsubscribe(scheduleRun));
 		});
 	}
 
@@ -2166,4 +2295,4 @@ function effect(effectFn) {
 	};
 }
 
-export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, computed, effect, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };
+export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, computed, effect, batch, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };

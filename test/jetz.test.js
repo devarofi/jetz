@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	Component, Dispatcher, Jetz, JetzElement, Raw, State,
-	_else, _elseif, _if, _show, addScript, createElement, createList, flatMap,
+	_else, _elseif, _if, _show, addScript, batch, computed, createElement, createList, effect, flatMap,
 	html, ifElse, listen, listOf, loop, onCreate, onDestroy, onMount, onUpdate,
 	range, rememberOf, sequenceOf, stateOf
 } from '../src/lib/jetz.js';
@@ -254,6 +254,50 @@ describe('stateOf', () => {
 	});
 });
 
+describe('batch', () => {
+	it('coalesces nested state notifications, computed values, effects, and DOM updates', () => {
+		const first = stateOf(1);
+		const second = stateOf(2);
+		const total = computed(() => first.value + second.value);
+		const seen = [];
+		const effectRuns = [];
+		first.subscribe((next, previous) => seen.push([next, previous]));
+		total.subscribe(value => seen.push(value));
+		const dispose = effect(() => effectRuns.push(`${first.value}:${second.value}`));
+		const target = mount(div(first, ':', second, ':', total));
+		effectRuns.length = 0;
+
+		const result = batch(() => {
+			first.value = 3;
+			batch(() => {
+				second.value = 4;
+				first.value = 5;
+			});
+			return 'done';
+		});
+
+		expect(result).toBe('done');
+		expect(first.value).toBe(5);
+		expect(total.value).toBe(9);
+		expect(seen).toEqual([[5, 1], 9]);
+		expect(effectRuns).toEqual(['5:4']);
+		expect(target.textContent).toBe('5:4:9');
+		dispose();
+	});
+	it('flushes changes even when the callback throws', () => {
+		const value = stateOf(0);
+		const seen = [];
+		value.subscribe((next, previous) => seen.push([next, previous]));
+
+		expect(() => batch(() => {
+			value.value = 1;
+			throw new Error('batch failed');
+		})).toThrow('batch failed');
+		expect(value.value).toBe(1);
+		expect(seen).toEqual([[1, 0]]);
+	});
+});
+
 describe('reactive css classes', () => {
 	it('updates a class when a callback interpolation reads state', () => {
 		const task = stateOf({ done: false, title: 'Review the API' });
@@ -352,8 +396,31 @@ describe('listOf / ListState', () => {
 		mount(ul(loop(items, item => li(item))));
 		items.removeAt(1);
 		expect(document.querySelectorAll('li').length).toBe(2);
+		expect(items[1]).toBe(items.values[1]);
 		items.insertAt(0, 'z');
 		expect(document.querySelector('li').textContent).toBe('z');
+		expect([...items]).toEqual(items.values);
+	});
+	it('keeps backing array slots synchronized after replacement mutations', () => {
+		const items = listOf('b', 'a');
+		items.set(['c', 'a']);
+		expect(items[0]).toBe('c');
+		items.sort();
+		expect([...items]).toEqual(['a', 'c']);
+		items.transform(value => value.toUpperCase());
+		expect([...items]).toEqual(['A', 'C']);
+		items.replaceAt(0, 'first');
+		items.updateAt(1, value => `${value}!`);
+		expect([...items]).toEqual(items.values);
+		expect([...items]).toEqual(['first', 'C!']);
+	});
+	it('refreshes a keyed view when replacing an item with the same key', () => {
+		const items = listOf({ id: 1, title: 'before' });
+		const target = mount(ul(loop(items, item => item.id, item => li(item.title))));
+
+		items.replaceAt(0, { id: 1, title: 'after' });
+
+		expect(target.textContent).toBe('after');
 	});
 	it('exposes helpers: at, first, last, filter, includes, size', () => {
 		const items = listOf(1, 2, 3);
@@ -390,6 +457,28 @@ describe('rememberOf', () => {
 		rememberOf('unit.intervening-state', 1);
 		const restored = rememberOf('unit.keyed-list', []);
 		expect(restored.values).toEqual(['saved']);
+	});
+});
+
+describe('remembered list object states', () => {
+	it('hydrates nested object properties and persists their changes', () => {
+		const original = listOf({ id: 1, details: { title: 'Before' } }).asRemember('unit.object-list');
+		const originalTask = original.values[0];
+
+		expect(originalTask.id).toBeInstanceOf(State);
+		expect(originalTask.details.title).toBeInstanceOf(State);
+		originalTask.details.title.value = 'After';
+		original.push({ id: 2, details: { title: 'Added' } });
+		expect(original.values[1].details.title).toBeInstanceOf(State);
+		original.replaceAt(1, { id: 2, details: { title: 'Replaced' } });
+
+		const restored = listOf({ id: 0, details: { title: 'Default' } }).asRemember('unit.object-list');
+		const restoredTask = restored.values[0];
+		expect(restoredTask.id).toBeInstanceOf(State);
+		expect(restoredTask.details.title).toBeInstanceOf(State);
+		expect(restoredTask.details.title.value).toBe('After');
+		expect(restored.values[1].details.title.value).toBe('Replaced');
+		expect(restored[1]).toBe(restored.values[1]);
 	});
 });
 

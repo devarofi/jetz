@@ -547,6 +547,32 @@ const profile = stateOf({ name: "Ada" });
 profile.name.value = "Grace"; // object properties are reactive states too
 ```
 
+#### Batching State Updates
+
+Use `batch(fn)` when one user action updates multiple related states. `stateOf()` holds the source values, `computed()` derives a value from them, and `effect()` reacts to that derived value. Without `batch()`, the effect below sees an intermediate name; with `batch()`, it runs once with the completed name.
+
+```javascript
+import { batch, computed, effect, stateOf } from "jetz";
+
+const firstName = stateOf("Ada");
+const lastName = stateOf("Lovelace");
+const fullName = computed(() => `${firstName.value} ${lastName.value}`);
+
+effect(() => {
+  console.log(`Profile name: ${fullName.value}`);
+});
+
+// Without batch(), these writes would emit "Augusta Lovelace" then "Augusta King".
+batch(() => {
+  firstName.value = "Augusta";
+  lastName.value = "King";
+});
+
+// The effect emits only "Augusta King" for the batched update.
+```
+
+Values are readable immediately inside the callback. Computed values, effects, subscribers, and bound DOM update when the outermost batch finishes. Keep the callback synchronous.
+
 Use `stateOf` for temporary UI or application state. Use a `ListState` for collections that need reactive add, remove, or replace operations.
 
 #### Persisting State with `rememberOf`
@@ -735,7 +761,10 @@ recentSearches.push("Jetz"); // saved to localStorage
 |---|---|
 | `list.push(...items)` | Append one or more items and update rendered lists |
 | `list.set(newArray)` | Replace all items; chainable |
-| `list.map(fn)` | Replace each item with the callback result; chainable |
+| `list.replaceAt(index, item)` | Replace one item; chainable |
+| `list.updateAt(index, updater)` | Replace one item using its current value; chainable |
+| `list.map(fn)` | Return a new array of mapped values without changing the list |
+| `list.transform(fn)` | Replace each item with the callback result and update rendered views |
 | `list.insertAt(index, ...items)` | Insert items at an index |
 | `list.remove(item)` | Remove the first matching item |
 | `list.removeAt(index)` | Remove the item at an index |
@@ -748,7 +777,7 @@ recentSearches.push("Jetz"); // saved to localStorage
 | `list.values` | Direct reference to underlying array |
 | `list.first()` / `list.last()` | Convenience accessors for boundary items |
 
-`ListState.map()` is a mutating collection operation, unlike `Array.prototype.map()`. For a derived array that should not replace the list items, use `list.values.map(callback)` instead. Avoid changing `list.values` or nested item properties in place when you need a rendered update; use a `ListState` method or `set()` with the updated array. For a remembered list, use `set()` after mutations other than `push()`, `set()`, or `clear()` to save the result. `asRemember()` stores JSON-serialized values, so prefer plain serializable records over reactive `State` instances.
+`ListState.map()` follows the standard array behavior and returns a new array. Use `transform()` when you want to replace list items and update rendered views. Avoid editing `list.values` directly when you need the rendered list and array slots to stay synchronized. Remembered lists persist changes made through their mutation methods and reactive child states; direct edits to the `values` array bypass that synchronization. `asRemember()` stores JSON-serialized values, so prefer plain serializable records over reactive `State` instances.
 
 ---
 
