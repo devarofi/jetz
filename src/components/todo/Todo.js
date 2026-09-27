@@ -1,16 +1,25 @@
 import { link } from '../../lib/jetz-router.js';
-import { computed, Jetz, listOf, loop, stateOf } from '../../lib/jetz.js';
+import { computed, Jetz, listOf, loop, rememberOf, stateOf } from '../../lib/jetz.js';
 import { a, article, button, css, div, footer, h1, h2, header, inputCheckbox, inputText, main, p, section, small, span, strong, style } from '../../lib/jetz-ui.js';
 import '../../../public/css/style.css';
 import '../../../public/css/todo.css';
 
 let nextTaskId = 4;
+let rememberedTasks;
 
 function createTask(id, title, completed = false) {
     const task = stateOf({ id, title, completed });
     task.draft = stateOf(title);
     task.editing = stateOf(false);
     return task;
+}
+
+function saveTasks() {
+    rememberedTasks.set(tasks.values.map(task => ({
+        id: task.id.value,
+        title: task.title.value,
+        completed: task.completed.value
+    })));
 }
 
 function TaskRow(task, refreshCounts) {
@@ -28,6 +37,7 @@ function TaskRow(task, refreshCounts) {
         if (!title) return;
         task.title.value = title;
         task.editing.value = false;
+        saveTasks();
         refreshCounts();
     };
 
@@ -38,7 +48,10 @@ function TaskRow(task, refreshCounts) {
             class: 'todo-task__check',
             bind: task.completed,
             'aria-label': 'Mark task complete',
-            onchange: refreshCounts
+            onchange() {
+                saveTasks();
+                refreshCounts();
+            }
         }),
         div(css`todo-task__content`,
             strong(
@@ -82,6 +95,7 @@ function TaskRow(task, refreshCounts) {
                 style: { display: () => task.editing.value ? 'none' : 'inline-flex' },
                 onclick() {
                     tasks.remove(task);
+                    saveTasks();
                     refreshCounts();
                 }
             })
@@ -153,6 +167,7 @@ function TodoList() {
                 class: 'todo-clear-button',
                 onclick() {
                     tasks.set(tasks.values.filter(task => !task.completed.value));
+                    saveTasks();
                     activeFilter.value = 'all';
                     refreshTodoCounts();
                 }
@@ -162,11 +177,13 @@ function TodoList() {
 }
 
 export function ToDo() {
-    tasks = listOf(
-        createTask(1, 'Explore the Jetz component API'),
-        createTask(2, 'Build a reactive task list'),
-        createTask(3, 'Celebrate a shipped feature', true)
-    );
+    rememberedTasks = rememberOf('todo.tasks', [
+        { id: 1, title: 'Explore the Jetz component API', completed: false },
+        { id: 2, title: 'Build a reactive task list', completed: false },
+        { id: 3, title: 'Celebrate a shipped feature', completed: true }
+    ]);
+    tasks = listOf(...rememberedTasks.values.map(task => createTask(task.id, task.title, task.completed)));
+    nextTaskId = Math.max(0, ...tasks.values.map(task => task.id.value)) + 1;
     search = stateOf('');
     activeFilter = stateOf('all');
     openCount = stateOf(0);
@@ -178,6 +195,7 @@ export function ToDo() {
         const title = newTaskTitle.value.trim();
         if (!title) return;
         tasks.push(createTask(nextTaskId++, title));
+        saveTasks();
         newTaskTitle.value = '';
         refreshTodoCounts();
     };
@@ -210,6 +228,6 @@ export function ToDo() {
             ),
             TodoList
         ),
-        footer(css`todo-footer`, span('Small steps. Real progress.'), strong('Jetz') )
+        footer(css`todo-footer`, span('Small steps. Real progress.'), strong('Jetz'))
     );
 }

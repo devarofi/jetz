@@ -534,9 +534,24 @@ const unsubscribe = counter.subscribe((newValue, oldValue) => {
 });
 ```
 
+#### Updating State Values
+
+Assign to `.value` to update a reactive value; use `setState()` when you prefer an explicit setter. Both forms notify subscribers and update bound UI:
+
+```javascript
+const count = stateOf(0);
+count.value += 1;
+count.setState(10);
+
+const profile = stateOf({ name: "Ada" });
+profile.name.value = "Grace"; // object properties are reactive states too
+```
+
+Use `stateOf` for temporary UI or application state. Use a `ListState` for collections that need reactive add, remove, or replace operations.
+
 #### Persisting State with `rememberOf`
 
-`rememberOf(key, initialValue)` works like `stateOf`, but automatically syncs to `localStorage` and restores itself on page refresh:
+`rememberOf(key, initialValue)` works like `stateOf`, but synchronizes supported updates to `localStorage` and restores them on refresh. The key should remain stable between visits; remembered values are scoped to the current page path.
 
 ```javascript
 import { rememberOf } from "jetz";
@@ -548,6 +563,14 @@ theme.value = "dark"; // automatically saved to localStorage
 const recentSearches = rememberOf("searches", []);
 recentSearches.push("JavaScript"); // persisted
 ```
+
+For remembered arrays, `push()`, `set()`, and `clear()` save automatically. Other list mutations still update the reactive UI, but do not currently write to storage. To persist a removal or other transformed result, replace the list with `set()`:
+
+```javascript
+recentSearches.set(recentSearches.values.filter(item => item !== "JavaScript"));
+```
+
+Store JSON-serializable data in remembered arrays. If list items need reactive fields, save plain data and recreate the reactive item states when loading.
 
 ---
 
@@ -669,42 +692,50 @@ dispose();
 
 ### 6. Reactive Collections (`listOf`, `sequenceOf`)
 
-For dynamic arrays, Jetz provides reactive collections via `listOf()` and `sequenceOf()`. They return a reactive `ListState` instance:
+For dynamic arrays, Jetz provides reactive collections via `listOf()` and `sequenceOf()`. Use their mutation methods when the collection itself changes; they update rendered lists created with `loop()`:
 
 ```javascript
-import { listOf } from "jetz";
-import { ul, li, button, div } from "jetz/ui";
+import { listOf, loop } from "jetz";
+import { ul, li } from "jetz/ui";
 
 const todos = listOf("Learn Jetz", "Build an App");
+const TodoList = ul(loop(todos, todo => li(todo)));
 
-const TodoApp = div(
-  ul(
-    todos.map(item => li(item))
-  ),
-  button("Add Todo", {
-    onclick() {
-      todos.push(`Task ${todos.size + 1}`);
-    }
-  })
-);
+todos.push("Test the app");
+todos.remove("Build an App");
+todos.set(["Ship the feature"]);
+```
+
+Use `push()` to append, `insertAt()` to insert at a known position, `remove()` / `removeAt()` to delete, and `set()` to replace the full collection (for example, after filtering or loading new data). Use `sequenceOf()` when creating a list whose duplicate primitive values must remain distinct, or call `asUnique()` on an existing list.
+
+Call `asRemember(key)` when an existing `ListState` should be restored from and saved to `localStorage`. Prefer an explicit, stable key so the list does not depend on creation order. Use `rememberOf(key, initialValue)` when you want to create a remembered value directly; use `asRemember()` when you already have a list to mark as remembered:
+
+```javascript
+const selectedTags = listOf("news", "news").asUnique();
+const recentSearches = listOf().asRemember("recent-searches");
+recentSearches.push("Jetz"); // saved to localStorage
 ```
 
 #### Complete `ListState` API
 
 | Method / Property | Description |
 |---|---|
-| `list.push(...items)` | Append one or more items (triggers re-render) |
-| `list.set(newArray)` | Replace all items in the list (chainable) |
-| `list.map(fn)` | Transform items to elements (chainable) |
-| `list.insertAt(index, ...items)` | Insert items at a specific index |
-| `list.remove(item)` | Remove an item by value |
-| `list.removeAt(index)` | Remove item at specific index |
-| `list.sort((a, b) => ...)` | Sort items in place (chainable) |
-| `list.filter(predicate)` | Returns a plain filtered JavaScript array |
+| `list.push(...items)` | Append one or more items and update rendered lists |
+| `list.set(newArray)` | Replace all items; chainable |
+| `list.map(fn)` | Replace each item with the callback result; chainable |
+| `list.insertAt(index, ...items)` | Insert items at an index |
+| `list.remove(item)` | Remove the first matching item |
+| `list.removeAt(index)` | Remove the item at an index |
+| `list.sort((a, b) => ...)` | Sort items in place; chainable |
+| `list.filter(predicate)` | Return a plain array without changing the list |
 | `list.clear()` | Empty the collection |
+| `list.asUnique()` | Make duplicate string/number values distinct entries; chainable |
+| `list.asRemember(key?)` | Restore and persist the list using an optional stable key; chainable |
 | `list.size` | Returns item count |
 | `list.values` | Direct reference to underlying array |
 | `list.first()` / `list.last()` | Convenience accessors for boundary items |
+
+`ListState.map()` is a mutating collection operation, unlike `Array.prototype.map()`. For a derived array that should not replace the list items, use `list.values.map(callback)` instead. Avoid changing `list.values` or nested item properties in place when you need a rendered update; use a `ListState` method or `set()` with the updated array. For a remembered list, use `set()` after mutations other than `push()`, `set()`, or `clear()` to save the result. `asRemember()` stores JSON-serialized values, so prefer plain serializable records over reactive `State` instances.
 
 ---
 

@@ -383,6 +383,14 @@ describe('rememberOf', () => {
 		const stored = JSON.parse(localStorage.getItem('app-remember-state'));
 		expect(JSON.stringify(stored)).toContain('8');
 	});
+	it('restores keyed lists independently of creation order', () => {
+		const original = rememberOf('unit.keyed-list', []);
+		original.push('saved');
+
+		rememberOf('unit.intervening-state', 1);
+		const restored = rememberOf('unit.keyed-list', []);
+		expect(restored.values).toEqual(['saved']);
+	});
 });
 
 describe('conditional element (_if/_elseif/_else)', () => {
@@ -444,83 +452,83 @@ describe('listen', () => {
 	});
 });
 describe('component lifecycle', () => {
-it('class component: create, mount then destroy when detached', () => {
-const steps = [];
-class Card extends Component {
-render() { return div('card'); }
-onCreate() { steps.push('create'); }
-onMount() { steps.push('mount'); }
-onDestroy() { steps.push('destroy'); }
-}
-const target = mount(div(new Card()));
-expect(steps).toEqual(['create', 'mount']);
-target.querySelector('div > div').remove();
-stateOf(1).setState(2); // sweep fires onDestroy for detached nodes
-expect(steps).toEqual(['create', 'mount', 'destroy']);
-});
-it('function component hooks fire', () => {
-const steps = [];
-function Widget() {
-onCreate(() => steps.push('create'));
-onMount(() => steps.push('mount'));
-return div('widget');
-}
-mount(div(Widget));
-expect(steps).toEqual(['create', 'mount']);
-});
-it('onUpdate fires on state change while mounted', () => {
-const steps = [];
-class Live extends Component {
-render() { return div('live'); }
-onUpdate() { steps.push('update'); }
-}
-mount(div(new Live()));
-expect(steps).toEqual([]);
-stateOf(0).setState(1);
-expect(steps).toEqual(['update']);
-});
+	it('class component: create, mount then destroy when detached', () => {
+		const steps = [];
+		class Card extends Component {
+			render() { return div('card'); }
+			onCreate() { steps.push('create'); }
+			onMount() { steps.push('mount'); }
+			onDestroy() { steps.push('destroy'); }
+		}
+		const target = mount(div(new Card()));
+		expect(steps).toEqual(['create', 'mount']);
+		target.querySelector('div > div').remove();
+		stateOf(1).setState(2); // sweep fires onDestroy for detached nodes
+		expect(steps).toEqual(['create', 'mount', 'destroy']);
+	});
+	it('function component hooks fire', () => {
+		const steps = [];
+		function Widget() {
+			onCreate(() => steps.push('create'));
+			onMount(() => steps.push('mount'));
+			return div('widget');
+		}
+		mount(div(Widget));
+		expect(steps).toEqual(['create', 'mount']);
+	});
+	it('onUpdate fires on state change while mounted', () => {
+		const steps = [];
+		class Live extends Component {
+			render() { return div('live'); }
+			onUpdate() { steps.push('update'); }
+		}
+		mount(div(new Live()));
+		expect(steps).toEqual([]);
+		stateOf(0).setState(1);
+		expect(steps).toEqual(['update']);
+	});
 });
 
 describe('utilities', () => {
-it('range, createList, flatMap, loop', () => {
-expect(range(1, 3)).toEqual([1, 2, 3]);
-expect(createList(3, i => i * 2)).toEqual([0, 2, 4]);
-expect(flatMap([1, [2, [3]]])).toEqual([1, 2, 3]);
-expect(loop([1, 2], n => n * 10)).toEqual([10, 20]);
-});
-it('html() creates Raw content', () => {
-const target = mount(div(html('<b>bold</b>')));
-expect(target.querySelector('b')?.textContent).toBe('bold');
-expect(html('<i>x</i>').get()).toBe('<i>x</i>');
-});
-it('createElement builds a JetzElement', () => {
-const el = createElement('section', { id: 's1' }, 'body');
-expect(el).toBeInstanceOf(JetzElement);
-mount(el);
-expect(document.getElementById('s1').textContent).toBe('body');
-});
+	it('range, createList, flatMap, loop', () => {
+		expect(range(1, 3)).toEqual([1, 2, 3]);
+		expect(createList(3, i => i * 2)).toEqual([0, 2, 4]);
+		expect(flatMap([1, [2, [3]]])).toEqual([1, 2, 3]);
+		expect(loop([1, 2], n => n * 10)).toEqual([10, 20]);
+	});
+	it('html() creates Raw content', () => {
+		const target = mount(div(html('<b>bold</b>')));
+		expect(target.querySelector('b')?.textContent).toBe('bold');
+		expect(html('<i>x</i>').get()).toBe('<i>x</i>');
+	});
+	it('createElement builds a JetzElement', () => {
+		const el = createElement('section', { id: 's1' }, 'body');
+		expect(el).toBeInstanceOf(JetzElement);
+		mount(el);
+		expect(document.getElementById('s1').textContent).toBe('body');
+	});
 });
 
 describe('Dispatcher', () => {
-it('dispatches an action to its handler', () => {
-let got = null;
-const d = new Dispatcher((action, value) => { got = [action, value]; });
-d.dispatch('save', 42);
-expect(got).toEqual(['save', 42]);
-});
+	it('dispatches an action to its handler', () => {
+		let got = null;
+		const d = new Dispatcher((action, value) => { got = [action, value]; });
+		d.dispatch('save', 42);
+		expect(got).toEqual(['save', 42]);
+	});
 });
 
 describe('Jetz helpers', () => {
-it('unmount clears the target and reports a version', () => {
-const target = mount(div('app'));
-Jetz.unmount(target);
-expect(target.innerHTML).toBe('');
-expect(Jetz.version).toBeTruthy();
-});
-it('addScript appends a script element to the body', () => {
-addScript('/test.js', { defer: 'defer' });
-const script = document.body.querySelector('script[src="/test.js"]');
-expect(script).toBeTruthy();
-expect(script.defer).toBe(true);
-});
+	it('unmount clears the target and reports a version', () => {
+		const target = mount(div('app'));
+		Jetz.unmount(target);
+		expect(target.innerHTML).toBe('');
+		expect(Jetz.version).toBeTruthy();
+	});
+	it('addScript appends a script element to the body', () => {
+		addScript('/test.js', { defer: 'defer' });
+		const script = document.body.querySelector('script[src="/test.js"]');
+		expect(script).toBeTruthy();
+		expect(script.defer).toBe(true);
+	});
 });

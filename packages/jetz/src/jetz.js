@@ -1184,9 +1184,13 @@ class RememberState extends State {
 		return this.getValue();
 	}
 	pathId = location.pathname.split('/').join('__');
-	constructor(value, handler = { get(obj) { }, set(obj) { } }) {
+	constructor(value, handler = { get(obj) { }, set(obj) { } }, key) {
 		super(value, handler);
-		RememberState.generateId(this);
+		if (key === undefined) {
+			RememberState.generateId(this);
+		} else {
+			this.id = `${this.pathId}__key__${key}`;
+		}
 		let oldValue = _RememberStateTemp.getCollectionValue(this.pathId, this.id);
 		if (oldValue != null) {
 			this.setState(oldValue);
@@ -1196,7 +1200,7 @@ class RememberState extends State {
 		super.setState(newValue);
 		_RememberStateTemp.assignCollectionValue(this.pathId, this.id, newValue);
 	}
-	toString(){
+	toString() {
 		return this.getValue();
 	}
 	// toInteger(){
@@ -1231,9 +1235,9 @@ export class ListState extends Array {
 	 * RememberState. Restores previously saved values and keeps saving on
 	 * every mutation. Returns the same list for chaining.
 	 */
-	asRemember() {
+	asRemember(key) {
 		if (this.isRemember) return this;
-		const objRemember = new RememberState(JSON.stringify(this.values));
+		const objRemember = new RememberState(JSON.stringify(this.values), undefined, key);
 		const saved = JSON.parse(objRemember.valueOf());
 		// adopt persisted values, if any
 		if (JSON.stringify(saved) !== JSON.stringify(this.values)) {
@@ -1254,13 +1258,13 @@ export class ListState extends Array {
 	renderCallback = item => { return item };
 
 	constructor(isRemember = false, ...values) {
-		if(isRemember){
+		if (isRemember) {
 			var objRemember = new RememberState(JSON.stringify(values));
 			values = JSON.parse(objRemember.valueOf());
 			super(...values);
 			this.isRemember = true;
 			this.objRemember = objRemember;
-		}else{
+		} else {
 			super(...values);
 		}
 		this.values = values;
@@ -1276,7 +1280,7 @@ export class ListState extends Array {
 		}
 		return this;
 	}
-	clear(){
+	clear() {
 		this.empty();
 	}
 	empty() {
@@ -1502,26 +1506,6 @@ export class ListState extends Array {
 }
 export function listOf(...items) {
 	return new ListState(false, ...items);
-	// return new Proxy(items, {
-	// 	listState: new ListState(...items),
-	// 	get(target, p, receiver) {
-	// 		if (typeof p == 'string' && p == 'listState') {
-	// 			return this.listState;
-	// 		}
-	// 		return this.listState[p];
-	// 	},
-	// 	set(target, i, value, receiver) {
-	// 		target[i] = value;
-	// 		if (i == 'parentElement') {
-	// 			console.log(value)
-	// 			return false;
-	// 		} else {
-	// 			console.log('setted', target)
-	// 			this.listState.push(target);
-	// 		}
-	// 		return true;
-	// 	}
-	// });
 }
 
 export function sequenceOf(...items) {
@@ -1582,19 +1566,28 @@ export function createList(length, callbackItem = (index) => { return index; }) 
 	}
 	return dataList;
 }
-function rememberOf(value) {
+function rememberOf(keyOrValue, value) {
+	const hasKey = arguments.length > 1;
+	const key = hasKey ? keyOrValue : undefined;
+	const initialValue = hasKey ? value : keyOrValue;
+	if (hasKey && typeof key !== 'string') {
+		throw new TypeError('rememberOf key must be a string');
+	}
+	const remember = (rememberKey, rememberValue) => rememberKey === undefined
+		? rememberOf(rememberValue)
+		: rememberOf(rememberKey, rememberValue);
 	let instance = null;
-	if (typeof value === 'object' && !(value instanceof Array) && !(value instanceof JetzElement)) {
-		for (const prop in value) {
-			if (Object.hasOwnProperty.call(value, prop)) {
-				const propValue = value[prop];
-				value[prop] = rememberOf(propValue);
+	if (typeof initialValue === 'object' && initialValue !== null && !(initialValue instanceof Array) && !(initialValue instanceof JetzElement)) {
+		for (const prop in initialValue) {
+			if (Object.hasOwnProperty.call(initialValue, prop)) {
+				const propValue = initialValue[prop];
+				initialValue[prop] = remember(key === undefined ? undefined : `${key}.${prop}`, propValue);
 			}
 		}
-		instance = value;
-	} else if(value instanceof Array){
-		instance = new ListState(true, ...value);
-	}else {
+		instance = initialValue;
+	} else if (initialValue instanceof Array) {
+		instance = new ListState(false, ...initialValue).asRemember(key);
+	} else {
 		const optDefaultProxy = {
 			get(obj, prop) {
 				return obj.getValue();
@@ -1604,7 +1597,7 @@ function rememberOf(value) {
 				return true;
 			}
 		};
-		let objState = new RememberState(value, optDefaultProxy);
+		let objState = new RememberState(initialValue, optDefaultProxy, key);
 		// custom function string
 		instance = objState;
 	}
@@ -2002,8 +1995,8 @@ class StateListener {
  * @example
  * div( 'Count : ', counter, listen(parent => parent.addClass(`count-${counter.value}`)) )
  */
-function listen(fn){
-  return new StateListener(fn);
+function listen(fn) {
+	return new StateListener(fn);
 }
 /**
  * Inline reactive conditional. Renders the branch matching `condition` and

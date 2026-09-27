@@ -6,6 +6,7 @@ import { ToDo } from "../src/components/todo/Todo.js";
 import { counter } from "../src/components/counter/counter.js";
 import { Calculator } from "../src/components/calculator/calculator.js";
 import { MyTest } from "../src/components/another/mytest.js";
+import ToDoComponent from "../src/components/todo/todo-component.js";
 
 export let routeWeb = [
     route('/', Home),

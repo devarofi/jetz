@@ -94,7 +94,7 @@ export declare class ListState<T = any> extends Array<T> {
     clear(): void;
 
     /** Persists this list to localStorage under rememberOf storage driver. */
-    asRemember(): this;
+    asRemember(key?: string): this;
 }
 
 /**
@@ -257,12 +257,15 @@ export declare class Raw {
 export declare function stateOf<T>(value: T): State<T>;
 
 /**
- * Creates a reactive state synchronized with `localStorage`.
+ * Creates a reactive state synchronized with `localStorage`. Supplying a key
+ * gives the state a stable storage identity independent of creation order.
  *
  * @example
  * const theme = rememberOf('theme', 'light');
  */
-export declare function rememberOf<T>(keyOrVal: any, val?: any): RememberState<T>;
+export declare function rememberOf<T>(key: string, value: T[]): ListState<T>;
+export declare function rememberOf<T>(key: string, value: T): RememberState<T>;
+export declare function rememberOf<T>(value: T): T extends any[] ? ListState<T[number]> : RememberState<T>;
 
 /**
  * Creates a derived reactive state that automatically tracks dependencies.
