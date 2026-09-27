@@ -29,18 +29,16 @@ Inspired by the composable, declarative paradigm of Jetpack Compose, Jetz brings
 
 ```javascript
 import { Jetz, stateOf } from "@daevsoft/jetz";
-import { div, p, button } from "@daevsoft/jetz/ui";
+import { button, div, p } from "@daevsoft/jetz/ui";
 
 const count = stateOf(0);
 
-const App = div(
+const App = () => div(
   p("Count: ", count),
-  button("Increment", {
-    onclick: () => count.setState(count.value + 1)
-  })
+  button({ onclick() { count.value++; } }, "Increment")
 );
 
-Jetz.mount(App, document.body);
+Jetz.mount(App, "#app");
 ```
 
 ```bash
@@ -126,25 +124,23 @@ The entire Jetz mental model comes down to four basic steps:
 
 ```javascript
 import { Jetz, stateOf } from "@daevsoft/jetz";
-import { div, h1, button } from "@daevsoft/jetz/ui";
+import { button, div, h1 } from "@daevsoft/jetz/ui";
 
 // 1. Create reactive state
 const count = stateOf(0);
 
 // 2. Compose your UI tree
-const App = div(
+const App = () => div(
   h1("Interactive Counter"),
-  
+
   // 3. React to state: pass state directly or update it on event
-  button("Clicked ", count, " times", {
-    onclick() {
-      count.value++; // automatically triggers fine-grained DOM update
-    }
-  })
+  button({ onclick() {
+    count.value++; // automatically triggers fine-grained DOM update
+  } }, "Clicked ", count, " times")
 );
 
 // 4. Mount to your HTML document
-Jetz.mount(App, document.body);
+Jetz.mount(App, "#app");
 ```
 
 No build step required to parse custom syntax. That is valid, executable JavaScript out of the box.
