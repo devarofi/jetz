@@ -13,7 +13,7 @@ import Prism from "prismjs/components/prism-core.js";
 import "prismjs/components/prism-clike.js";
 import "prismjs/components/prism-javascript.js";
 import "./playground.css";
-import { asBackLink } from "../../lib/jetz-router.js";
+import { asBackLink, link } from "../../lib/jetz-router.js";
 
 const examples = {
   counter: {
@@ -564,7 +564,7 @@ export const Playground = () => {
       button(css`run-button`, { onclick: () => preview(editor?.getValue() ?? examples[selectedExample].source) },
         span(css`run-icon`, "▶"), "Run preview",
       ),
-      a(css`home-link`, { href: '#' }, asBackLink, "Back to home"),
+      link('/', a(css`home-link`, { href: '#' }, "Back to home")),
     ),
     div(css`playground-intro`,
       h1("Learn by changing the code."),

@@ -207,7 +207,7 @@ export function ToDo() {
                 img({ src: logoUrl, alt: 'Jetz', class: 'todo-logo' }),
                 span('Todo')
             ),
-            a(css`todo-back-link`, { href: '#home' }, asBackLink, 'Back to home')
+            link('/', a(css`todo-back-link`, { href: '#' }, 'Back to home'))
         ),
         section(css`todo-main`,
             div(css`todo-page-intro`,
