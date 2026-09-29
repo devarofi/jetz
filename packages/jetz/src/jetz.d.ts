@@ -177,6 +177,13 @@ export declare class JetzElement {
     o: HTMLElement;
 
     tagName: string;
+
+    /**
+     * Pending attributes collected before render.
+     * Keys are normalized on the way in: the `className` alias maps onto
+     * `class`, and `data_`/`aria_` prefixes convert `_` to `-`
+     * (e.g. `data_counter` reaches the DOM as `data-counter`).
+     */
     attributes: Record<string, any>;
     children: any[];
     parent: JetzElement | null;
@@ -206,13 +213,17 @@ export declare class JetzElement {
     /** Hook invoked right before the element is rendered. */
     onStart(callback?: () => void): this;
 
-    /** Reads an attribute value. */
+    /** Reads an attribute value (pass the hyphenated form for `data-*`/`aria-*`). */
     attr(name: string): any;
 
-    /** Adds or updates an attribute. */
+    /**
+     * Adds or updates an attribute. The name is normalized first: `className`
+     * maps onto `class` and `data_`/`aria_` underscores become hyphens, so
+     * `addAttr('data_counter', 1)` writes `data-counter="1"`.
+     */
     addAttr(name: string, value: any): this;
 
-    /** Removes an attribute. */
+    /** Removes an attribute (pass the hyphenated form for `data-*`/`aria-*`). */
     removeAttr(name: string): this;
 
     /** Reads a `data-*` attribute. */
