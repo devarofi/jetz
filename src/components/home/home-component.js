@@ -1,80 +1,1571 @@
 import { link } from "../../lib/jetz-router.js";
-import { a, alt, article, code, css, div, h1, h2, header, img, main, nav, p, pre, section, small, span, src, strong, width } from "../../lib/jetz-ui.js";
+import { html, ifElse, stateOf } from "../../lib/jetz.js";
+
+import {
+    a,
+    alt,
+    article,
+    button,
+    code,
+    css,
+    div,
+    footer,
+    h1,
+    h2,
+    h3,
+    header,
+    img,
+    li,
+    main,
+    nav,
+    p,
+    pre,
+    section,
+    small,
+    span,
+    src,
+    strong,
+    ul,
+    width
+} from "../../lib/jetz-ui.js";
+
 import logo from '../../../public/img/logo/small.png';
 import '../../../public/css/style.css';
 
-export function Home(){
-    return main(
-        { id: 'welcome-page' },
-        header(css`welcome-header`,
-            a({ class: 'welcome-brand', href: '/' },
-                img(src(logo), alt`Jetz`, width`42`),
-                span('jetz')
-            ),
-            nav(css`welcome-nav`,
-                a({ href: 'https://github.com/devarofi/jetz', target: '_blank', rel: 'noreferrer' }, 'GitHub', span('↗'))
-            )
-        ),
-        section(css`welcome-hero`,
-            div(css`welcome-copy`,
-                span(css`welcome-kicker`, span(css`welcome-kicker-dot`), 'A JavaScript UI framework'),
-                h1('Build interfaces.', span(css`welcome-headline-accent`, 'Stay in JavaScript.')),
-                p('Compose reactive web experiences with native JavaScript. No JSX, no compiler magic, just a small set of expressive building blocks.'),
-                div(css`welcome-actions`,
-                    a({ class: 'welcome-action welcome-action--primary', href: 'https://github.com/devarofi/jetz#quick-start', target: '_blank', rel: 'noreferrer' }, 'Get started', span('↗')),
-                    a({ class: 'welcome-action welcome-action--text', href: 'https://github.com/devarofi/jetz', target: '_blank', rel: 'noreferrer' }, 'Explore the source', span('→'))
-                ),
-                div(css`welcome-meta`,
-                    span('Fine-grained reactivity'),
-                    span('·'),
-                    span('Direct DOM updates'),
-                    span('·'),
-                    span('Zero JSX')
-                )
-            ),
-            article(css`welcome-code-panel`,
-                div(css`welcome-code-topbar`,
-                    div(css`welcome-code-dots`, span(), span(), span()),
-                    small('hello-jetz.js'),
-                    span(css`welcome-code-label`, 'LIVE IDEA')
-                ),
-                pre(css`welcome-code`,
-                    code(
-`import { Jetz, stateOf } from "@daevsoft/jetz";
-import { div, button } from "@daevsoft/jetz/ui";
+// Prism core plus the JavaScript grammar. The grammar files publish themselves
+// on the global `Prism` object the core module creates, so the core has to stay
+// the first import of this trio.
+import Prism from "prismjs/components/prism-core.js";
+import "prismjs/components/prism-clike.js";
+import "prismjs/components/prism-javascript.js";
 
-const clicks = stateOf(0);
 
-const App = div(
-  button("Clicked ", clicks, " times", {
-    onclick: () => clicks.value++
-  })
+export function Home() {
+
+    const activeTab = stateOf('state');
+
+
+    // -------------------------------------------------------------------------
+    // Code examples
+    // -------------------------------------------------------------------------
+
+    const examples = {
+        state: {
+            label: 'State',
+            title: 'Reactive state without ceremony',
+            description: 'Create state with one line and update it directly.',
+            code:
+`import { stateOf } from "@daevsoft/jetz";
+import { button } from "@daevsoft/jetz/ui";
+
+const count = stateOf(0);
+
+button(
+    {
+        onclick() {
+            count.value++;
+        }
+    },
+    "Clicked ",
+    count,
+    " times"
+);`
+        },
+
+        components: {
+            label: 'Components',
+            title: 'Components are just functions',
+            description: 'No special class, file format, or template syntax.',
+            code:
+`const UserCard = user => div(
+    css\`user-card\`,
+
+    strong(user.name),
+
+    span(
+        user.email
+    )
 );
 
-Jetz.mount(App, document.body);`
+const App = () => div(
+    UserCard({
+        name: "Daev",
+        email: "hello@example.com"
+    })
+);`
+        },
+
+        routing: {
+            label: 'Routing',
+            title: 'Simple client-side routing',
+            description: 'Define pages with familiar JavaScript.',
+            code:
+`import { Jetz } from "@daevsoft/jetz";
+import { Router, route } from "@daevsoft/jetz/router";
+
+const router = new Router([
+    route("/", Home),
+    route("/docs", Docs),
+    route("/about", About)
+]);
+
+Jetz.use(router);`
+        },
+
+        events: {
+            label: 'Events',
+            title: 'Events stay close to your UI',
+            description: 'Handle interaction exactly where it happens.',
+            code:
+`const message = stateOf("Ready");
+
+button(
+    {
+        onclick() {
+            message.value = "Triggered";
+        }
+    },
+    "Run action"
+);
+
+div(
+    "Status: ",
+    message
+);`
+        },
+
+        lists: {
+            label: 'Lists',
+            title: 'Lists that update themselves',
+            description: 'Push, remove, or replace items; looped views follow.',
+            code:
+`import { listOf, loop } from "@daevsoft/jetz";
+import { button, li, ul } from "@daevsoft/jetz/ui";
+
+const tasks = listOf("Read the docs", "Build a demo");
+
+ul(
+    loop(tasks, task => li(task))
+);
+
+button(
+    {
+        onclick() {
+            tasks.push("Ship it");
+        }
+    },
+    "Add a task"
+);`
+        },
+
+        conditional: {
+            label: 'Conditional',
+            title: 'Render only the active branch',
+            description: 'Declarative branches without wrapper elements.',
+            code:
+`import { _else, _if, stateOf } from "@daevsoft/jetz";
+import { button, div, p } from "@daevsoft/jetz/ui";
+
+const online = stateOf(false);
+
+div(
+    div(_if(() => online.value), p("You are online")),
+    div(_else, p("You are offline"))
+);
+
+button(
+    {
+        onclick() {
+            online.value = !online.value;
+        }
+    },
+    "Toggle status"
+);`
+        }
+    };
+
+
+    // The hero window always shows the same snippet, so it lives next to the
+    // explorer examples instead of being keyed by a tab.
+    const heroCode =
+`import { Jetz, stateOf } from "@daevsoft/jetz";
+import { button, div } from "@daevsoft/jetz/ui";
+
+const count = stateOf(0);
+
+const App = () => div(
+
+    button({
+        onclick() {
+            count.value++;
+        }
+    }, "Clicked ", count, " times")
+
+);
+
+Jetz.mount(App, "#app");`;
+
+    // Short runnable snippet used only by the playground promo. It excludes the
+    // hero imports and mount call so the page keeps exactly two highlighted
+    // `language-javascript` blocks in the always-active content.
+    const playgroundSnippet =
+`const count = stateOf(7);
+
+button(
+    "Clicked ",
+    count,
+    " times",
+    {
+        onclick() {
+            count.value++;
+        }
+    }
+);`;
+
+
+    // -------------------------------------------------------------------------
+    // Syntax highlighting
+    //
+    // Prism runs at render time: `highlight()` returns the token markup as an
+    // HTML string and `html()` injects it into the <code> element. The panels
+    // stay static afterwards, so switching tabs never needs a post-mount DOM
+    // pass and never re-parses the source.
+    // -------------------------------------------------------------------------
+
+    const highlight = source => html(
+        Prism.highlight(source, Prism.languages.javascript, 'javascript')
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Tab button
+    // -------------------------------------------------------------------------
+
+    const tabButton = (key, label) => ifElse(
+        () => activeTab.value === key,
+
+        () => button(
+            {
+                class: 'jetz-code-tab is-active',
+                onclick() {
+                    activeTab.value = key;
+                }
+            },
+            label
+        ),
+
+        () => button(
+            {
+                class: 'jetz-code-tab',
+                onclick() {
+                    activeTab.value = key;
+                }
+            },
+            label
+        )
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Example panel
+    //
+    // Each tab owns one `ifElse()` panel: the panel renders while its tab is
+    // active and renders nothing otherwise. A branch callback must return
+    // content, never another `ifElse()`, so every tab gets its own panel.
+    // -------------------------------------------------------------------------
+
+    const examplePanel = key => ifElse(
+        () => activeTab.value === key,
+
+        () => div(
+            css`jetz-code-panel`,
+
+            div(
+                css`jetz-code-heading`,
+
+                strong(examples[key].title),
+
+                p(examples[key].description)
+            ),
+
+            pre(
+                css`jetz-code`,
+
+                code(
+                    css`language-javascript`,
+
+                    highlight(examples[key].code)
+                )
+            )
+        ),
+
+        () => null
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Comparison row
+    // -------------------------------------------------------------------------
+
+    const compareRow = (concern, jetz, others) => div(
+        css`jetz-compare-row`,
+
+        strong(
+            css`jetz-compare-concern`,
+            concern
+        ),
+
+        span(
+            css`jetz-compare-cell jetz-compare-jetz`,
+
+            small(
+                css`jetz-compare-tag`,
+                'Jetz'
+            ),
+
+            jetz
+        ),
+
+        span(
+            css`jetz-compare-cell jetz-compare-others`,
+
+            small(
+                css`jetz-compare-tag`,
+                'Other frameworks'
+            ),
+
+            others
+        )
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Page
+    // -------------------------------------------------------------------------
+
+    return main(
+        {
+            id: 'welcome-page'
+        },
+
+
+        // =====================================================================
+        // NAVBAR
+        // =====================================================================
+
+        header(
+            css`jetz-header`,
+
+            div(
+                {
+                    class: 'container jetz-header-inner'
+                },
+
+                a(
+                    {
+                        class: 'jetz-brand',
+                        href: '/'
+                    },
+
+                    img(
+                        src(logo),
+                        alt`Jetz`,
+                        width`38`
+                    ),
+
+                    div(
+                        css`jetz-brand-text`,
+
+                        strong('jetz'),
+
+                        small('JavaScript UI framework')
                     )
                 ),
-                div(css`welcome-code-foot`, span('●'), 'Plain JavaScript. Reactive by design.')
+
+
+                nav(
+                    css`jetz-nav`,
+
+                    a(
+                        {
+                            href: '#why'
+                        },
+                        'Why Jetz'
+                    ),
+
+                    a(
+                        {
+                            href: '#features'
+                        },
+                        'Features'
+                    ),
+
+                    a(
+                        {
+                            href: '#examples'
+                        },
+                        'Examples'
+                    ),
+
+                    a(
+                        {
+                            href: '#special'
+                        },
+                        'Compare'
+                    ),
+
+                    a(
+                        {
+                            href: '#start'
+                        },
+                        'Get started'
+                    ),
+
+                    link(
+                        'playground',
+
+                        a(
+                            {
+                                href: '#playground'
+                            },
+                            'Playground'
+                        )
+                    ),
+
+                    a(
+                        {
+                            class: 'jetz-nav-github',
+                            href: 'https://github.com/devarofi/jetz',
+                            target: '_blank',
+                            rel: 'noreferrer'
+                        },
+                        'GitHub',
+                        span('↗')
+                    )
+                )
             )
         ),
-        section(css`welcome-capabilities`,
-            div(css`welcome-section-heading`,
-                span(css`welcome-overline`, 'THE BUILDING BLOCKS'),
-                h2('Everything you need. Nothing in the way.')
-            ),
-            div(css`welcome-feature-list`,
-                article(css`welcome-feature`, span(css`welcome-feature-number`, '01'), h2('Compose'), p('Build interfaces from familiar functions and small, reusable components.')),
-                article(css`welcome-feature`, span(css`welcome-feature-number`, '02'), h2('React'), p('State changes update the exact DOM nodes that depend on them.')),
-                article(css`welcome-feature`, span(css`welcome-feature-number`, '03'), h2('Ship'), p('Use standard JavaScript with no JSX transform or template compiler.'))
+
+
+        // =====================================================================
+        // HERO
+        // =====================================================================
+
+        section(
+            {
+                class: 'jetz-hero'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-hero-grid`,
+
+                    // Hero copy
+                    div(
+                        css`jetz-hero-col`,
+
+                        div(
+                            css`jetz-hero-copy`,
+
+                            div(
+                                css`jetz-eyebrow`,
+
+                                span(
+                                    css`jetz-eyebrow-dot`
+                                ),
+
+                                'A small JavaScript UI framework'
+                            ),
+
+                            h1(
+                                'Build interfaces.',
+
+                                span(
+                                    css`jetz-gradient-text`,
+                                    'Stay in JavaScript.'
+                                )
+                            ),
+
+                            p(
+                                css`jetz-tagline`,
+
+                                'Javascript, Compose.'
+                            ),
+
+                            p(
+                                css`jetz-hero-description`,
+
+                                'Jetz gives you reactive state, components, routing and events without forcing your JavaScript into another language.'
+                            ),
+
+                            div(
+                                css`jetz-hero-actions`,
+
+                                link(
+                                    'playground',
+
+                                    a(
+                                        {
+                                            class: 'jetz-btn-primary',
+                                            href: '#playground'
+                                        },
+
+                                        'Try Jetz',
+
+                                        span('→')
+                                    )
+                                ),
+
+                                a(
+                                    {
+                                        class: 'jetz-btn-secondary',
+                                        href: 'https://github.com/devarofi/jetz',
+                                        target: '_blank',
+                                        rel: 'noreferrer'
+                                    },
+
+                                    'View on GitHub'
+                                )
+                            ),
+
+                            div(
+                                css`jetz-hero-points`,
+
+                                span(
+                                    '✓',
+                                    ' No JSX'
+                                ),
+
+                                span(
+                                    '✓',
+                                    ' Reactive state'
+                                ),
+
+                                span(
+                                    '✓',
+                                    ' Plain JavaScript'
+                                )
+                            )
+                        )
+                    ),
+
+
+                    // Hero code window
+                    div(
+                        css`jetz-hero-col`,
+
+                        div(
+                            css`jetz-hero-code`,
+
+                            div(
+                                css`jetz-window`,
+
+                                div(
+                                    css`jetz-window-bar`,
+
+                                    div(
+                                        css`jetz-window-dots`,
+
+                                        span(),
+                                        span(),
+                                        span()
+                                    ),
+
+                                    small(
+                                        'hello-jetz.js'
+                                    ),
+
+                                    span(
+                                        css`jetz-live-badge`,
+                                        'LIVE'
+                                    )
+                                ),
+
+                                pre(
+                                    css`jetz-hero-code-content`,
+
+                                    code(
+                                        css`language-javascript`,
+
+                                        highlight(heroCode)
+                                    )
+                                ),
+
+                                div(
+                                    css`jetz-window-status`,
+
+                                    span(
+                                        css`jetz-status-dot`
+                                    ),
+
+                                    'Reactive by design'
+                                )
+                            )
+                        )
+                    )
+                ),
+
+
+                // Hero bottom note
+                div(
+                    css`jetz-hero-note`,
+
+                    span('Built with familiar JavaScript primitives.'),
+
+                    span(css`jetz-note-arrow`, '↓')
+                )
             )
         ),
-        section(css`welcome-examples`,
-            div(css`welcome-example-copy`, span(css`welcome-overline`, 'TAKE IT FOR A SPIN'), h2('A framework should feel good to build with.'), p('Open a working example and explore Jetz in motion.')),
-            div(css`welcome-example-links`,
-                link('open-todo', a({ href: '#open-todo', class: 'welcome-example-link' }, span('01'), strong('Task list'), span('Reactive state in a familiar workflow'), span('↗'))),
-                link('calculator', a({ href: '#calculator', class: 'welcome-example-link' }, span('02'), strong('Calculator'), span('A complete interactive app'), span('↗')))
+
+
+        // =====================================================================
+        // WHY
+        // =====================================================================
+
+        section(
+            {
+                id: 'why',
+                class: 'jetz-section jetz-section-white'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-section-heading text-center`,
+
+                    span(
+                        css`jetz-label`,
+                        'WHY JETZ'
+                    ),
+
+                    h2(
+                        'A framework that stays out of your way.'
+                    ),
+
+                    p(
+                        'Learn the fundamentals quickly, then keep using the same simple ideas as your application grows.'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-card-grid`,
+
+                    div(
+                        css`jetz-card-col`,
+
+                        article(
+                            css`jetz-benefit-card`,
+
+                            div(
+                                css`jetz-card-number`,
+                                '01'
+                            ),
+
+                            div(
+                                css`jetz-card-icon`,
+                                '{}'
+                            ),
+
+                            h3(
+                                'Just JavaScript'
+                            ),
+
+                            p(
+                                'Write UI with functions, objects, arrays and events. No JSX or template language required.'
+                            )
+                        )
+                    ),
+
+
+                    div(
+                        css`jetz-card-col`,
+
+                        article(
+                            css`jetz-benefit-card`,
+
+                            div(
+                                css`jetz-card-number`,
+                                '02'
+                            ),
+
+                            div(
+                                css`jetz-card-icon`,
+                                '↻'
+                            ),
+
+                            h3(
+                                'Reactive by default'
+                            ),
+
+                            p(
+                                'State changes flow directly into the UI so your code stays close to the behavior it controls.'
+                            )
+                        )
+                    ),
+
+
+                    div(
+                        css`jetz-card-col`,
+
+                        article(
+                            css`jetz-benefit-card`,
+
+                            div(
+                                css`jetz-card-number`,
+                                '03'
+                            ),
+
+                            div(
+                                css`jetz-card-icon`,
+                                '→'
+                            ),
+
+                            h3(
+                                'Small enough to understand'
+                            ),
+
+                            p(
+                                'Jetz focuses on the core building blocks you actually use when creating frontend applications.'
+                            )
+                        )
+                    )
+                )
             )
         ),
-        section(css`welcome-bottom`, p('Made for the web, with the web.'), a({ href: 'https://github.com/devarofi/jetz', target: '_blank', rel: 'noreferrer' }, 'Jetz on GitHub ↗'))
-    )
+
+
+        // =====================================================================
+        // FEATURES
+        // =====================================================================
+
+        section(
+            {
+                id: 'features',
+                class: 'jetz-section jetz-section-soft'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-split-grid`,
+
+                    div(
+                        css`jetz-split-col`,
+
+                        span(
+                            css`jetz-label`,
+                            'CORE CONCEPTS'
+                        ),
+
+                        h2(
+                            'Everything starts with a few simple ideas.'
+                        ),
+
+                        p(
+                            css`jetz-section-lead`,
+
+                            'Instead of learning dozens of APIs, learn a small set of primitives and combine them to build your application.'
+                        ),
+
+                        ul(
+                            css`jetz-concept-list`,
+
+                            li(
+                                strong('State'),
+                                span('Keep values reactive with stateOf() and rememberOf().')
+                            ),
+
+                            li(
+                                strong('Components'),
+                                span('Compose UI with ordinary JavaScript functions.')
+                            ),
+
+                            li(
+                                strong('Events'),
+                                span('Connect user actions directly to application logic.')
+                            ),
+
+                            li(
+                                strong('Lists'),
+                                span('Render reactive collections with listOf() and loop().')
+                            ),
+
+                            li(
+                                strong('Conditional'),
+                                span('Show the active branch with _if(), _else, and ifElse().')
+                            ),
+
+                            li(
+                                strong('Routing'),
+                                span('Create application pages without unnecessary complexity.')
+                            )
+                        )
+                    ),
+
+
+                    div(
+                        css`jetz-split-col`,
+
+                        div(
+                            css`jetz-concept-visual`,
+
+                            div(
+                                css`jetz-concept-window`,
+
+                                div(
+                                    css`jetz-concept-window-top`,
+
+                                    span('jetz.js'),
+
+                                    span(
+                                        css`jetz-mini-badge`,
+                                        'CORE'
+                                    )
+                                ),
+
+                                div(
+                                    css`jetz-concept-flow`,
+
+                                    div(
+                                        css`jetz-flow-item jetz-flow-state`,
+
+                                        strong('stateOf()'),
+
+                                        span('Store state')
+                                    ),
+
+                                    div(
+                                        css`jetz-flow-arrow`,
+                                        '↓'
+                                    ),
+
+                                    div(
+                                        css`jetz-flow-item`,
+
+                                        strong('Component'),
+
+                                        span('Compose UI')
+                                    ),
+
+                                    div(
+                                        css`jetz-flow-arrow`,
+                                        '↓'
+                                    ),
+
+                                    div(
+                                        css`jetz-flow-item jetz-flow-result`,
+
+                                        strong('DOM'),
+
+                                        span('Reactive output')
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // CODE EXPLORER
+        // =====================================================================
+
+        section(
+            {
+                id: 'examples',
+                class: 'jetz-section jetz-section-white'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-section-heading`,
+
+                    span(
+                        css`jetz-label`,
+                        'LEARN BY DOING'
+                    ),
+
+                    h2(
+                        'See how little code you need.'
+                    ),
+
+                    p(
+                        'Explore the basic building blocks and get a feel for the programming model before reading the documentation.'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-code-promo`,
+
+                    div(
+                        css`jetz-code-promo-copy`,
+
+                        strong('Run this pattern live.'),
+
+                        span(
+                            'The playground contains the same building blocks as runnable examples.'
+                        )
+                    ),
+
+                    link(
+                        'playground',
+
+                        a(
+                            {
+                                class: 'jetz-code-run-link',
+                                href: '#playground'
+                            },
+
+                            'Open Playground →'
+                        )
+                    )
+                ),
+
+
+                div(
+                    css`jetz-code-explorer`,
+
+                    div(
+                        css`jetz-code-tabs`,
+
+                        tabButton('state', 'State'),
+
+                        tabButton('components', 'Components'),
+
+                        tabButton('routing', 'Routing'),
+
+                        tabButton('events', 'Events'),
+
+                        tabButton('lists', 'Lists'),
+
+                        tabButton('conditional', 'Conditional')
+                    ),
+
+                    div(
+                        css`jetz-code-content`,
+
+                        examplePanel('state'),
+
+                        examplePanel('components'),
+
+                        examplePanel('routing'),
+
+                        examplePanel('events'),
+
+                        examplePanel('lists'),
+
+                        examplePanel('conditional')
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // PLAYGROUND PROMO
+        // =====================================================================
+
+        section(
+            {
+                id: 'playground',
+                class: 'jetz-section jetz-section-dark'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-playground-promo`,
+
+                    div(
+                        css`jetz-playground-promo-copy`,
+
+                        span(
+                            css`jetz-label jetz-label-light`,
+                            'LIVE PLAYGROUND'
+                        ),
+
+                        h2(
+                            'Stop reading. Start running.'
+                        ),
+
+                        p(
+                            'The playground ships with the framework: pick a working example, change the code, and see the result instantly. No setup, no build step.'
+                        ),
+
+                        div(
+                            css`jetz-playground-steps`,
+
+                            span('Write code → Run → See result → Modify → Try again')
+                        ),
+
+                        div(
+                            css`jetz-hero-actions`,
+
+                            link(
+                                'playground',
+
+                                a(
+                                    {
+                                        class: 'jetz-btn-primary jetz-btn-light',
+                                        href: '#playground'
+                                    },
+
+                                    'Try Jetz',
+
+                                    span('→')
+                                )
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-playground-promo-visual`,
+
+                        div(
+                            css`jetz-window`,
+
+                            div(
+                                css`jetz-window-bar`,
+
+                                div(
+                                    css`jetz-window-dots`,
+
+                                    span(),
+                                    span(),
+                                    span()
+                                ),
+
+                                small(
+                                    'playground / main.js'
+                                ),
+
+                                span(
+                                    css`jetz-live-badge`,
+                                    'LIVE'
+                                )
+                            ),
+
+                            pre(
+                                css`jetz-hero-code-content`,
+
+                                code(
+                                    css`language-javascript`,
+
+                                    highlight(playgroundSnippet)
+                                )
+                            ),
+
+                            div(
+                                css`jetz-window-status`,
+
+                                span(
+                                    css`jetz-status-dot`
+                                ),
+
+                                'Preview: edit the code, press Run, change inputs live'
+                            )
+                        )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // DEVELOPER JOURNEY
+        // =====================================================================
+
+        section(
+            {
+                id: 'journey',
+                class: 'jetz-section jetz-section-white'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-section-heading text-center`,
+
+                    span(
+                        css`jetz-label`,
+                        'FROM FIRST TRY TO REAL APP'
+                    ),
+
+                    h2(
+                        'Start small. Grow naturally.'
+                    ),
+
+                    p(
+                        'The same primitives you use for your first counter can become the foundation of a larger frontend application.'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-step-grid`,
+
+                    div(
+                        css`jetz-step-col`,
+
+                        div(
+                            css`jetz-journey-card`,
+
+                            span('01'),
+
+                            strong('Learn'),
+
+                            p(
+                                'Understand state, components and events in minutes.'
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-step-col`,
+
+                        div(
+                            css`jetz-journey-card`,
+
+                            span('02'),
+
+                            strong('Compose'),
+
+                            p(
+                                'Turn small functions into reusable application components.'
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-step-col`,
+
+                        div(
+                            css`jetz-journey-card`,
+
+                            span('03'),
+
+                            strong('Connect'),
+
+                            p(
+                                'Add routing, API calls and application behavior around your UI.'
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-step-col`,
+
+                        div(
+                            css`jetz-journey-card`,
+
+                            span('04'),
+
+                            strong('Build'),
+
+                            p(
+                                'Use the same concepts to create complete frontend applications.'
+                            )
+                        )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // EXAMPLES
+        // =====================================================================
+
+        section(
+            {
+                class: 'jetz-section jetz-section-soft'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-section-heading text-center`,
+
+                    span(
+                        css`jetz-label`,
+                        'TRY SOMETHING REAL'
+                    ),
+
+                    h2(
+                        'Not just a counter.'
+                    ),
+
+                    p(
+                        'Use the same primitives to build practical applications.'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-example-grid`,
+
+                    div(
+                        css`jetz-example-col`,
+
+                        link(
+                            'open-todo',
+
+                            a(
+                                {
+                                    href: '#open-todo',
+                                    class: 'welcome-example-link'
+                                },
+
+                                div(
+                                    css`jetz-example-card`,
+
+                                    div(
+                                        css`jetz-example-icon`,
+                                        '✓'
+                                    ),
+
+                                    div(
+                                        css`jetz-example-content`,
+
+                                        strong(
+                                            'Task List'
+                                        ),
+
+                                        span(
+                                            'Reactive CRUD, filtering and live counters'
+                                        )
+                                    ),
+
+                                    span(
+                                        css`jetz-example-arrow`,
+                                        '→'
+                                    )
+                                )
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-example-col`,
+
+                        link(
+                            'calculator',
+
+                            a(
+                                {
+                                    href: '#calculator',
+                                    class: 'welcome-example-link'
+                                },
+
+                                div(
+                                    css`jetz-example-card`,
+
+                                    div(
+                                        css`jetz-example-icon`,
+                                        '='
+                                    ),
+
+                                    div(
+                                        css`jetz-example-content`,
+
+                                        strong(
+                                            'Calculator'
+                                        ),
+
+                                        span(
+                                            'Reactive expressions and application state'
+                                        )
+                                    ),
+
+                                    span(
+                                        css`jetz-example-arrow`,
+                                        '→'
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // SPECIAL
+        // =====================================================================
+
+        section(
+            {
+                id: 'special',
+                class: 'jetz-section jetz-section-white'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-section-heading text-center`,
+
+                    span(
+                        css`jetz-label`,
+                        'SPECIAL BY DESIGN'
+                    ),
+
+                    h2(
+                        'Composable first, instead of composable too.'
+                    ),
+
+                    p(
+                        'Jetz keeps what makes a modern UI framework productive - reactive state, components, routing - and leaves out the parts that move your code into another language or behind a compiler.'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-compare`,
+
+                    div(
+                        css`jetz-compare-row jetz-compare-head`,
+
+                        span('Concern'),
+
+                        span('Jetz'),
+
+                        span('JSX and template frameworks')
+                    ),
+
+                    compareRow(
+                        'Authoring',
+                        'Plain JavaScript functions: div(), button(), p()',
+                        'JSX, .vue or .svelte files that must be compiled first'
+                    ),
+
+                    compareRow(
+                        'Build step',
+                        'Nothing extra for syntax - standard ES modules',
+                        'Babel, SWC or a TypeScript JSX transform'
+                    ),
+
+                    compareRow(
+                        'Rendering',
+                        'State updates the exact bound text node or attribute',
+                        'Virtual-DOM diffing on every state change'
+                    ),
+
+                    compareRow(
+                        'Reactivity',
+                        'stateOf(), computed() and effect() track dependencies automatically',
+                        'Manual dependency arrays and memoization rules'
+                    ),
+
+                    compareRow(
+                        'Lists',
+                        'loop(list, keyFn, renderFn) recycles keyed elements',
+                        'Framework-specific key props and helper components'
+                    ),
+
+                    compareRow(
+                        'App features',
+                        'Router, route guards, session state and dispatcher included',
+                        'Assembled from separate ecosystem packages'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-fit-grid`,
+
+                    div(
+                        css`jetz-fit-card`,
+
+                        strong(
+                            'Use Jetz when you want...'
+                        ),
+
+                        ul(
+                            li(
+                                'Interactive web applications and SPAs with routing and lifecycle.'
+                            ),
+
+                            li(
+                                'Dashboards and internal tools without a heavy toolchain.'
+                            ),
+
+                            li(
+                                'JavaScript-first frontends built from small composable functions.'
+                            ),
+
+                            li(
+                                'Small interactive interfaces where direct DOM updates matter.'
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-fit-card jetz-fit-card-alt`,
+
+                        strong(
+                            'Reach for something else when...'
+                        ),
+
+                        ul(
+                            li(
+                                'Your team is required to write JSX or TSX.'
+                            ),
+
+                            li(
+                                'You are shipping a content-heavy static site with no interactivity, where plain HTML or a static site generator is enough.'
+                            )
+                        )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // CTA
+        // =====================================================================
+
+        section(
+            {
+                id: 'start',
+                class: 'jetz-cta'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-cta-inner`,
+
+                    div(
+                        css`jetz-cta-logo`,
+
+                        img(
+                            src(logo),
+                            alt`Jetz`,
+                            width`54`
+                        )
+                    ),
+
+                    span(
+                        css`jetz-label jetz-label-light`,
+                        'READY TO BUILD?'
+                    ),
+
+                    h2(
+                        'Your next frontend can start here.'
+                    ),
+
+                    p(
+                        'Install Jetz, write a few lines of JavaScript, and see where it takes you. Or skip setup and run working code now.'
+                    ),
+
+                    div(
+                        css`jetz-cta-actions`,
+
+                        link(
+                            'playground',
+
+                            a(
+                                {
+                                    class: 'jetz-btn-primary jetz-btn-light',
+                                    href: '#playground'
+                                },
+
+                                'Try Jetz',
+
+                                span('→')
+                            )
+                        ),
+
+                        a(
+                            {
+                                class: 'jetz-cta-link',
+                                href: 'https://github.com/devarofi/jetz',
+                                target: '_blank',
+                                rel: 'noreferrer'
+                            },
+
+                            'Explore the source ↗'
+                        )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // FOOTER
+        // =====================================================================
+
+        footer(
+            css`jetz-footer`,
+
+            div(
+                {
+                    class:
+                        'container jetz-footer-inner'
+                },
+
+                div(
+                    css`jetz-footer-brand`,
+
+                    img(
+                        src(logo),
+                        alt`Jetz`,
+                        width`24`
+                    ),
+
+                    strong('jetz')
+                ),
+
+                span(
+                    'Javascript, Compose.'
+                ),
+
+                a(
+                    {
+                        href: 'https://github.com/devarofi/jetz',
+                        target: '_blank',
+                        rel: 'noreferrer'
+                    },
+
+                    'GitHub ↗'
+                )
+            )
+        )
+    );
 }

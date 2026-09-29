@@ -1,6 +1,7 @@
-import { link } from '../../lib/jetz-router.js';
+import { asBackLink, link } from '../../lib/jetz-router.js';
 import { computed, Jetz, listOf, loop, rememberOf, stateOf } from '../../lib/jetz.js';
-import { a, article, button, css, div, footer, h1, h2, header, inputCheckbox, inputText, main, p, section, small, span, strong, style } from '../../lib/jetz-ui.js';
+import { a, article, button, css, div, footer, h1, h2, header, img, inputCheckbox, inputText, main, p, section, small, span, strong, style } from '../../lib/jetz-ui.js';
+import logoUrl from '../../../public/img/logo/small.png';
 import '../../../public/css/style.css';
 import '../../../public/css/todo.css';
 
@@ -202,8 +203,11 @@ export function ToDo() {
 
     return main({ id: 'todo-page' },
         header(css`todo-topbar`,
-            a({ class: 'todo-brand', href: '/' }, span(css`todo-brand-mark`, 'J'), 'jetz'),
-            link('/', a({ class: 'todo-back-link', href: '#home' }, '← Home'))
+            a(css`todo-brand`, { href: '/', 'aria-label': 'Back to Jetz home' },
+                img({ src: logoUrl, alt: 'Jetz', class: 'todo-logo' }),
+                span('Todo')
+            ),
+            a(css`todo-back-link`, { href: '#home' }, asBackLink, 'Back to home')
         ),
         section(css`todo-main`,
             div(css`todo-page-intro`,

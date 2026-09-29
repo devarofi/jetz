@@ -7,12 +7,16 @@ import { counter } from "../src/components/counter/counter.js";
 import { Calculator } from "../src/components/calculator/calculator.js";
 import ToDoComponent from "../src/components/todo/todo-component.js";
 import { RememberTodo } from "../src/components/todo/todo-remember.js";
+import { Playground } from "../src/components/playground/playground.js";
+import { MyPlay } from "../src/components/another/myplay.js";
 
 export let routeWeb = [
     route('/', Home),
-    route('landing', Landing),
+    route('playground', Playground),
+    route('play', MyPlay),
     route('open-todo', ToDo),
     route('counter', counter),
+    route('landing', Landing),
     route('remember-todo', RememberTodo),
     route('calculator', Calculator)
 ];

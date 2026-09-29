@@ -62,8 +62,16 @@ const browser = await puppeteer.launch({
 
 const page = await browser.newPage();
 const pageErrors = [];
+// Jetz drops lifecycle hooks registered outside a render pass. The component then
+// silently never wires itself up, so it fails the suite instead of only warning.
+const lifecycleWarnings = [];
+const LIFECYCLE_WARNING = /called outside of a component render/;
 page.on('pageerror', error => pageErrors.push(`pageerror: ${error.message}${error.stack ? '\n' + error.stack : ''}`));
 page.on('console', message => {
+	if (LIFECYCLE_WARNING.test(message.text())) {
+		lifecycleWarnings.push(message.text());
+		return;
+	}
 	if (message.type() === 'error') pageErrors.push('console.error: ' + message.text());
 });
 
@@ -98,6 +106,9 @@ console.log(report);
 if (pageErrors.length > 0) {
 	console.log('\nPAGE ERRORS:\n' + pageErrors.join('\n'));
 }
+if (lifecycleWarnings.length > 0) {
+	console.log('\nDROPPED LIFECYCLE HOOKS:\n' + lifecycleWarnings.join('\n'));
+}
 if (suiteError != null) {
 	console.log('\nSUITE DID NOT FINISH: ' + suiteError);
 }
@@ -105,7 +116,7 @@ if (suiteError != null) {
 const lines = report.split('\n');
 const passed = lines.filter(line => line.startsWith('PASS ::')).length;
 const failed = lines.filter(line => line.startsWith('FAIL ::'));
-const ok = failed.length === 0 && suiteError == null && !report.includes('(no results');
+const ok = failed.length === 0 && suiteError == null && lifecycleWarnings.length === 0 && !report.includes('(no results');
 
 console.log(`\n${passed} passed, ${failed.length} failed${needsReload ? ' (2 page loads: reload phase for rememberOf)' : ''}`);
 console.log(ok ? 'ALL PASS' : 'FAILED');

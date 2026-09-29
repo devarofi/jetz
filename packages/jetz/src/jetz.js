@@ -47,6 +47,45 @@ function subscribeRememberedValues(value, onChange, seen = new Set()) {
 		}
 	});
 }
+/**
+ * Attribute keys accepted as aliases, matched case-insensitively.
+ *
+ * `className` is the DOM property name (and the JSX one), so it is written far
+ * more often than the HTML attribute it stands for. Unlike an unknown key, which
+ * would silently land in the DOM as a junk `classname` attribute, it is mapped
+ * onto `class` before merging so it folds together with `css()` on the same
+ * element. Only the names listed here and the `data_`/`aria_` prefixes below are
+ * rewritten - camelCase attribute names that carry meaning (`viewBox`,
+ * `preserveAspectRatio`, …) pass through untouched.
+ */
+const attributeNameAliases = {
+	classname: 'class'
+};
+/**
+ * Attribute prefixes whose `_` separator stands for the HTML `-`.
+ *
+ * `data_counter` reads naturally in an object literal where the quoted hyphenated
+ * form (`{ 'data-counter': … }`) does not, and `dataset` only ever exposes the
+ * hyphenated spelling. Every `_` after a `data`/`aria` prefix becomes `-`, so
+ * `data_row_index` yields `data-row-index` and `dataset.rowIndex`. Only these two
+ * prefixes are converted, so `source_map` or `my_data` stay exactly as written.
+ */
+const dashedAttributePrefixes = new Set(['data', 'aria']);
+/**
+ * Maps a key onto the attribute it stands for: the `className` alias, then the
+ * `data_`/`aria_` underscore form. Anything else is returned untouched, so a typo
+ * like `cssClass` still lands in the DOM verbatim rather than being rerouted.
+ */
+function normalizeAttributeName(name) {
+	const key = String(name);
+	const alias = attributeNameAliases[key.toLowerCase()];
+	if (alias) return alias;
+	const separator = key.indexOf('_');
+	if (separator > 0 && dashedAttributePrefixes.has(key.slice(0, separator))) {
+		return key.replace(/_/g, '-');
+	}
+	return key;
+}
 const booleanAttributes = new Set([
 	'allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'controls',
 	'default', 'defer', 'disabled', 'formnovalidate', 'hidden', 'inert', 'ismap',
@@ -348,6 +387,10 @@ class JetzElement {
 	children;
 	oldStyle = {};
 	style = {};
+	// class sources merged onto this element, kept so a reactive part can be
+	// recomposed instead of being frozen at its mount-time value
+	#classParts = [];
+	#classUnsubs = [];
 	listener = [];
 	parent;
 	position;
@@ -425,9 +468,12 @@ class JetzElement {
 	/**
 	 * Fires onMount for this element and its subtree once the nodes are in
 	 * the document. Called by the parent after appending the child.
+	 * While the tree is still detached (initial render / route swap), mount is
+	 * deferred: Jetz.onFirstRenderPage() or the lifecycle sweep fires it as
+	 * soon as the subtree becomes connected.
 	 */
 	#notifyMounted() {
-		if (!this.o) return;
+		if (!this.o || !this.o.isConnected) return;
 		if (this.lifecycle) this.lifecycle.runMount();
 		this.children.forEach(child => {
 			if (child instanceof JetzElement) child.#notifyMounted();
@@ -765,13 +811,15 @@ class JetzElement {
 		return this;
 	}
 	addAttr(attrName, attrValue) {
+		attrName = normalizeAttributeName(attrName);
 		if (typeof attrValue === 'function') {
 			attrValue = computed(attrValue);
 		}
 		if (attrName === 'class') {
-			if (attrValue instanceof State) {
-				this.#setClassAttribute(attrValue.getValue());
-				attrValue.subscribe(value => this.#setClassAttribute(value));
+			// #bindClassParts also covers a single reactive source, so this one
+			// branch handles every case that can change after mount
+			if (this.#hasReactiveParts(attrValue)) {
+				this.#bindClassParts(attrValue);
 			} else {
 				this.addClass(attrValue);
 			}
@@ -808,6 +856,42 @@ class JetzElement {
 		}
 		this.o.setAttribute(attrName, value);
 	}
+	/** True when a class value - or any part of a merged array - can change. */
+	#hasReactiveParts(value) {
+		if (value instanceof State || typeof value === 'function') return true;
+		if (Array.isArray(value)) return value.some(item => this.#hasReactiveParts(item));
+		return false;
+	}
+	/**
+	 * Binds a class attribute assembled from more than one source.
+	 *
+	 * `div(css('base'), css(() => …))` merges into `{ class: ['base', state] }`
+	 * via mergeObject. A plain array used to fall through to addClass, which
+	 * flattened it into a one-off classList, so every reactive part stayed
+	 * frozen at the value it happened to hold on mount. Each part is kept so
+	 * the whole attribute can be recomposed when any of them changes.
+	 */
+	#bindClassParts(value) {
+		// re-binding replaces the previous wiring; without dropping it a re-render
+		// would leave the earlier compose callback subscribed as well
+		this.#unbindClassParts();
+		const parts = (Array.isArray(value) ? value.flat(Infinity) : [value])
+			.map(part => (typeof part === 'function' ? computed(part) : part));
+		this.#classParts = parts;
+		const compose = () => this.#setClassAttribute(
+			this.#classParts.map(part => (part instanceof State ? part.getValue() : part))
+		);
+		parts.forEach(part => {
+			if (!(part instanceof State)) return;
+			part.subscribe(compose);
+			this.#classUnsubs.push(() => part.unsubscribe(compose));
+		});
+		compose();
+	}
+	#unbindClassParts() {
+		this.#classUnsubs.forEach(off => off());
+		this.#classUnsubs = [];
+	}
 	#setClassAttribute(value) {
 		const values = Array.isArray(value) ? flatMap(value) : [value];
 		const className = values
@@ -823,7 +907,11 @@ class JetzElement {
 			this.attributes['class'] = value;
 		} else {
 			if (Array.isArray(value)) {
-				const values = flatMap(value.map(x => (typeof x === 'string') ? x.split(' ') : x));
+				const values = flatMap(value.map(x => (typeof x === 'string') ? x.split(' ') : x))
+					// classList stringifies whatever it is given, so a conditional
+					// that resolved to false/null would otherwise be added as a
+					// class literally named "false" or "null"
+					.filter(item => item != null && item !== false && item !== '');
 				this.#addClassClassification(values);
 			} else if (typeof value === 'string') {
 				this.o.classList.add(...(value.split(' ')));
@@ -992,6 +1080,9 @@ class Jetz {
 			if (node && !node.isConnected) {
 				context.runDestroy();
 				Jetz.#lifecycles.delete(context);
+			} else if (node && !context.mounted) {
+				// connected after a route swap or late render: onMount never ran yet
+				context.runMount();
 			} else if (context.mounted && !context.destroyed) {
 				context.runUpdate();
 			}
@@ -1295,6 +1386,29 @@ class RememberState extends State {
 	// }
 }
 
+/**
+ * A list view that owns several sibling elements rendered by one item, e.g.
+ * `loop(list, item => [li(item.title), li(item.body)])`. It quacks like a single
+ * JetzElement for the view bookkeeping (remove/replace), but keeps the render
+ * function's structure in the DOM instead of hiding it behind a carrier tag.
+ */
+class ListViewGroup {
+	constructor(elements) {
+		this.elements = elements;
+	}
+	/** DOM nodes currently backing this view. */
+	getNodes() {
+		return this.elements.map(element => element?.getElement?.()).filter(Boolean);
+	}
+	/** First node, so single-node consumers keep working. */
+	getElement() {
+		return this.getNodes()[0] ?? null;
+	}
+	remove() {
+		this.elements.forEach(element => element?.remove?.());
+	}
+}
+
 export class ListState extends Array {
 	parentElement = [];
 	values = [];
@@ -1387,14 +1501,44 @@ export class ListState extends Array {
 	}
 	createItemView(parent, item, index) {
 		var renderedItem = this.renderCallback(item, index);
-		if (renderedItem instanceof JetzElement) {
-			renderedItem.render(parent);
-			return renderedItem;
+		// a render function may return several nodes for one item: keep them as
+		// siblings instead of collapsing them into a carrier element
+		const parts = (Array.isArray(renderedItem) ? renderedItem.flat(Infinity) : [renderedItem])
+			.filter(entry => entry != null && entry !== false);
+		if (parts.length === 1 && parts[0] instanceof JetzElement) {
+			parts[0].render(parent);
+			return parts[0];
+		}
+		if (parts.length > 1 && parts.every(entry => entry instanceof JetzElement)) {
+			// render eagerly so the nodes exist for keyed reordering, matching
+			// the single-element path below
+			parts.forEach(element => element.render(parent));
+			return new ListViewGroup(parts);
 		}
 		// plain values need a carrier element so views stay removable/replaceable
 		const carrier = createElement('span', renderedItem);
 		carrier.render(parent);
 		return carrier;
+	}
+	/** DOM nodes backing a stored view (single element, group, or raw node). */
+	#viewNodes(view) {
+		if (view instanceof JetzElement) return [view.getElement()];
+		if (view instanceof ListViewGroup) return view.getNodes();
+		return view ? [view] : [];
+	}
+	/** Removes a stored view whatever shape it has. */
+	#removeView(view) {
+		if (view instanceof JetzElement) { view.remove(); return; }
+		if (view instanceof ListViewGroup) { view.remove(); return; }
+		view?.remove?.();
+	}
+	/** Attaches a freshly created view to its parent element. */
+	#appendView(parent, view) {
+		if (view instanceof ListViewGroup) {
+			parent.append(...view.elements);
+			return;
+		}
+		parent.append(view);
 	}
 	push(...items) {
 		for (let _i = 0; _i < items.length; _i++) {
@@ -1427,7 +1571,7 @@ export class ListState extends Array {
 				// 1. Remove items no longer in the list
 				for (const [key, entry] of keyMap) {
 					if (!newKeySet.has(key)) {
-						if (entry.view instanceof JetzElement) entry.view.remove();
+						this.#removeView(entry.view);
 						keyMap.delete(key);
 					}
 				}
@@ -1436,7 +1580,7 @@ export class ListState extends Array {
 				newKeys.forEach((key, j) => {
 					let entry = keyMap.get(key);
 					if (entry && entry.item !== this.values[j]) {
-						if (entry.view instanceof JetzElement) entry.view.remove();
+						this.#removeView(entry.view);
 						keyMap.delete(key);
 						entry = undefined;
 					}
@@ -1446,27 +1590,29 @@ export class ListState extends Array {
 						entry = { item: this.values[j], view: rendered };
 						keyMap.set(key, entry);
 						// Insert at correct position
-						const domNode = rendered instanceof JetzElement ? rendered.getElement() : rendered;
+						const domNodes = this.#viewNodes(rendered);
 						if (prevNode) {
-							prevNode.after(domNode);
+							prevNode.after(...domNodes);
 						} else {
-							parent.o.prepend(domNode);
+							parent.o.prepend(...domNodes);
 						}
 					} else {
 						// Existing item: reorder if needed
 						entry.item = this.values[j];
-						const domNode = entry.view instanceof JetzElement ? entry.view.getElement() : entry.view;
+						const domNodes = this.#viewNodes(entry.view);
+						const domNode = domNodes[0];
 						if (prevNode) {
-							if (domNode.previousSibling !== prevNode) {
-								prevNode.after(domNode);
+							if (domNode?.previousSibling !== prevNode) {
+								prevNode.after(...domNodes);
 							}
 						} else {
 							if (parent.o.firstChild !== domNode) {
-								parent.o.prepend(domNode);
+								parent.o.prepend(...domNodes);
 							}
 						}
 					}
-					prevNode = entry.view instanceof JetzElement ? entry.view.getElement() : entry.view;
+					const entryNodes = this.#viewNodes(entry.view);
+					prevNode = entryNodes[entryNodes.length - 1] ?? prevNode;
 				});
 				// Rebuild views array from keyMap order
 				this.views[parentIdx] = newKeys.map(k => keyMap.get(k).view);
@@ -1478,8 +1624,7 @@ export class ListState extends Array {
 			this.views = this.views.map(view => {
 				// if its HTML element
 				view.map(v => {
-					if (v instanceof JetzElement)
-						v.remove();
+					this.#removeView(v);
 					return [];
 				})
 				return [];
@@ -1495,7 +1640,7 @@ export class ListState extends Array {
 	newView(index, view, content, _index) {
 		var renderedItem = this.createItemView(this.parentElement[index], content, _index);
 		view.push(renderedItem);
-		this.parentElement[index].append(renderedItem);
+		this.#appendView(this.parentElement[index], renderedItem);
 	}
 	remove(item) {
 		const index = this.values.indexOf(item);
@@ -1506,7 +1651,7 @@ export class ListState extends Array {
 		const removedItem = this.values[index];
 		this.values.splice(index, 1);
 		this.views.forEach(view => {
-			view[index]?.remove?.();
+			this.#removeView(view[index]);
 			view.splice(index, 1);
 		});
 		this.splice(index, 1);
@@ -1590,7 +1735,7 @@ export class ListState extends Array {
 			this._keyMaps.push(keyMap);
 			this.values.forEach((value, i) => {
 				var renderedItem = this.createItemView(this.parentElement[lastIndex], value, i);
-				this.parentElement[lastIndex].append(renderedItem);
+				this.#appendView(this.parentElement[lastIndex], renderedItem);
 				this.views[this.views.length - 1].push(renderedItem);
 				keyMap.set(this._keyFn(value), { item: value, view: renderedItem });
 			});
@@ -1598,7 +1743,7 @@ export class ListState extends Array {
 			this._keyMaps.push(null);
 			this.values.forEach((value, i) => {
 				var renderedItem = this.createItemView(this.parentElement[lastIndex], value, i);
-				this.parentElement[lastIndex].append(renderedItem);
+				this.#appendView(this.parentElement[lastIndex], renderedItem);
 				this.views[this.views.length - 1].push(renderedItem);
 			});
 		}
@@ -1744,7 +1889,11 @@ let PageSession = {
 }
 function stateOf(value, handler = { get(value) { return value } }) {
 	let instance = null;
-	if (typeof value === 'object' && !(value instanceof JetzElement)) {
+	// `typeof null === "object"`, so an explicit null check has to come first.
+	// Without it `stateOf(null)` fell into the object branch and threw on
+	// `value.toObject = …`, which broke conditional classes like
+	// css(() => ready ? 'is-ready' : null).
+	if (value !== null && typeof value === 'object' && !(value instanceof JetzElement)) {
 		for (const prop in value) {
 			if (Object.hasOwnProperty.call(value, prop)) {
 				const propValue = value[prop];
@@ -1790,20 +1939,21 @@ function mergeObject(obj1, ...obj2) {
 	for (const obj of sources) {
 		for (const prop in obj) {
 			if (Object.hasOwnProperty.call(obj, prop)) {
+				const key = normalizeAttributeName(prop);
 				const value = obj[prop];
 				// check prop in newobj
-				if (Object.hasOwnProperty.call(newObj, prop)) {
-					const value2 = newObj[prop];
+				if (Object.hasOwnProperty.call(newObj, key)) {
+					const value2 = newObj[key];
 					// check datatype
 					if (Array.isArray(value)) {
-						newObj[prop] = Array.isArray(value2) ? [...value, ...value2] : [...value, value2];
+						newObj[key] = Array.isArray(value2) ? [...value, ...value2] : [...value, value2];
 					} else if (Array.isArray(value2)) {
-						newObj[prop] = [...value2, value];
+						newObj[key] = [...value2, value];
 					} else {
-						newObj[prop] = [value2, value];
+						newObj[key] = [value2, value];
 					}
 				} else {
-					newObj[prop] = Array.isArray(value) ? [...value] : value;
+					newObj[key] = Array.isArray(value) ? [...value] : value;
 				}
 			}
 		}

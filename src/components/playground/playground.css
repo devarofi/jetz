@@ -1,0 +1,519 @@
+.playground-shell {
+  /* the chrome and the editor both read this; it was referenced in five rules
+     but never declared, which made each `font` shorthand invalid at computed
+     value time and silently dropped the intended sizes */
+  --mono: "DM Mono", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto minmax(510px, 1fr) auto;
+  color: #16344d;
+  background: #f3f7fa;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+.playground-header {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  padding: 0 30px;
+  border-bottom: 1px solid #d7e3eb;
+  background: #fbfdfe;
+}
+
+.playground-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.playground-logo {
+  display: block;
+  width: 38px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.playground-controls {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.playground-controls label {
+  color: #8297a6;
+  font: 9px var(--mono);
+}
+
+.playground-controls select {
+  min-width: 190px;
+  padding: 9px 32px 9px 11px;
+  border: 1px solid #cbd9e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #28485e;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.run-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 37px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 4px;
+  background: #218bc4;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background .18s ease, transform .18s ease;
+}
+
+.run-button:hover {
+  background: #176b9a;
+  transform: translateY(-1px);
+}
+
+.run-icon {
+  font-size: 9px;
+}
+
+.home-link {
+  color: #60788a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.home-link:hover {
+  color: #218bc4;
+}
+
+.playground-intro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 25px 30px 19px;
+}
+
+.playground-intro h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.playground-intro p {
+  margin: 0 0 2px;
+  color: #718593;
+  font-size: 11px;
+}
+
+.playground-workbench {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(380px, .92fr);
+  gap: 14px;
+  padding: 0 22px 22px;
+}
+
+.editor-pane,
+.preview-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #d3e0e8;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 8px 28px #16344d0a;
+}
+
+.pane-toolbar {
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 15px;
+  border-bottom: 1px solid #dce6ec;
+  color: #8297a6;
+  font: 8px var(--mono);
+}
+
+.file-tab {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #35566c;
+}
+
+.file-type {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 3px;
+  background: #dff1fa;
+  color: #227eaf;
+  font-size: 7px;
+}
+
+.monaco-host {
+  /* a column flex box so .playground-code-surface can stretch to the pane;
+     as a plain block the surface had no resolved height to fill */
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: #102f46;
+  color: #b9cad4;
+  font: 12px var(--mono);
+}
+
+/* The editor is a Prism-painted <pre> stacked under a transparent textarea.
+   Every property that shifts a glyph horizontally or vertically has to match
+   between the two, otherwise the caret drifts away from the painted text. That
+   is why the shared metrics live in one rule both selectors are listed in
+   rather than being repeated per element. */
+.playground-code-surface {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #102f46;
+}
+
+.playground-highlight,
+.playground-textarea {
+  margin: 0;
+  padding: 18px 16px;
+  border: 0;
+  font: 13px/1.7 "DM Mono", Consolas, monospace;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  tab-size: 2;
+  -moz-tab-size: 2;
+}
+
+.playground-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #d7e7f0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.playground-textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+  overflow: auto;
+  resize: none;
+  background: transparent;
+  /* the glyphs come from the overlay; the textarea only supplies the caret,
+     the selection and the scroll offsets */
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: #d7e7f0;
+  outline: none;
+}
+
+/* A selection wash has to stay translucent: it paints in the textarea layer,
+   which sits above the highlighted <pre>, so an opaque fill would hide the very
+   text it is meant to mark. */
+.playground-textarea::selection {
+  background: rgba(101, 191, 240, 0.3);
+}
+
+/* Prism token palette. The home page keeps an equivalent block in style.css,
+   but that stylesheet is not part of this page's bundle, and borrowing the
+   language-javascript class would make the colours depend on whether the user
+   reached the playground by navigating or by a direct load. */
+.playground-highlight .token.comment,
+.playground-highlight .token.prolog,
+.playground-highlight .token.doctype,
+.playground-highlight .token.cdata {
+  color: #6a8a9d;
+  font-style: italic;
+}
+
+.playground-highlight .token.keyword,
+.playground-highlight .token.important,
+.playground-highlight .token.atrule {
+  color: #65bff0;
+}
+
+.playground-highlight .token.function,
+.playground-highlight .token.class-name {
+  color: #ffca7a;
+}
+
+.playground-highlight .token.string,
+.playground-highlight .token.char,
+.playground-highlight .token.regex,
+.playground-highlight .token.template-string {
+  color: #7fe0a6;
+}
+
+.playground-highlight .token.number,
+.playground-highlight .token.boolean,
+.playground-highlight .token.constant,
+.playground-highlight .token.symbol {
+  color: #d8a6ff;
+}
+
+.playground-highlight .token.property,
+.playground-highlight .token.parameter,
+.playground-highlight .token.attr-name {
+  color: #9ed2ea;
+}
+
+.playground-highlight .token.operator,
+.playground-highlight .token.template-punctuation,
+.playground-highlight .token.interpolation-punctuation {
+  color: #b6cede;
+}
+
+.playground-highlight .token.punctuation {
+  color: #8ba7b8;
+}
+
+.editor-footer {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border-top: 1px solid #dce6ec;
+  color: #8395a2;
+  font: 8px var(--mono);
+}
+
+.editor-footer span:last-child {
+  margin-left: auto;
+}
+
+.editor-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2b9bd7;
+}
+
+.preview-toolbar {
+  color: #8a9ca8;
+}
+
+.preview-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #47677c;
+}
+
+.preview-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #278fc7;
+  box-shadow: 0 0 0 3px #278fc71b;
+}
+
+.preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.preview-frame {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: #f3f7fa;
+}
+
+/* A frame that is still fetching the framework would otherwise read as a blank
+   pane, so the overlay states what is happening until the frame reports ready. */
+.preview-loading {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  gap: 10px;
+  color: #8093a0;
+  font: 9px var(--mono);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  background: #f3f7fa;
+}
+
+.preview-stage[data-state="loading"] .preview-loading {
+  display: grid;
+}
+
+.preview-loading span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #278fc7;
+  animation: preview-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes preview-pulse {
+  0%,
+  100% {
+    opacity: .25;
+    transform: scale(.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.preview-note {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 13px;
+  border-top: 1px solid #e1e9ee;
+  color: #8093a0;
+  font: 8px var(--mono);
+}
+
+.preview-note span {
+  color: #278fc7;
+  font-size: 12px;
+}
+
+.playground-footer {
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 0 30px;
+  border-top: 1px solid #d7e3eb;
+  color: #7a8d9a;
+  font-size: 10px;
+}
+
+.playground-footer span {
+  margin-right: auto;
+}
+
+.playground-footer a {
+  color: #47677c;
+  font-weight: 600;
+}
+
+.playground-footer a:hover {
+  color: #218bc4;
+}
+
+@media (max-width: 900px) {
+  .playground-workbench {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(420px, 1fr) minmax(360px, .8fr);
+  }
+
+  .playground-shell {
+    grid-template-rows: auto auto minmax(820px, 1fr) auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .playground-header {
+    min-height: 0;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 13px 16px;
+  }
+
+  .playground-brand {
+    width: 100%;
+  }
+
+  .playground-controls {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .playground-controls label {
+    display: none;
+  }
+
+  .playground-controls select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .run-button {
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  .home-link {
+    display: none;
+  }
+
+  .playground-intro {
+    display: block;
+    padding: 20px 17px 16px;
+  }
+
+  .playground-intro h1 {
+    font-size: 22px;
+  }
+
+  .playground-intro p {
+    margin-top: 7px;
+    line-height: 1.6;
+  }
+
+  .playground-workbench {
+    grid-template-rows: minmax(430px, 58vh) minmax(330px, 45vh);
+    gap: 10px;
+    padding: 0 10px 12px;
+  }
+
+  .pane-toolbar {
+    padding: 0 10px;
+  }
+
+  #playground-concept {
+    max-width: 52%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .playground-footer {
+    flex-wrap: wrap;
+    gap: 9px 14px;
+    padding: 12px 16px;
+  }
+
+  .playground-footer span {
+    width: 100%;
+  }
+}

@@ -1,4 +1,4 @@
-﻿import { Jetz, listOf, loop, stateOf } from '../../lib/jetz.js';
+﻿import { Jetz, listOf, loop, rememberOf, stateOf } from '../../lib/jetz.js';
 import { link } from '../../lib/jetz-router.js';
 import {
     button, css, div, h1, hr, i, main, p, span
@@ -8,20 +8,20 @@ import {
 // Calculator Engine & Reactive State
 // ---------------------------------------------------------------------------
 
-export const display = stateOf('0');
-export const formula = stateOf('');
-export const historyList = listOf();
+export const display = rememberOf('calculator-display', '0');
+export const formula = rememberOf('calculator-formula', '');
+export const historyList = rememberOf('calculator-history', []);
 
-let currentInput = '0';
+let currentInput = rememberOf('calculator-input', '0');
 let previousOperand = null;
 let currentOperator = null;
 let awaitingNewNumber = false;
 let lastEvaluated = false;
 
 export function updateDisplay() {
-    display.value = currentInput;
+    display.value = currentInput.value;
     if (previousOperand !== null && currentOperator !== null) {
-        formula.value = `${previousOperand} ${currentOperator} ${awaitingNewNumber ? '' : currentInput}`;
+        formula.value = `${previousOperand} ${currentOperator} ${awaitingNewNumber ? '' : currentInput.value}`;
     } else {
         formula.value = '';
     }
@@ -29,22 +29,22 @@ export function updateDisplay() {
 
 export function inputDigit(digit) {
     if (awaitingNewNumber || lastEvaluated) {
-        currentInput = digit;
+        currentInput.value = digit;
         awaitingNewNumber = false;
         lastEvaluated = false;
     } else {
-        currentInput = currentInput === '0' ? digit : currentInput + digit;
+        currentInput.value = currentInput.value === '0' ? digit : currentInput.value + digit;
     }
     updateDisplay();
 }
 
 export function inputDecimal() {
     if (awaitingNewNumber || lastEvaluated) {
-        currentInput = '0.';
+        currentInput.value = '0.';
         awaitingNewNumber = false;
         lastEvaluated = false;
-    } else if (!currentInput.includes('.')) {
-        currentInput += '.';
+    } else if (!currentInput.value.includes('.')) {
+        currentInput.value += '.';
     }
     updateDisplay();
 }
@@ -69,17 +69,17 @@ export function calculate(a, b, op) {
 }
 
 export function handleOperator(nextOp) {
-    if (currentInput === 'Error') {
+    if (currentInput.value === 'Error') {
         clearAll();
         return;
     }
 
     if (previousOperand === null) {
-        previousOperand = currentInput;
+        previousOperand = currentInput.value;
     } else if (currentOperator && !awaitingNewNumber) {
-        const result = calculate(previousOperand, currentInput, currentOperator);
+        const result = calculate(previousOperand, currentInput.value, currentOperator);
         previousOperand = result;
-        currentInput = result;
+        currentInput.value = result;
     }
 
     currentOperator = nextOp;
@@ -89,12 +89,12 @@ export function handleOperator(nextOp) {
 }
 
 export function evaluateEquals() {
-    if (previousOperand === null || currentOperator === null || currentInput === 'Error') {
+    if (previousOperand === null || currentOperator === null || currentInput.value === 'Error') {
         return;
     }
 
-    const expressionStr = `${previousOperand} ${currentOperator} ${currentInput}`;
-    const result = calculate(previousOperand, currentInput, currentOperator);
+    const expressionStr = `${previousOperand} ${currentOperator} ${currentInput.value}`;
+    const result = calculate(previousOperand, currentInput.value, currentOperator);
 
     historyList.push({
         id: Date.now() + Math.random(),
@@ -102,7 +102,7 @@ export function evaluateEquals() {
         result: result
     });
 
-    currentInput = result;
+    currentInput.value = result;
     previousOperand = null;
     currentOperator = null;
     awaitingNewNumber = false;
@@ -112,7 +112,7 @@ export function evaluateEquals() {
 }
 
 export function clearAll() {
-    currentInput = '0';
+    currentInput.value = '0';
     previousOperand = null;
     currentOperator = null;
     awaitingNewNumber = false;
@@ -122,16 +122,16 @@ export function clearAll() {
 }
 
 export function toggleSign() {
-    if (currentInput === '0' || currentInput === 'Error') return;
-    currentInput = currentInput.startsWith('-') ? currentInput.slice(1) : '-' + currentInput;
+    if (currentInput.value === '0' || currentInput.value === 'Error') return;
+    currentInput.value = currentInput.value.startsWith('-') ? currentInput.value.slice(1) : '-' + currentInput.value;
     updateDisplay();
 }
 
 export function percentage() {
-    if (currentInput === 'Error') return;
-    const val = parseFloat(currentInput);
+    if (currentInput.value === 'Error') return;
+    const val = parseFloat(currentInput.value);
     if (isNaN(val)) return;
-    currentInput = String(val / 100);
+    currentInput.value = String(val / 100);
     updateDisplay();
 }
 
@@ -271,8 +271,8 @@ export function Calculator() {
                             css`p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition flex flex-col text-right cursor-pointer`,
                             {
                                 onclick() {
-                                    currentInput = item.result;
-                                    display.value = item.result;
+                                    currentInput.value = item.result.value;
+                                    display.value = item.result.value;
                                     formula.value = `${item.expr} =`;
                                 }
                             },

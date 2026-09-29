@@ -1,6 +1,6 @@
 {
   "name": "@daevsoft/jetz",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "A composable javascript framework",
   "types": "./packages/jetz/src/index.d.ts",
   "main": "index.js",
@@ -72,5 +72,8 @@
     "puppeteer": "^19.11.1",
     "vitest": "^5.0.1",
     "webpack-manifest-plugin": "^5.0.1"
+  },
+  "dependencies": {
+    "prismjs": "^1.30.0"
   }
 }

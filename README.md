@@ -156,6 +156,7 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Reactive State** | `stateOf(value)` | Fine-grained single-value state with subscribers and watchers. |
 | **Remembered State** | `rememberOf(key, value)` | State synchronized with `localStorage` across page reloads. |
 | **Derived State** | `computed(fn)` | Auto-tracked computed values with zero manual dependency arrays. |
+| **Reactive Classes** | `css(fn)` | Class attributes that re-evaluate whenever the state they read changes. |
 | **Side-Effects** | `effect(fn)` | Auto-tracking effects with instant execution and disposal cleanup. |
 | **Reactive Lists** | `listOf()`, `sequenceOf()` | Observable arrays with chainable methods (`push`, `remove`, `sort`). |
 | **Keyed Reconciliation** | `loop(list, keyFn, renderFn)` | O(1) DOM element recycling and minimal mutations on array changes. |
@@ -436,8 +437,8 @@ const Banner = div(
 Element functions accept arguments in any natural order:
 * **Strings & Numbers:** Rendered as child text nodes.
 * **Child Elements:** Appended directly into the parent.
-* **Objects:** Configured as attributes, properties, or event handlers.
-* **CSS Helpers:** Tagged template `css\`class-name\`` or style objects.
+* **Objects:** Configured as attributes, properties, or event handlers. Keys written `data_*` / `aria_*` render hyphenated, so `{ data_counter: n }` writes `data-counter`.
+* **CSS Helpers:** Tagged template `css\`class-name\``, a reactive function `css(() => …)`, or style objects.
 * **Reactive States:** Automatically bind their text content.
 
 ```javascript
@@ -448,6 +449,8 @@ div(
   "Text content"                 // text node
 )
 ```
+
+Multiple `css()` calls on one element are merged, so reactive and static classes can be declared side by side. See [Reactive Classes](#reactive-classes).
 
 ---
 
@@ -545,6 +548,14 @@ profile.name.value = "Grace"; // object properties are reactive states too
 
 Use `stateOf` for temporary UI or application state. Use a `ListState` for collections that need reactive add, remove, or replace operations.
 
+Any value can be held, including falsy ones. `null`, `false`, `0`, `""`, and `undefined` are all valid initial values, so a state can start out "empty" and be filled in later:
+
+```javascript
+const filter = stateOf("");   // starts blank
+const ready = stateOf(null);  // no value yet
+const chosen = stateOf(false);
+```
+
 #### Persisting State with `rememberOf`
 
 `rememberOf(key, initialValue)` works like `stateOf`, but synchronizes supported updates to `localStorage` and restores them on refresh. The key should remain stable between visits; remembered values are scoped to the current page path.
@@ -608,7 +619,16 @@ const grandTotal = computed(() => subtotal.value + tax.value);
 
 #### Reactive Classes
 
-Use a callback interpolation when part of a class depends on state. `css` evaluates that callback as a computed value and updates the element's class attribute when the state changes:
+`css` accepts either a tagged template or a plain function, and both can be reactive. Pick whichever reads better:
+
+| Form | Use it when |
+|---|---|
+| ``css`base ${() => …}` `` | Only *part* of the class depends on state. |
+| `css(() => …)` | The *whole* class is derived from state. |
+
+In both cases the callback is evaluated as a computed value, and the element's class attribute is rewritten whenever the state it reads changes.
+
+Use a callback interpolation when part of a class depends on state:
 
 ```javascript
 import { listOf, loop, stateOf } from "jetz";
@@ -626,6 +646,56 @@ const TaskList = ul(loop(tasks, task => li(
 ```
 
 The callback must read `task.done.value`; an expression like `${task.done ? "completed" : ""}` is evaluated before `css` receives it and cannot track future changes. Static classes remain ordinary tagged templates, for example `css`task-number completed``.
+
+When the *whole* class depends on state, pass a function instead of a tagged template:
+
+```javascript
+import { stateOf } from "jetz";
+import { css, div } from "jetz/ui";
+
+const count = stateOf(0);
+
+const Counter = div(
+  css(() => count.value % 2 === 0 ? "text-red-200" : "text-green-200")
+);
+```
+
+Return `null` to drop the class entirely - handy for conditional styling that should leave no residue when inactive:
+
+```javascript
+const ready = stateOf(false);
+
+const Badge = div(css(() => ready.value ? "is-ready" : null));
+```
+
+Several `css()` calls on the same element are merged, and **every** reactive part keeps updating. Static classes are preserved across recompositions:
+
+```javascript
+const active = stateOf(true);
+
+const Panel = div(
+  css("panel base"),                                   // always present
+  css(() => active.value ? "is-active" : "is-idle")   // swaps on change
+);
+```
+
+The same two forms work as a plain attribute, written either as `class` or as its `className` alias:
+
+```javascript
+const count = stateOf(0);
+
+const Heading = div({ class: () => (count.value ? "wow" : "now") }, "A counter");
+const Same    = div({ className: () => (count.value ? "wow" : "now") }, "A counter");
+```
+
+`className` is the DOM property name, so it is accepted and mapped onto `class` *before* attributes are merged - it combines with any `css()` on the same element instead of overwriting it.
+
+**Only `class` and `className` reach the class attribute.** Any other key reaches the DOM under the name you wrote - apart from the `data_`/`aria_` underscore rule shown under Reactive Attributes - and HTML attribute names are case-insensitive, so `div({ cssClass: () => … })` renders `<div cssclass="now">`. The callback does run, and keeps re-running - it updates an attribute that nothing styles, which is why the element looks inert. Jetz maps this one well-known alias and never guesses at the rest, so `viewBox` and `preserveAspectRatio` keep their casing and a mistyped key stays visible in the markup rather than being silently rerouted.
+
+Two rules cover every form above:
+
+* **Read `.value` inside the callback.** A callback tracks the states it reads, so `() => count.value % 2` updates while `${count.value % 2 ? "a" : "b"}` is evaluated before `css` ever sees it and freezes at its first value.
+* **Return `null` or `false` to contribute nothing.** Those values are filtered out instead of being stringified, so no stray `class="false"` is left behind.
 
 #### Reactive Attributes
 
@@ -651,6 +721,28 @@ const Swatch = a(style({ color: () => color.value }), "Preview");
 ```
 
 HTML boolean attributes such as `disabled` are added for `true` and removed for `false`. `aria-*` and `data-*` values remain strings, so a false state becomes `"false"` rather than removing the attribute.
+
+Underscores work for these two prefixes, which spares an object literal its quotes:
+
+```javascript
+import { stateOf } from "jetz";
+import { css, data_, div, p } from "jetz/ui";
+
+const counter = stateOf(0);
+
+const Row = p(css`counter-${counter}`, { data_counter: counter }, "Counter:", counter);
+// renders data-counter="0" - [data-counter] and element.dataset.counter both find it
+
+const Same = p(data_({ counter }), "Counter:", counter);            // helper form, same attribute
+const Note = div({ aria_labelledby: "total", data_row_index: 2 });  // aria-labelledby, data-row-index
+```
+
+Every `_` after a `data` or `aria` prefix becomes a `-`, so `data_row_index` reads back as `dataset.rowIndex`. No other key is rewritten - `source_map` and `my_data` stay exactly as written - and a key that merely starts with those letters (`database_id`) is left alone.
+
+Two things to keep in mind:
+
+* **Write the tail lowercase.** HTML lowercases attribute names, so `data_rowIndex` lands as `data-rowindex` and `dataset.rowIndex` misses it; `data_row_index` is the spelling that round-trips.
+* **Pick one spelling per element.** `{ data_counter: a }` and `data_({ counter: b })` name the same attribute, and a duplicated non-class attribute is merged into a list that only `class` knows how to use - both values are dropped.
 
 ---
 
@@ -718,7 +810,7 @@ recentSearches.push("Jetz"); // saved to localStorage
 |---|---|
 | `list.push(...items)` | Append one or more items and update rendered lists |
 | `list.set(newArray)` | Replace all items; chainable |
-| `list.map(fn)` | Replace each item with the callback result; chainable |
+| `list.map(fn)` | Return a new array of mapped values without changing the list |
 | `list.insertAt(index, ...items)` | Insert items at an index |
 | `list.remove(item)` | Remove the first matching item |
 | `list.removeAt(index)` | Remove the item at an index |
@@ -731,7 +823,7 @@ recentSearches.push("Jetz"); // saved to localStorage
 | `list.values` | Direct reference to underlying array |
 | `list.first()` / `list.last()` | Convenience accessors for boundary items |
 
-`ListState.map()` is a mutating collection operation, unlike `Array.prototype.map()`. For a derived array that should not replace the list items, use `list.values.map(callback)` instead. Avoid changing `list.values` or nested item properties in place when you need a rendered update; use a `ListState` method or `set()` with the updated array. For a remembered list, use `set()` after mutations other than `push()`, `set()`, or `clear()` to save the result. `asRemember()` stores JSON-serialized values, so prefer plain serializable records over reactive `State` instances.
+`ListState.map()` follows the standard array behavior and returns a new array. Use `transform()` when you want to replace list items and update rendered views. Avoid changing `list.values` or nested item properties in place when you need a rendered update; use a `ListState` method or `set()` with the updated array. For a remembered list, use `set()` after mutations other than `push()`, `set()`, or `clear()` to save the result. `asRemember()` stores JSON-serialized values, so prefer plain serializable records over reactive `State` instances.
 
 ---
 
@@ -1371,6 +1463,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`computed(fn)`](#4-computed-state-computed): Auto-tracked derived state.
 * [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`).
 * [`listen(callback)`](#11-reactive-listeners-listen): Reactive inline listener attached to element.
+* [`css(...)`](#reactive-classes): Class attribute; the function form `css(() => …)` re-evaluates on state change.
 
 ### Collections & Reconciliation
 * [`listOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive array with helper mutation methods.

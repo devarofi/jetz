@@ -252,6 +252,20 @@ describe('stateOf', () => {
 		s.setState(2);
 		expect(fn).not.toHaveBeenCalled();
 	});
+	it('accepts null, which typeof reports as an object', () => {
+		// stateOf used to treat null as a plain object and throw while trying to
+		// attach toObject, so any `cond ? 'x' : null` state crashed on creation
+		const s = stateOf(null);
+		expect(s.getValue()).toBeNull();
+		s.value = 'now set';
+		expect(s.getValue()).toBe('now set');
+	});
+	it('accepts false and other falsy primitives', () => {
+		expect(stateOf(false).getValue()).toBe(false);
+		expect(stateOf(0).getValue()).toBe(0);
+		expect(stateOf('').getValue()).toBe('');
+		expect(stateOf(undefined).getValue()).toBeUndefined();
+	});
 });
 
 describe('batch', () => {
@@ -314,6 +328,163 @@ describe('reactive css classes', () => {
 		expect(item.className).toBe('task-number');
 		expect(item.textContent).toBe('Review the API');
 	});
+
+	it('swaps a whole class from a plain function argument', () => {
+		const count = stateOf(0);
+		const target = mount(div(css(() => count.value % 2 === 0 ? 'text-red-200' : 'text-green-200')));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('text-red-200');
+		count.value = 1;
+		expect(box.className).toBe('text-green-200');
+		count.value = 2;
+		expect(box.className).toBe('text-red-200');
+	});
+
+	it('drops the class entirely when a function yields null', () => {
+		const ready = stateOf(false);
+		const target = mount(div(css(() => ready.value ? 'is-ready' : null)));
+		const box = target.querySelector('div');
+
+		expect(box.hasAttribute('class')).toBe(false);
+		ready.value = true;
+		expect(box.className).toBe('is-ready');
+		ready.value = false;
+		expect(box.hasAttribute('class')).toBe(false);
+	});
+
+	it('treats a falsy interpolation as absent, not as the text "false"', () => {
+		// cssValue used to end with `?? ''`, which only drops nullish values, so
+		// a falsy branch was concatenated into the literal class "false"
+		const done = stateOf(false);
+		const target = mount(div(css`task ${() => done.value ? 'completed' : false}`));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('task');
+		done.value = true;
+		expect(box.className).toBe('task completed');
+		done.value = false;
+		expect(box.className).toBe('task');
+		expect(box.classList.contains('false')).toBe(false);
+	});
+
+	it('ignores falsy values from a plain css() call', () => {
+		// classList stringifies its input, so these would otherwise land as
+		// classes literally named "false" and "null"
+		const target = mount(div(css('card'), css(false), css(null)));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('card');
+	});
+
+	it('keeps a static class reactive when merged with a function class', () => {
+		const active = stateOf(true);
+		const target = mount(div(css('p-2 base'), css(() => active.value ? 'is-active' : 'is-idle')));
+		const box = target.querySelector('div');
+
+		// mergeObject folds both sources into one array, so the static part has
+		// to survive every recomposition of the reactive one
+		expect(box.classList.contains('base')).toBe(true);
+		expect(box.classList.contains('p-2')).toBe(true);
+		expect(box.classList.contains('is-active')).toBe(true);
+		active.value = false;
+		expect(box.classList.contains('base')).toBe(true);
+		expect(box.classList.contains('is-idle')).toBe(true);
+		expect(box.classList.contains('is-active')).toBe(false);
+	});
+
+	it('updates each reactive part when several css() calls are merged', () => {
+		const a = stateOf(1);
+		const b = stateOf(2);
+		const c = stateOf(3);
+		const target = mount(div(
+			css(() => `a-${a.value}`),
+			css(() => `b-${b.value}`),
+			css(() => `c-${c.value}`)
+		));
+		const box = target.querySelector('div');
+
+		expect(box.classList.contains('a-1')).toBe(true);
+		expect(box.classList.contains('b-2')).toBe(true);
+		expect(box.classList.contains('c-3')).toBe(true);
+
+		a.value = 9;
+		b.value = 8;
+		expect(box.classList.contains('a-9')).toBe(true);
+		expect(box.classList.contains('a-1')).toBe(false);
+		expect(box.classList.contains('b-8')).toBe(true);
+		expect(box.classList.contains('c-3')).toBe(true);
+	});
+
+	it('reacts to a function passed straight to the class attribute', () => {
+		const parity = stateOf(0);
+		const target = mount(div({ class: () => parity.value % 2 ? 'odd' : 'even' }));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('even');
+		parity.value = 1;
+		expect(box.className).toBe('odd');
+	});
+
+	it('accepts className as an alias for the class attribute', () => {
+		const target = mount(div({ className: 'card wide' }, 'x'));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('card wide');
+		expect(box.hasAttribute('classname')).toBe(false);
+	});
+
+	it('reacts to a function passed through className', () => {
+		const count = stateOf(0);
+		const target = mount(div({ className: () => count.value % 2 ? 'text-red-200' : 'text-green-200' }));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('text-green-200');
+		count.value = 1;
+		expect(box.className).toBe('text-red-200');
+		count.value = 2;
+		expect(box.className).toBe('text-green-200');
+	});
+
+	it('folds className together with css() instead of replacing it', () => {
+		const ready = stateOf(false);
+		const target = mount(div(css`preview-card`, { className: () => ready.value ? 'is-ready' : 'idle' }));
+		const box = target.querySelector('div');
+
+		// the alias is resolved before merging, so both sources share the class
+		// key and recompose as one attribute rather than clobbering each other
+		expect(box.classList.contains('preview-card')).toBe(true);
+		expect(box.classList.contains('idle')).toBe(true);
+		ready.value = true;
+		expect(box.classList.contains('preview-card')).toBe(true);
+		expect(box.classList.contains('is-ready')).toBe(true);
+		expect(box.classList.contains('idle')).toBe(false);
+	});
+
+	it('matches the alias regardless of capitalisation', () => {
+		const target = mount(div({ classname: 'lower' }, 'x'));
+		expect(target.querySelector('div').className).toBe('lower');
+	});
+
+	it('resolves the alias for attributes added after mount', () => {
+		const target = mount(div('x'));
+		const box = new JetzElement('div');
+		box.o = target.querySelector('div');
+		box.addAttr('className', 'late');
+
+		expect(target.querySelector('div').className).toBe('late');
+	});
+
+	it('only rewrites listed aliases, leaving other keys alone', () => {
+		// camelCase names that carry meaning (SVG's viewBox, preserveAspectRatio)
+		// must survive untouched, so the alias table cannot lowercase everything
+		const target = mount(div({ preserveAspectRatio: 'none' }, 'x'));
+		const box = target.querySelector('div');
+
+		expect(box.className).toBe('');
+		expect(box.getAttribute('preserveaspectratio')).toBe('none');
+	});
+
 });
 
 describe('reactive attributes', () => {
@@ -376,11 +547,151 @@ describe('reactive attributes', () => {
 	});
 });
 
+describe('data_ and aria_ underscore keys', () => {
+	it('writes a data_ key as a hyphenated attribute and stays reactive', () => {
+		const counter = stateOf(0);
+		const target = mount(p(css`counter-${counter}`, { data_counter: counter }, 'Counter:', counter));
+		const paragraph = target.querySelector('p');
+
+		// the object-literal spelling must land on the attribute dataset reads,
+		// not on a junk `data_counter` attribute that CSS and dataset both miss
+		expect(paragraph.getAttribute('data-counter')).toBe('0');
+		expect(paragraph.dataset.counter).toBe('0');
+		expect(paragraph.hasAttribute('data_counter')).toBe(false);
+
+		counter.value = 3;
+		expect(paragraph.getAttribute('data-counter')).toBe('3');
+		expect(paragraph.dataset.counter).toBe('3');
+	});
+
+	it('separates every segment of a multi-word key', () => {
+		const target = mount(div({ data_row_index: 2 }));
+		const box = target.querySelector('div');
+
+		expect(box.getAttribute('data-row-index')).toBe('2');
+		expect(box.dataset.rowIndex).toBe('2');
+	});
+
+	it('writes an aria_ key as a hyphenated attribute', () => {
+		const described = stateOf('summary');
+		const target = mount(div({ aria_labelledby: described, aria_live: 'polite' }, 'x'));
+		const box = target.querySelector('div');
+
+		expect(box.getAttribute('aria-labelledby')).toBe('summary');
+		expect(box.getAttribute('aria-live')).toBe('polite');
+
+		described.value = 'details';
+		expect(box.getAttribute('aria-labelledby')).toBe('details');
+	});
+
+	it('keeps callback values reactive through the underscore spelling', () => {
+		const visible = stateOf(false);
+		const target = mount(div({ data_toggle: () => (visible.value ? 'Shown' : 'Hidden') }));
+		const box = target.querySelector('div');
+
+		expect(box.getAttribute('data-toggle')).toBe('Hidden');
+		visible.value = true;
+		expect(box.getAttribute('data-toggle')).toBe('Shown');
+	});
+
+	it('reaches the same attribute as the data_ helper', () => {
+		const target = mount(div({ data_status: 'raw' }, 'x'));
+		const helper = mount(div(data_({ status: 'helper' }), 'x'));
+
+		// both spellings must name the same attribute, which is what makes them
+		// interchangeable rather than two look-alikes that miss each other
+		expect(target.querySelector('div').getAttributeNames())
+			.toEqual(helper.querySelector('div').getAttributeNames());
+		expect(target.querySelector('div').getAttribute('data-status')).toBe('raw');
+		expect(helper.querySelector('div').getAttribute('data-status')).toBe('helper');
+	});
+
+	it('leaves every other underscore key exactly as written', () => {
+		// only the data/aria prefixes carry a hyphenated meaning, so guessing on
+		// other keys would rewrite custom attributes the author actually wants
+		const target = mount(div({ source_map: 'a', my_data: 'b', x_: 'c', _data: 'd' }, 'x'));
+		const box = target.querySelector('div');
+
+		expect(box.getAttribute('source_map')).toBe('a');
+		expect(box.getAttribute('my_data')).toBe('b');
+		expect(box.getAttribute('x_')).toBe('c');
+		expect(box.getAttribute('_data')).toBe('d');
+		expect(box.getAttributeNames()).toEqual(['source_map', 'my_data', 'x_', '_data']);
+	});
+});
+
 describe('listOf / ListState', () => {
 	it('renders one view per value via loop()', () => {
 		const items = listOf('a', 'b');
 		mount(ul(loop(items, item => li(item))));
 		expect(document.querySelectorAll('ul > li').length).toBe(2);
+	});
+	it('keeps multi-node render output as siblings, without a carrier element', () => {
+		// regression: a render fn returning an array used to be wrapped in a
+		// <span> carrier, so the DOM no longer matched the render function
+		const items = listOf('a', 'b');
+		mount(ul(loop(items, item => [li(`t-${item}`), li(`b-${item}`)])));
+		expect(document.querySelectorAll('ul > li').length).toBe(4);
+		expect(document.querySelectorAll('ul > span').length).toBe(0);
+		expect([...document.querySelectorAll('ul > li')].map(el => el.textContent))
+			.toEqual(['t-a', 'b-a', 't-b', 'b-b']);
+	});
+	it('renders multi-node output for remembered lists the same way', () => {
+		const items = listOf('a').asRemember('unit.multi-node');
+		mount(ul(loop(items, item => [li(`t-${item}`), li(`b-${item}`)])));
+		expect(document.querySelectorAll('ul > span').length).toBe(0);
+		expect([...document.querySelectorAll('ul > li')].map(el => el.textContent)).toEqual(['t-a', 'b-a']);
+	});
+	it('still uses a carrier element for plain (non element) values', () => {
+		mount(ul(loop(listOf('a', 'b'))));
+		expect(document.querySelectorAll('ul > span').length).toBe(2);
+	});
+	it('list.map() is a derived snapshot: it renders but never updates', () => {
+		// map() returns a plain array, so the list's views are never wired up
+		const items = listOf('a', 'b');
+		const mapped = items.map(item => li(item));
+		expect(Array.isArray(mapped)).toBe(true);
+		expect(mapped instanceof listOf('x').constructor).toBe(false);
+		const target = mount(ul(mapped));
+		expect([...target.querySelectorAll('li')].map(el => el.textContent)).toEqual(['a', 'b']);
+		items.push('c');
+		expect(target.querySelectorAll('li').length).toBe(2);
+		expect(items.size).toBe(3);
+	});
+	it('a bare list child uses the carrier element and stays reactive', () => {
+		const items = listOf('a', 'b');
+		const target = mount(ul(items));
+		expect([...target.querySelectorAll('span')].map(el => el.textContent)).toEqual(['a', 'b']);
+		items.push('c');
+		expect([...target.querySelectorAll('span')].map(el => el.textContent)).toEqual(['a', 'b', 'c']);
+	});
+	it('loop() applies the render function and stays reactive', () => {
+		const items = listOf('a', 'b');
+		const target = mount(ul(loop(items, item => li(item))));
+		expect([...target.querySelectorAll('li')].map(el => el.textContent)).toEqual(['a', 'b']);
+		items.push('c');
+		expect([...target.querySelectorAll('li')].map(el => el.textContent)).toEqual(['a', 'b', 'c']);
+	});
+	it('removes every node of a multi-node view', () => {
+		const items = listOf('a', 'b');
+		mount(ul(loop(items, item => [li(`t-${item}`), li(`b-${item}`)])));
+		items.removeAt(0);
+		expect([...document.querySelectorAll('ul > li')].map(el => el.textContent)).toEqual(['t-b', 'b-b']);
+		items.remove('b');
+		expect(document.querySelectorAll('li').length).toBe(0);
+	});
+	it('keyed reconciliation reorders multi-node views as a unit', () => {
+		const items = listOf({ id: 1, n: 'a' }, { id: 2, n: 'b' }, { id: 3, n: 'c' });
+		mount(ul(loop(items, i => i.id, i => [li(`t-${i.n}`), li(`b-${i.n}`)])));
+		items.set([{ id: 3, n: 'c' }, { id: 1, n: 'a' }, { id: 2, n: 'b' }]);
+		expect([...document.querySelectorAll('ul > li')].map(el => el.textContent))
+			.toEqual(['t-c', 'b-c', 't-a', 'b-a', 't-b', 'b-b']);
+	});
+	it('keyed set() replacing an item keeps multi-node output', () => {
+		const items = listOf({ id: 1, n: 'one' }, { id: 2, n: 'two' });
+		mount(ul(loop(items, i => i.id, i => [li(`t-${i.n}`), li(`b-${i.n}`)])));
+		items.set([{ id: 1, n: 'ONE' }]);
+		expect([...document.querySelectorAll('ul > li')].map(el => el.textContent)).toEqual(['t-ONE', 'b-ONE']);
 	});
 	it('push adds a view and set replaces all', () => {
 		const items = listOf('a');
@@ -564,6 +875,19 @@ describe('component lifecycle', () => {
 		}
 		mount(div(Widget));
 		expect(steps).toEqual(['create', 'mount']);
+	});
+	it('function onMount runs only once the element is attached to the document', () => {
+		// regression: the hook used to run while the tree was still detached, so
+		// DOM lookups inside onMount resolved to null (stuck editors/canvases)
+		let foundDuringMount = null;
+		function Widget() {
+			onMount(() => {
+				foundDuringMount = document.getElementById('lifecycle-widget') !== null;
+			});
+			return div({ id: 'lifecycle-widget' }, 'widget');
+		}
+		mount(div(Widget));
+		expect(foundDuringMount).toBe(true);
 	});
 	it('onUpdate fires on state change while mounted', () => {
 		const steps = [];

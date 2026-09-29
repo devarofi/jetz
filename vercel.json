@@ -1,8 +1,21 @@
 {
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "headers": [
+        {
+            "source": "/lib/(.*)",
+            "headers": [
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
+                }
+            ]
+        }
+    ],
     "rewrites": [
         {
             "source": "/(.*)",
-            "destination": "/"
+            "destination": "/index.html"
         }
     ]
 }

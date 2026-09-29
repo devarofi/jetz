@@ -13,7 +13,11 @@ const attrOf = key => value => ({
 function cssValue(value) {
     if (typeof value === 'function') value = value();
     if (value instanceof State) value = value.value;
-    return value ?? '';
+    // `?? ''` only drops null/undefined, so a falsy branch such as
+    // `cond ? 'on' : false` used to be concatenated into the literal text
+    // "false" and end up as a real class. false and null mean "contribute
+    // nothing", matching what the function form of css() already did.
+    return value == null || value === false ? '' : value;
 }
 
 /** Creates a class attribute, supporting reactive tagged-template interpolations. */
