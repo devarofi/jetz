@@ -79,6 +79,84 @@ export function Home() {
 
 
     // -------------------------------------------------------------------------
+    // Scroll reveal
+    //
+    // Blocks marked `.jetz-reveal` fade in and slide up as they reach the
+    // viewport. The class that actually hides them lives on <html> and is only
+    // added once the observer is live, so nothing on the page is ever invisible
+    // unless we are certain we can show it again.
+    //
+    // This deliberately does not use onMount()/onDestroy(). The router resolves
+    // a route by calling its component directly and storing the finished
+    // element in a State, so a routed component never runs inside a lifecycle
+    // context and those hooks are warned about and dropped. The element lands
+    // in the document a frame after this body returns, so the setup waits for
+    // the node to exist instead of guessing with a timer.
+    // -------------------------------------------------------------------------
+
+    const REVEAL_FRAME_BUDGET = 300;
+
+    let revealObserver = null;
+
+    const startReveal = () => {
+        const targets = document.querySelectorAll(
+            '#welcome-page .jetz-reveal, #welcome-page .jetz-chart-panel'
+        );
+
+        // still not in the document: let the caller try again next frame
+        if (!targets.length) return false;
+
+        // Without an observer nothing could ever un-hide these blocks, and a
+        // visitor who asked for reduced motion did not sign up for a slide.
+        // Both cases show the content immediately.
+        if (typeof IntersectionObserver === 'undefined'
+            || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            targets.forEach(target => target.classList.add('is-visible'));
+            return true;
+        }
+
+        document.documentElement.classList.add('jetz-has-reveal');
+
+        // a previous visit to this route leaves its observer behind
+        revealObserver?.disconnect();
+
+        revealObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                // the chart panel is not a reveal target, but arriving at it is
+                // exactly when its bars should draw themselves in
+                entry.target.classList.add(
+                    entry.target.classList.contains('jetz-chart-panel')
+                        ? 'is-grown'
+                        : 'is-visible'
+                );
+                // one-shot: a block that has already arrived stays put
+                revealObserver.unobserve(entry.target);
+            });
+        }, {
+            // trigger slightly before the block is fully on screen, so the
+            // movement has finished by the time the visitor starts reading
+            rootMargin: '0px 0px -10% 0px',
+            threshold: 0.05
+        });
+
+        targets.forEach(target => revealObserver.observe(target));
+
+        return true;
+    };
+
+    // The budget is a safety net, not a delay: it only matters if this route is
+    // somehow never attached, and giving up simply leaves the page unanimated
+    // and fully visible.
+    const awaitReveal = framesLeft => {
+        if (framesLeft <= 0 || startReveal()) return;
+        requestAnimationFrame(() => awaitReveal(framesLeft - 1));
+    };
+
+    requestAnimationFrame(() => awaitReveal(REVEAL_FRAME_BUDGET));
+
+
+    // -------------------------------------------------------------------------
     // Code examples
     // -------------------------------------------------------------------------
 
@@ -88,7 +166,7 @@ export function Home() {
             title: 'Reactive state without ceremony',
             description: 'Create state with one line and update it directly.',
             code:
-`import { stateOf } from "@daevsoft/jetz";
+                `import { stateOf } from "@daevsoft/jetz";
 import { button } from "@daevsoft/jetz/ui";
 
 const count = stateOf(0);
@@ -110,7 +188,7 @@ button(
             title: 'Components are just functions',
             description: 'No special class, file format, or template syntax.',
             code:
-`const UserCard = user => div(
+                `const UserCard = user => div(
     css\`user-card\`,
 
     strong(user.name),
@@ -133,7 +211,7 @@ const App = () => div(
             title: 'Simple client-side routing',
             description: 'Define pages with familiar JavaScript.',
             code:
-`import { Jetz } from "@daevsoft/jetz";
+                `import { Jetz } from "@daevsoft/jetz";
 import { Router, route } from "@daevsoft/jetz/router";
 
 const router = new Router([
@@ -150,7 +228,7 @@ Jetz.use(router);`
             title: 'Events stay close to your UI',
             description: 'Handle interaction exactly where it happens.',
             code:
-`const message = stateOf("Ready");
+                `const message = stateOf("Ready");
 
 button(
     {
@@ -172,7 +250,7 @@ div(
             title: 'Lists that update themselves',
             description: 'Push, remove, or replace items; looped views follow.',
             code:
-`import { listOf, loop } from "@daevsoft/jetz";
+                `import { listOf, loop } from "@daevsoft/jetz";
 import { button, li, ul } from "@daevsoft/jetz/ui";
 
 const tasks = listOf("Read the docs", "Build a demo");
@@ -196,7 +274,7 @@ button(
             title: 'Render only the active branch',
             description: 'Declarative branches without wrapper elements.',
             code:
-`import { _else, _if, stateOf } from "@daevsoft/jetz";
+                `import { _else, _if, stateOf } from "@daevsoft/jetz";
 import { button, div, p } from "@daevsoft/jetz/ui";
 
 const online = stateOf(false);
@@ -221,7 +299,7 @@ button(
     // The hero window always shows the same snippet, so it lives next to the
     // explorer examples instead of being keyed by a tab.
     const heroCode =
-`import { Jetz, stateOf } from "@daevsoft/jetz";
+        `import { Jetz, stateOf } from "@daevsoft/jetz";
 import { button, div } from "@daevsoft/jetz/ui";
 
 const count = stateOf(0);
@@ -242,7 +320,7 @@ Jetz.mount(App, "#app");`;
     // hero imports and mount call so the page keeps exactly two highlighted
     // `language-javascript` blocks in the always-active content.
     const playgroundSnippet =
-`const count = stateOf(7);
+        `const count = stateOf(7);
 
 button(
     "Clicked ",
@@ -512,13 +590,28 @@ button(
 
     const JETZ_NAME = 'Jetz Framework';
 
+    // Framework marks for the chart rows. These are deliberately simple
+    // geometric glyphs rather than the vendors' official artwork: at 18px a
+    // clean shape reads better than a detailed logo, and it keeps the landing
+    // page from shipping other companies' trademarked files.
+    //
+    // They are kept as *strings* and turned into a fresh node on every render.
+    // `html()` builds a real DOM node, and the panels are destroyed and rebuilt
+    // on every tab click - a shared instance would move a stale node with them.
+    const FRAMEWORK_MARKS = {
+        'SolidJS': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.2" stroke="#4a90d9" stroke-width="2.2"/><circle cx="12" cy="12" r="2.6" fill="#4a90d9"/></svg>',
+        'Svelte 5': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M16.8 6.2c-1.3-1.3-3.3-1.6-4.9-.7L7 9.2c-1.6.9-2.2 2.9-1.3 4.5.5.9 1.4 1.5 2.4 1.7" stroke="#ff3e00" stroke-width="2.1" stroke-linecap="round"/><path d="M7.2 17.8c1.3 1.3 3.3 1.6 4.9.7l4.9-3.7c1.6-.9 2.2-2.9 1.3-4.5-.5-.9-1.4-1.5-2.4-1.7" stroke="#ff3e00" stroke-width="2.1" stroke-linecap="round"/></svg>',
+        'Vue 3': '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M1.5 3.2h5.2l5.3 9.4 5.3-9.4h5.2L12 21.4z" fill="#41b883"/><path d="M6.6 3.2h5.2l5.3 9.4h-5.2z" fill="#35495e"/></svg>',
+        'React 19': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true" stroke="#61dafb" stroke-width="1.5"><circle cx="12" cy="12" r="2" fill="#61dafb" stroke="none"/><ellipse cx="12" cy="12" rx="10" ry="4.1"/><ellipse cx="12" cy="12" rx="10" ry="4.1" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.1" transform="rotate(120 12 12)"/></svg>'
+    };
+
     const CHART_METRICS = {
         update: {
             tab: 'Partial Update Speed (ms)',
             title: 'Single Row Partial Update Time',
             bars: [
-                { name: 'SolidJS', value: 0.05, display: '0.05 ms' },
                 { name: JETZ_NAME, value: 0, display: '0.00 ms', jetz: true },
+                { name: 'SolidJS', value: 0.05, display: '0.05 ms' },
                 { name: 'Svelte 5', value: 0.1, display: '0.10 ms' },
                 { name: 'Vue 3', value: 3.2, display: '3.20 ms' },
                 { name: 'React 19', value: 12.5, display: '12.50 ms' }
@@ -548,12 +641,65 @@ button(
         }
     };
 
+    // -------------------------------------------------------------------------
+    // Highlight strip
+    //
+    // Three headline numbers, derived from the very same bars the chart draws.
+    // Computing them here rather than hardcoding the copy means the strip can
+    // never advertise a figure the bars contradict - which is the one failure
+    // mode a benchmark section cannot afford.
+    //
+    // React 19 is the reference because it is the slowest on every metric, so
+    // each ratio is both true and flattering without being a stretch.
+    // -------------------------------------------------------------------------
+
+    const barOf = (metric, name) => CHART_METRICS[metric].bars.find(bar => bar.name === name);
+
+    const CHART_HIGHLIGHTS = [
+        {
+            icon: '⚡',
+            value: barOf('update', JETZ_NAME).display,
+            note: 'single row partial update'
+        },
+        {
+            icon: '🧠',
+            value: `${Math.round((1 - barOf('memory', JETZ_NAME).value / barOf('memory', 'React 19').value) * 100)}% less memory`,
+            note: 'than React 19 at 50,000 rows'
+        },
+        {
+            icon: '🚀',
+            value: `${(barOf('mount', 'React 19').value / barOf('mount', JETZ_NAME).value).toFixed(1)}× faster mount`,
+            note: 'than React 19 for 500 rows'
+        }
+    ];
+
+    const chartHighlight = ({ icon, value, note }) => div(
+        css`jetz-chart-highlight`,
+
+        span(
+            css`jetz-chart-highlight-icon`,
+            icon
+        ),
+
+        div(
+            css`jetz-chart-highlight-body`,
+
+            strong(value),
+
+            small(note)
+        )
+    );
+
+
     // A measured 0.00 ms is a real result, but scaled against 12.50 ms it would
     // render as nothing at all - and the bar we most want seen is exactly that
     // one. The fill therefore has a floor, so the fastest framework still shows a
-    // visible sliver. The printed figure is always the true one; only the drawn
-    // length is floored, and the note under the chart says so.
-    const CHART_MIN_FILL = 1.5;
+    // visible bar. The floor is set high enough to read as a bar rather than a
+    // dot: on an 18px row anything under ~30px looks like a bullet. Note that
+    // this also flattens SolidJS (0.05) and Svelte 5 (0.10) onto the same floor as
+    // Jetz - at this scale they genuinely are indistinguishable, and the printed
+    // figures are what separate them. The note under the chart discloses this.
+    const CHART_MIN_FILL = 4;
 
     const chartFill = bars => {
         const slowest = Math.max(...bars.map(bar => bar.value));
@@ -564,16 +710,34 @@ button(
     // -------------------------------------------------------------------------
     // One bar row
     //
-    // Name and value sit in a flex head above a full-width track, so the printed
-    // figure always sits at the right edge of the row and never competes with a
-    // short bar for space.
+    // Mark, name, badge and value share a flex head above a full-width track, so
+    // the printed figure always sits at the right edge of the row and never
+    // competes with a short bar for space.
+    //
+    // The fill carries its final width inline and is grown by `transform` from
+    // the stylesheet (see `.jetz-chart-panel.is-grown`). Scaling rather than
+    // animating `width` keeps the real percentage readable on the element and
+    // lets the browser composite the animation off the main thread.
     // -------------------------------------------------------------------------
 
-    const chartBar = (bar, fill) => div(
+    const chartBar = (bar, fill, index) => div(
         css`jetz-chart-bar${bar.jetz ? ' jetz-chart-bar-jetz' : ''}`,
 
         div(
             css`jetz-chart-bar-head`,
+
+            span(
+                css`jetz-chart-logo`,
+
+                // Jetz keeps its real mark; the others get the geometric glyph
+                bar.jetz
+                    ? img(
+                        src(logo),
+                        alt`Jetz Framework logo`,
+                        width`18`
+                    )
+                    : html(FRAMEWORK_MARKS[bar.name])
+            ),
 
             strong(
                 css`jetz-chart-name`,
@@ -586,7 +750,7 @@ button(
 
                 () => small(
                     css`jetz-chart-badge`,
-                    'YOUR FRAMEWORK'
+                    'JETZ'
                 ),
 
                 () => null
@@ -604,11 +768,12 @@ button(
             div(
                 css`jetz-chart-fill`,
 
-                // data-driven geometry has to be a style callback: a bare width
-                // would be read once and never repaint
                 {
                     style: {
-                        width: `${fill(bar)}%`
+                        // the final width, floor included (see CHART_MIN_FILL)
+                        width: `${fill(bar)}%`,
+                        // rows arrive one after another instead of as one block
+                        transitionDelay: `${index * 90}ms`
                     }
                 }
             )
@@ -631,6 +796,18 @@ button(
         { key: 'mount', label: CHART_METRICS.mount.tab }
     ];
 
+    // Switching tabs builds a brand new panel, so the growth has to be re-triggered
+    // for it. The panel is swapped in place by `ifElse()`, so one frame is enough
+    // to find the replacement and let it draw itself in.
+    const selectMetric = key => {
+        chartMetric.value = key;
+        requestAnimationFrame(() => {
+            document
+                .querySelector('#chart .jetz-chart-panel')
+                ?.classList.add('is-grown');
+        });
+    };
+
     const chartTab = (key, label) => ifElse(
         () => chartMetric.value === key,
 
@@ -641,7 +818,7 @@ button(
                 role: 'tab',
                 'aria-selected': 'true',
                 onclick() {
-                    chartMetric.value = key;
+                    selectMetric(key);
                 }
             },
             label
@@ -654,7 +831,7 @@ button(
                 role: 'tab',
                 'aria-selected': 'false',
                 onclick() {
-                    chartMetric.value = key;
+                    selectMetric(key);
                 }
             },
             label
@@ -684,7 +861,7 @@ button(
                     span('Lower is better')
                 ),
 
-                ...metric.bars.map(bar => chartBar(bar, fill))
+                ...metric.bars.map((bar, index) => chartBar(bar, fill, index))
             );
         },
 
@@ -866,7 +1043,7 @@ button(
 
                     // Hero copy
                     div(
-                        css`jetz-hero-col`,
+                        css`jetz-hero-col jetz-reveal`,
 
                         div(
                             css`jetz-hero-copy`,
@@ -956,7 +1133,7 @@ button(
 
                     // Hero code window
                     div(
-                        css`jetz-hero-col`,
+                        css`jetz-hero-col jetz-reveal`,
 
                         div(
                             css`jetz-hero-code`,
@@ -1038,7 +1215,7 @@ button(
                 },
 
                 div(
-                    css`jetz-section-heading text-center`,
+                    css`jetz-section-heading text-center jetz-reveal`,
 
                     span(
                         css`jetz-label`,
@@ -1056,7 +1233,7 @@ button(
 
 
                 div(
-                    css`jetz-card-grid`,
+                    css`jetz-card-grid jetz-reveal`,
 
                     div(
                         css`jetz-card-col`,
@@ -1295,7 +1472,7 @@ button(
                 },
 
                 div(
-                    css`jetz-section-heading`,
+                    css`jetz-section-heading jetz-reveal`,
 
                     span(
                         css`jetz-label`,
@@ -1508,7 +1685,7 @@ button(
                 },
 
                 div(
-                    css`jetz-section-heading text-center`,
+                    css`jetz-section-heading text-center jetz-reveal`,
 
                     span(
                         css`jetz-label`,
@@ -1611,7 +1788,7 @@ button(
                 },
 
                 div(
-                    css`jetz-section-heading text-center`,
+                    css`jetz-section-heading text-center jetz-reveal`,
 
                     span(
                         css`jetz-label`,
@@ -1733,7 +1910,7 @@ button(
                 },
 
                 div(
-                    css`jetz-section-heading text-center`,
+                    css`jetz-section-heading text-center jetz-reveal`,
 
                     span(
                         css`jetz-label`,
@@ -1751,7 +1928,7 @@ button(
 
 
                 div(
-                    css`jetz-compare`,
+                    css`jetz-compare jetz-reveal`,
 
                     compareHead(SPECIAL_LABELS),
 
@@ -1794,7 +1971,7 @@ button(
 
 
                 div(
-                    css`jetz-fit-grid`,
+                    css`jetz-fit-grid jetz-reveal`,
 
                     div(
                         css`jetz-fit-card`,
@@ -1862,7 +2039,7 @@ button(
                 // -- header ----------------------------------------------------
 
                 div(
-                    css`jetz-section-heading text-center`,
+                    css`jetz-section-heading text-center jetz-reveal`,
 
                     div(
                         css`jetz-eyebrow`,
@@ -1895,7 +2072,7 @@ button(
                 // -- key metric cards ------------------------------------------
 
                 div(
-                    css`jetz-card-grid`,
+                    css`jetz-card-grid jetz-reveal`,
 
                     metrics.map(metric => div(
                         css`jetz-card-col`,
@@ -1908,7 +2085,7 @@ button(
                 // -- measured proof strip -------------------------------------
 
                 div(
-                    css`jetz-bench-proof`,
+                    css`jetz-bench-proof jetz-reveal`,
 
                     div(
                         css`jetz-bench-proof-item`,
@@ -1960,7 +2137,7 @@ button(
                 // -- comparison table -----------------------------------------
 
                 div(
-                    css`jetz-compare`,
+                    css`jetz-compare jetz-reveal`,
 
                     compareHead(BENCH_LABELS),
 
@@ -2011,7 +2188,7 @@ button(
                 // -- call to action -------------------------------------------
 
                 div(
-                    css`jetz-cta-actions`,
+                    css`jetz-cta-actions jetz-reveal`,
 
                     a(
                         {
@@ -2059,7 +2236,7 @@ button(
                 // -- header ----------------------------------------------------
 
                 div(
-                    css`jetz-section-heading text-center`,
+                    css`jetz-section-heading text-center jetz-reveal`,
 
                     div(
                         css`jetz-eyebrow`,
@@ -2071,11 +2248,24 @@ button(
                         'BENCHMARK & SPEED SPECTRUM'
                     ),
 
-                    h2('Performa Kelas Atas Tanpa Virtual DOM Overhead'),
+                    h2('Top-Tier Performance Without Virtual DOM Overhead'),
 
                     p(
-                        'Lihat bagaimana arsitektur Fine-Grained Direct DOM Jetz mengungguli framework berbasis Virtual DOM dalam kecepatan dan efisiensi memori.'
+                        'See how Jetz\'s Fine-Grained Direct DOM architecture outperforms Virtual DOM based frameworks in speed and memory efficiency.'
                     )
+                ),
+
+
+                // -- highlight strip ---------------------------------------------
+                //
+                // Sits above the tabs so the headline wins are read before the
+                // detail. The numbers come from CHART_METRICS, so they cannot
+                // drift away from the bars underneath.
+
+                div(
+                    css`jetz-chart-highlights`,
+
+                    ...CHART_HIGHLIGHTS.map(chartHighlight)
                 ),
 
 
@@ -2083,7 +2273,7 @@ button(
 
                 div(
                     {
-                        class: 'jetz-chart-tabs',
+                        class: 'jetz-chart-tabs jetz-reveal',
                         role: 'tablist'
                     },
 
@@ -2101,7 +2291,7 @@ button(
                 p(
                     css`jetz-bench-source`,
 
-                    '* Dites menggunakan Chrome DevTools pada Intel i7/M-Series, 50.000 dataset reaktif, 500 baris DOM aktif. Benchmark dilakukan setelah memicu Garbage Collector (Post-GC). Panjang bar diskalakan terhadap framework terlambat di tiap metrik, dengan lebar minimum agar hasil 0.00 ms tetap terlihat.'
+                    '* Tested in Chrome DevTools on an Intel i7/M-Series with 50,000 reactive records and 500 active DOM rows. Benchmarks are taken after triggering the Garbage Collector (post-GC). Bar lengths are scaled against the slowest framework in each metric, with a minimum width so the 0.00 ms result stays visible.'
                 ),
 
                 a(
@@ -2110,7 +2300,7 @@ button(
                         href: '/stress.html'
                     },
 
-                    'Lihat Methodologi & Stress Test Interactive Demo',
+                    'See the Methodology & Interactive Stress Test Demo',
 
                     span('→')
                 )
@@ -2134,7 +2324,7 @@ button(
                 },
 
                 div(
-                    css`jetz-cta-inner`,
+                    css`jetz-cta-inner jetz-reveal`,
 
                     div(
                         css`jetz-cta-logo`,
@@ -2160,7 +2350,7 @@ button(
                     ),
 
                     div(
-                        css`jetz-cta-actions`,
+                        css`jetz-cta-actions jetz-reveal`,
 
                         link(
                             'playground',

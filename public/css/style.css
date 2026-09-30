@@ -163,8 +163,8 @@ body:has(#welcome-page) {
     /* gradient endpoints: the hero wash and the closing call to action */
     --jetz-hero-from: #ffffff;
     --jetz-hero-to: #f7fbfd;
-    --jetz-cta-from: #eaf7fd;
-    --jetz-cta-to: #f4fbf7;
+    --jetz-cta-from: #eaedfd;
+    --jetz-cta-to: #f4f8fb;
 
     /* the glass card floating in the call to action */
     --jetz-cta-card: rgba(255, 255, 255, 0.7);
@@ -185,8 +185,26 @@ body:has(#welcome-page) {
        the muted fill still has to sit clearly above its own track. */
     --jetz-chart-jetz: #0891b2;
     --jetz-chart-jetz-soft: #cffafe;
-    --jetz-chart-bar: #9fb0c0;
+    --jetz-chart-bar: #8fa3b6;
+    --jetz-chart-bar-hover: #64798f;
     --jetz-chart-track: #e7edf2;
+    --jetz-chart-row-hover: rgba(8, 145, 178, 0.06);
+    --jetz-chart-glow: rgba(34, 211, 238, 0.55);
+    --jetz-chart-jetz-glow: 0 0 18px -2px rgba(34, 211, 238, 0.55);
+    --jetz-chart-jetz-glow-strong: 0 0 30px 0 rgba(34, 211, 238, 0.75);
+
+    /* the glassmorphism segmented control, and its lit active pill */
+    --jetz-chart-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.6));
+    --jetz-chart-glass-blur: blur(18px) saturate(160%);
+    --jetz-chart-glass-line: rgba(255, 255, 255, 0.85);
+    --jetz-chart-glass-shadow:
+        0 10px 34px rgba(16, 32, 47, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --jetz-chart-pill: #ffffff;
+    --jetz-chart-pill-ink: #0d1f2c;
+    --jetz-chart-pill-glow: rgba(34, 211, 238, 0.45);
+    --jetz-chart-card-shadow: 0 12px 32px rgba(16, 32, 47, 0.05);
+    --jetz-chart-card-shadow-hover: 0 20px 44px rgba(8, 145, 178, 0.16);
 
     background: var(--jetz-white);
     color: var(--jetz-ink);
@@ -1963,66 +1981,204 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
-/* -- performance chart ------------------------------------------------------- */
+/* -- performance chart -------------------------------------------------------
+   The chart is the one place on the page that gets to be loud: a floating glass
+   segmented control, a gradient highlight bar with a neon glow, and everything
+   else pushed into slate so a single row owns the eye. */
 
-/* the tab row reuses the code-tab shape, so the two filter strips on the page
-   read as one family rather than two unrelated controls */
+/* A soft colour wash sits behind the header and the control. Without something
+   coloured underneath, a frosted surface has nothing to refract and the
+   glassmorphism reads as a plain white pill. */
+#chart {
+    position: relative;
+
+    overflow: hidden;
+}
+
+#chart::before {
+    content: "";
+
+    position: absolute;
+    top: -180px;
+    left: 50%;
+
+    width: 860px;
+    height: 520px;
+
+    transform: translateX(-50%);
+
+    background: radial-gradient(closest-side,
+            rgba(34, 211, 238, 0.26),
+            rgba(52, 211, 153, 0.12) 55%,
+            transparent 76%);
+
+    filter: blur(26px);
+
+    pointer-events: none;
+}
+
+#chart>.container {
+    position: relative;
+}
+
 .jetz-chart-tabs {
     display: flex;
+    width: fit-content;
+    max-width: 100%;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 4px;
 
-    margin-top: 34px;
-    padding: 10px;
+    margin: 30px auto 0;
+    padding: 6px;
 
-    border: 1px solid var(--jetz-line);
-    border-radius: 12px;
+    border: 1px solid var(--jetz-chart-glass-line);
+    border-radius: 999px;
 
-    background: var(--jetz-card-soft);
+    background: var(--jetz-chart-glass);
+    /* passed through a custom property on purpose: the production minifier
+       rewrites a literal `backdrop-filter` down to the -webkit- form only */
+    backdrop-filter: var(--jetz-chart-glass-blur);
+    -webkit-backdrop-filter: var(--jetz-chart-glass-blur);
+
+    box-shadow: var(--jetz-chart-glass-shadow);
 }
 
 
 .jetz-chart-tab {
-    padding: 10px 16px;
+    padding: 11px 20px;
 
     border: 0;
-    border-radius: 8px;
+    border-radius: 999px;
 
     background: transparent;
 
     color: var(--jetz-muted);
 
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 700;
+
+    white-space: nowrap;
 
     cursor: pointer;
 
     transition:
-        color 150ms ease,
-        background 150ms ease;
+        color 200ms ease,
+        background 200ms ease,
+        box-shadow 200ms ease,
+        transform 200ms ease;
 }
 
 .jetz-chart-tab:hover {
     color: var(--jetz-ink);
+}
+
+
+/* the active segment is a lit white pill, in both themes */
+.jetz-chart-tab.is-active {
+    background: var(--jetz-chart-pill);
+
+    color: var(--jetz-chart-pill-ink);
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 6px 18px rgba(15, 23, 42, 0.16),
+        0 0 0 1px rgba(15, 23, 42, 0.05),
+        0 0 24px var(--jetz-chart-pill-glow);
+}
+
+
+/* -- highlight strip --------------------------------------------------------- */
+
+.jetz-chart-highlights {
+    display: grid;
+
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+
+    margin-top: 32px;
+}
+
+.jetz-chart-highlight {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    padding: 18px 20px;
+
+    border: 1px solid var(--jetz-chart-glass-line);
+    border-radius: 16px;
 
     background: var(--jetz-card);
+    box-shadow: var(--jetz-chart-card-shadow);
+
+    transition:
+        transform 200ms ease,
+        box-shadow 200ms ease;
 }
 
-.jetz-chart-tab.is-active {
-    background: var(--jetz-invert-bg);
+.jetz-chart-highlight:hover {
+    transform: translateY(-3px);
 
-    color: var(--jetz-invert-text);
+    box-shadow: var(--jetz-chart-card-shadow-hover);
+}
+
+.jetz-chart-highlight-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 auto;
+
+    width: 42px;
+    height: 42px;
+
+    border-radius: 12px;
+
+    background: var(--jetz-chart-jetz-soft);
+
+    font-size: 20px;
+    line-height: 1;
+}
+
+.jetz-chart-highlight-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    min-width: 0;
+}
+
+.jetz-chart-highlight-body>strong {
+    color: var(--jetz-chart-jetz);
+
+    font-size: 19px;
+    font-weight: 850;
+
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+
+    font-variant-numeric: tabular-nums;
+}
+
+.jetz-chart-highlight-body>small {
+    color: var(--jetz-muted);
+
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 
-/* the panel is the card the bars sit in; only the active one is ever rendered */
+/* -- the panel --------------------------------------------------------------- */
+
 .jetz-chart-panel {
     margin-top: 22px;
 
     padding: 30px 32px;
 
     border: 1px solid var(--jetz-line);
-    border-radius: 16px;
+    border-radius: 18px;
 
     background: var(--jetz-card);
 
@@ -2038,7 +2194,7 @@ div#app:has(#welcome-page)>main>footer {
     justify-content: space-between;
     gap: 8px;
 
-    margin-bottom: 24px;
+    margin-bottom: 26px;
 }
 
 .jetz-chart-axis>strong {
@@ -2059,23 +2215,62 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
+/* -- bar rows ---------------------------------------------------------------- */
+
+/* the row is the hover target, so it carries a plate that can light up */
 .jetz-chart-bar {
-    margin-top: 18px;
+    margin-top: 14px;
+    padding: 10px 14px;
+
+    margin-left: -14px;
+    margin-right: -14px;
+
+    border-radius: 14px;
+
+    transition: background 220ms ease;
 }
 
 .jetz-chart-bar:first-of-type {
     margin-top: 0;
 }
 
+.jetz-chart-bar:hover {
+    background: var(--jetz-chart-row-hover);
+}
 
-/* name, badge and value share one line above the track, so a short bar never
-   squeezes the figure out of the row */
+
+/* mark, name, badge and value share one line above the track, so a short bar
+   never squeezes the figure out of the row */
 .jetz-chart-bar-head {
     display: flex;
     align-items: center;
     gap: 10px;
 
-    margin-bottom: 8px;
+    margin-bottom: 9px;
+}
+
+.jetz-chart-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 auto;
+
+    width: 26px;
+    height: 26px;
+
+    border: 1px solid var(--jetz-line);
+    border-radius: 8px;
+
+    background: var(--jetz-card-soft);
+}
+
+.jetz-chart-logo>svg,
+.jetz-chart-logo>img {
+    display: block;
+
+    width: 18px;
+    height: 18px;
 }
 
 .jetz-chart-name {
@@ -2083,10 +2278,12 @@ div#app:has(#welcome-page)>main>footer {
 
     font-size: 13px;
     font-weight: 700;
+
+    transition: color 220ms ease;
 }
 
 
-/* the highlighted row is the only one with colour, weight and a badge */
+/* the highlighted row is the only one with colour and weight */
 .jetz-chart-bar-jetz .jetz-chart-name {
     color: var(--jetz-chart-jetz);
 
@@ -2094,9 +2291,11 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
+/* a thin glowing outline rather than a filled chip, so the pill reads as lit */
 .jetz-chart-badge {
-    padding: 3px 8px;
+    padding: 4px 10px;
 
+    border: 1px solid var(--jetz-chart-jetz);
     border-radius: 999px;
 
     background: var(--jetz-chart-jetz-soft);
@@ -2104,33 +2303,25 @@ div#app:has(#welcome-page)>main>footer {
     color: var(--jetz-chart-jetz);
 
     font-size: 9px;
-    font-weight: 800;
+    font-weight: 850;
 
-    letter-spacing: 0.11em;
+    letter-spacing: 0.12em;
     white-space: nowrap;
+
+    text-shadow: 0 0 10px var(--jetz-chart-glow);
+
+    box-shadow:
+        0 0 12px -2px var(--jetz-chart-glow),
+        inset 0 0 10px -5px var(--jetz-chart-glow);
 }
 
 
 /* pushed to the right edge so every figure lines up into a readable column */
-.jetz-chart-value {
-    margin-left: auto;
 
-    color: var(--jetz-muted);
-
-    font-size: 13px;
-    font-weight: 700;
-
-    font-variant-numeric: tabular-nums;
-}
-
-.jetz-chart-bar-jetz .jetz-chart-value {
-    color: var(--jetz-chart-jetz);
-    font-weight: 800;
-}
-
+/* -- the bars themselves ----------------------------------------------------- */
 
 .jetz-chart-track {
-    height: 10px;
+    height: 18px;
 
     border-radius: 999px;
 
@@ -2139,22 +2330,62 @@ div#app:has(#welcome-page)>main>footer {
     overflow: hidden;
 }
 
+
+/* The real width is set inline; the growth is a scaleX transition so the browser
+   can composite it. The collapsed state is gated on `.jetz-has-reveal` for the
+   same reason the fade-in is: if the observer never runs, the bars stay drawn
+   instead of vanishing. */
 .jetz-chart-fill {
     height: 100%;
+
+    /* a short floor as well as the percentage one, so the bar still reads as a
+       bar when the track itself is narrow (mobile) */
+    min-width: 30px;
 
     border-radius: 999px;
 
     background: var(--jetz-chart-bar);
 
-    transition: width 320ms ease;
+    transform-origin: left center;
+
+    transition:
+        transform 900ms cubic-bezier(0.22, 0.61, 0.36, 1),
+        box-shadow 220ms ease,
+        background 220ms ease;
 }
 
-.jetz-chart-bar-jetz .jetz-chart-fill {
+.jetz-has-reveal .jetz-chart-panel .jetz-chart-fill {
+    transform: scaleX(0);
+}
+
+.jetz-has-reveal .jetz-chart-panel.is-grown .jetz-chart-fill {
+    transform: scaleX(1);
+}
+
+
+/* rivals lift towards the accent on hover, so every row responds to the cursor */
+.jetz-chart-bar:hover .jetz-chart-fill {
+    background: var(--jetz-chart-bar-hover);
+}
+
+
+/* Jetz owns the only gradient on the page, plus a glow that grows on hover */
+.jetz-chart-bar-jetz .jetz-chart-fill,
+.jetz-chart-bar-jetz:hover .jetz-chart-fill {
     background: linear-gradient(90deg,
-            var(--jetz-chart-jetz),
-            var(--jetz-blue));
+            #06b6d4,
+            #22d3ee 45%,
+            #34d399);
+
+    box-shadow: var(--jetz-chart-jetz-glow);
 }
 
+.jetz-chart-bar-jetz:hover .jetz-chart-fill {
+    box-shadow: var(--jetz-chart-jetz-glow-strong);
+}
+
+
+/* -- methodology link -------------------------------------------------------- */
 
 .jetz-chart-method-link {
     display: inline-flex;
@@ -2178,6 +2409,30 @@ div#app:has(#welcome-page)>main>footer {
 .jetz-chart-method-link:hover>span {
     transform: translateX(3px);
 }
+
+.jetz-chart-value {
+    margin-left: auto;
+
+    color: var(--jetz-muted);
+
+    font-size: 13px;
+    font-weight: 700;
+
+    font-variant-numeric: tabular-nums;
+
+    transition: color 220ms ease;
+}
+
+.jetz-chart-bar-jetz .jetz-chart-value {
+    color: var(--jetz-chart-jetz);
+    font-weight: 800;
+}
+
+.jetz-chart-bar:hover .jetz-chart-name,
+.jetz-chart-bar:hover .jetz-chart-value {
+    color: var(--jetz-ink);
+}
+
 
 
 /* ============================================================================
@@ -2273,6 +2528,85 @@ div#app:has(#welcome-page)>main>footer {
 
 
 /* ============================================================================
+   SCROLL REVEAL
+   ---------------------------------------------------------------------------
+   A gentle fade-in-up as each block reaches the viewport.
+
+   The hidden state is deliberately scoped to `.jetz-has-reveal` on <html>,
+   which Home() adds only once the IntersectionObserver is live. That class is
+   the only thing holding content at opacity 0, so if scripting is unavailable
+   or the setup never runs, the page renders normally instead of staying blank.
+   `is-visible` is added by the observer, which then stops watching that
+   element, so a block animates exactly once.
+
+   Only static blocks carry `.jetz-reveal`. The panels behind the code tabs and
+   the metric tabs are rebuilt by `ifElse()` on every click, so they would
+   never be observed and would sit at opacity 0 forever.
+   ============================================================================ */
+
+@keyframes jetz-fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(26px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+.jetz-has-reveal .jetz-reveal {
+    opacity: 0;
+}
+
+.jetz-has-reveal .jetz-reveal.is-visible {
+    animation: jetz-fade-in-up 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+
+/* siblings arrive one after another instead of as a single block, which is what
+   keeps a four-card row from popping in all at once */
+.jetz-has-reveal .jetz-reveal:nth-child(2) {
+    animation-delay: 90ms;
+}
+
+.jetz-has-reveal .jetz-reveal:nth-child(3) {
+    animation-delay: 180ms;
+}
+
+.jetz-has-reveal .jetz-reveal:nth-child(4) {
+    animation-delay: 270ms;
+}
+
+.jetz-has-reveal .jetz-reveal:nth-child(5) {
+    animation-delay: 360ms;
+}
+
+
+/* motion-sensitive visitors get the content immediately, with no movement */
+@media (prefers-reduced-motion: reduce) {
+
+    .jetz-has-reveal .jetz-reveal,
+    .jetz-has-reveal .jetz-reveal.is-visible {
+        opacity: 1;
+
+        transform: none;
+        animation: none;
+    }
+
+    /* the bars would otherwise sit at their collapsed width: reduced motion
+       means "do not animate me", not "hide me" */
+    .jetz-has-reveal .jetz-chart-panel .jetz-chart-fill,
+    .jetz-has-reveal .jetz-chart-panel.is-grown .jetz-chart-fill {
+        transform: none;
+        transition: none;
+    }
+}
+
+
+/* ============================================================================
    DARK THEME
    ---------------------------------------------------------------------------
    Applied by toggling `jetz-theme-dark` on <html> (see Home() in
@@ -2317,7 +2651,7 @@ html.jetz-theme-dark body:has(#welcome-page) {
     --jetz-hero-from: #0a1620;
     --jetz-hero-to: #0d1c28;
     --jetz-cta-from: #0d2130;
-    --jetz-cta-to: #0c2018;
+    --jetz-cta-to: #0c1d20;
 
     /* the call-to-action card is glass, so it lifts off the wash with a light film
        rather than a solid plate */
@@ -2333,8 +2667,27 @@ html.jetz-theme-dark body:has(#welcome-page) {
        muted bars have to go darker or they out-shout the highlighted one */
     --jetz-chart-jetz: #22d3ee;
     --jetz-chart-jetz-soft: rgba(34, 211, 238, 0.16);
-    --jetz-chart-bar: #33485c;
+    --jetz-chart-bar: #3b5165;
+    --jetz-chart-bar-hover: #55708a;
     --jetz-chart-track: #16293a;
+    --jetz-chart-row-hover: rgba(34, 211, 238, 0.08);
+    --jetz-chart-glow: rgba(34, 211, 238, 0.6);
+    --jetz-chart-jetz-glow: 0 0 20px -2px rgba(34, 211, 238, 0.6);
+    --jetz-chart-jetz-glow-strong: 0 0 34px 0 rgba(52, 211, 153, 0.6);
+
+    /* the glass reads against a dark page, and the active pill stays white so
+       the lit segment is the brightest thing in the control */
+    --jetz-chart-glass: linear-gradient(180deg, rgba(28, 52, 68, 0.86), rgba(12, 26, 37, 0.66));
+    --jetz-chart-glass-blur: blur(18px) saturate(160%);
+    --jetz-chart-glass-line: rgba(34, 211, 238, 0.22);
+    --jetz-chart-glass-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --jetz-chart-pill: #ffffff;
+    --jetz-chart-pill-ink: #08161f;
+    --jetz-chart-pill-glow: rgba(34, 211, 238, 0.55);
+    --jetz-chart-card-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    --jetz-chart-card-shadow-hover: 0 20px 44px rgba(34, 211, 238, 0.18);
 }
 
 
@@ -2473,6 +2826,43 @@ html.jetz-theme-dark .jetz-theme-toggle:hover {
     .jetz-example-grid,
     .jetz-fit-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* the three headline stats no longer fit side by side, and squeezing them
+       into one row clipped the figures off the edge of the screen */
+    .jetz-chart-highlights {
+        grid-template-columns: minmax(0, 1fr);
+
+        gap: 12px;
+    }
+
+    .jetz-chart-panel {
+        padding: 22px 18px;
+    }
+
+    .jetz-chart-bar {
+        padding: 10px 8px;
+
+        margin-left: -8px;
+        margin-right: -8px;
+    }
+
+    /* the badge is the first thing to cost space on a narrow row */
+    .jetz-chart-badge {
+        padding: 3px 7px;
+
+        font-size: 8px;
+        letter-spacing: 0.08em;
+    }
+
+    .jetz-chart-tabs {
+        border-radius: 22px;
+    }
+
+    .jetz-chart-tab {
+        flex: 1 1 100%;
+
+        padding: 11px 12px;
     }
 
 

@@ -254,7 +254,7 @@ assertTrue('/ home never renders a placeholder benchmark value', !(await page.$e
 section('/: performance chart section');
 assert('/ home renders the chart section', await page.$eval('#chart', el => el.classList.contains('jetz-section')), true);
 assert('/ home badges the chart as a speed spectrum', (await page.$eval('#chart .jetz-eyebrow', el => el.textContent.trim())), 'BENCHMARK & SPEED SPECTRUM');
-assert('/ home headlines the chart on the no-overhead claim', (await page.$eval('#chart h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Performa Kelas Atas Tanpa Virtual DOM Overhead');
+assert('/ home headlines the chart on the no-overhead claim', (await page.$eval('#chart h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Top-Tier Performance Without Virtual DOM Overhead');
 assertTrue('/ home subheads the chart with the fine-grained claim', (await page.$eval('#chart .jetz-section-heading p', el => el.textContent)).includes('Fine-Grained Direct DOM'));
 assert('/ home offers three metric tabs', await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.length), 3);
 assert('/ home labels every metric tab', (await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.map(tab => tab.textContent.trim()).join('|'))), 'Partial Update Speed (ms)|Memory Footprint (MB)|DOM Mount Speed (ms)');
@@ -266,9 +266,9 @@ assert('/ home titles the default metric panel', (await page.$eval('#chart .jetz
 // "lower is better" is stated, because a shorter bar winning is otherwise ambiguous
 assert('/ home states the direction that wins', (await page.$eval('#chart .jetz-chart-axis span', el => el.textContent)), 'Lower is better');
 assert('/ home draws one bar per framework', await page.$$eval('#chart .jetz-chart-bar', bars => bars.length), 5);
-assert('/ home names every framework on the default metric', (await page.$$eval('#chart .jetz-chart-name', els => els.map(el => el.textContent).join('|'))), 'SolidJS|Jetz Framework|Svelte 5|Vue 3|React 19');
-assert('/ home prints the update figures', (await page.$$eval('#chart .jetz-chart-value', els => els.map(el => el.textContent).join('|'))), '0.05 ms|0.00 ms|0.10 ms|3.20 ms|12.50 ms');
-assert('/ home badges exactly the Jetz bar', (await page.$$eval('#chart .jetz-chart-badge', els => els.map(el => el.textContent).join('|'))), 'YOUR FRAMEWORK');
+assert('/ home names every framework on the default metric', (await page.$$eval('#chart .jetz-chart-name', els => els.map(el => el.textContent).join('|'))), 'Jetz Framework|SolidJS|Svelte 5|Vue 3|React 19');
+assert('/ home prints the update figures', (await page.$$eval('#chart .jetz-chart-value', els => els.map(el => el.textContent).join('|'))), '0.00 ms|0.05 ms|0.10 ms|3.20 ms|12.50 ms');
+assert('/ home badges exactly the Jetz bar', (await page.$$eval('#chart .jetz-chart-badge', els => els.map(el => el.textContent).join('|'))), 'JETZ');
 assert('/ home highlights only the Jetz bar', await page.$$eval('#chart .jetz-chart-bar', bars => bars.filter(bar => bar.classList.contains('jetz-chart-bar-jetz')).length), 1);
 assert('/ home colours the Jetz bar in the house cyan', await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-name', el => getComputedStyle(el).color), 'rgb(8, 145, 178)');
 assert('/ home mutes the competing bars', await page.$eval('#chart .jetz-chart-bar:not(.jetz-chart-bar-jetz) .jetz-chart-name', el => getComputedStyle(el).color), 'rgb(36, 59, 83)');
@@ -276,9 +276,13 @@ assert('/ home mutes the competing bars', await page.$eval('#chart .jetz-chart-b
 assertTrue('/ home keeps the 0.00 ms Jetz bar visible', parseFloat(await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-fill', el => el.style.width)) > 0);
 assert('/ home scales the slowest bar to full width', await page.$eval('#chart .jetz-chart-bar:last-child .jetz-chart-fill', el => el.style.width), '100%');
 assertTrue('/ home cites the methodology under the chart', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).includes('Intel i7/M-Series'));
-assertTrue('/ home discloses the post-GC condition', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).includes('Post-GC'));
+assertTrue('/ home discloses the post-GC condition', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).toLowerCase().includes('post-gc'));
 assert('/ home links the chart to the stress test', await page.$eval('#chart .jetz-chart-method-link', el => el.getAttribute('href')), '/stress.html');
-assertTrue('/ home names the methodology link', (await page.$eval('#chart .jetz-chart-method-link', el => el.textContent)).includes('Methodologi'));
+assertTrue('/ home names the methodology link', (await page.$eval('#chart .jetz-chart-method-link', el => el.textContent)).includes('Methodology'));
+// the chart section is English-only, like the benchmark section above it.
+// word boundaries matter here: a bare "Performa" also matches "Performance"
+assertTrue('/ home writes the chart section in English', !(await page.$eval('#chart', el => el.textContent))
+	.match(/\bPerforma\b|\bLihat\b|\bDites\b|\bKompromi\b|reaktif aktif|\bMengungguli\b|\bTanpa\b|dataset reaktif|baris DOM|\bSiklus\b|\bPenggunaan\b|\bMemori\b/));
 assertTrue('/ home never renders a placeholder chart value', !(await page.$eval('#chart', el => el.textContent)).includes('[object Object]'));
 assertTrue('/ home points the Chart nav link at the section', (await page.$eval('.jetz-nav a[href="#chart"]', el => el.textContent)) === 'Chart');
 
@@ -311,17 +315,102 @@ assert('/ home prints the mount figures', mount.values, '58 ms|65 ms|77 ms|95 ms
 assert('/ home re-ranks the bars for the mount metric', mount.names, 'SolidJS|Svelte 5|Jetz Framework|Vue 3|React 19');
 assert('/ home repaints the bars on every switch', mount.widths !== memory.widths, true);
 assert('/ home keeps the Jetz bar highlighted across switches', await page.$$eval('#chart .jetz-chart-bar-jetz .jetz-chart-value', els => els.map(el => el.textContent).join('|')), '77 ms');
+// --- the scroll reveal ------------------------------------------------------
+// The animation must never be able to hide content it cannot bring back, so
+// these check both the animation itself and the class that guards it.
+section('/: scroll reveal');
+assertTrue('/ home adds the reveal gate to <html>', await page.evaluate(() => document.documentElement.classList.contains('jetz-has-reveal')));
+assertTrue('/ home marks the static blocks for reveal', await page.$$eval('#welcome-page .jetz-reveal', els => els.length) >= 10, true);
+assertTrue('/ home reveals everything above the fold on load', await page.evaluate(() =>
+	[...document.querySelectorAll('#welcome-page .jetz-hero-col')].every(el => el.classList.contains('is-visible'))));
+assertTrue('/ home runs the fade-in-up keyframes', await page.evaluate(() =>
+	getComputedStyle(document.querySelector('#welcome-page .jetz-reveal.is-visible')).animationName === 'jetz-fade-in-up'));
+// the panels behind both tab strips are rebuilt by ifElse() on click, so they
+// must stay out of the reveal set or they would never be un-hidden
+assert('/ home leaves the chart panel out of the reveal set', await page.$$eval('#chart .jetz-chart-panel', els => els.filter(el => el.classList.contains('jetz-reveal')).length), 0);
+assert('/ home leaves the code panel out of the reveal set', await page.$$eval('.jetz-code-panel', els => els.filter(el => el.classList.contains('jetz-reveal')).length), 0);
+// switching a tab builds a brand new panel: it has to be visible, not stranded
+await page.evaluate(() => [...document.querySelectorAll('#chart .jetz-chart-tab')]
+	.find(tab => tab.textContent.trim() === 'Memory Footprint (MB)').click());
+await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+assert('/ home keeps a freshly swapped chart panel visible', await page.$eval('#chart .jetz-chart-panel', el => getComputedStyle(el).opacity), '1');
 
-// the chart follows the theme like everything else on the page
-const chartThemed = await page.evaluate(() => {
+// the gate is what holds content at opacity 0, so with it gone nothing is hidden
+assertTrue('/ home hides nothing without the gate class', await page.evaluate(() => {
+	const el = document.querySelector('#welcome-page .jetz-reveal');
+	el.classList.remove('is-visible');
+	document.documentElement.classList.remove('jetz-has-reveal');
+	const opacity = getComputedStyle(el).opacity;
+	document.documentElement.classList.add('jetz-has-reveal');
+	el.classList.add('is-visible');
+	return opacity === '1';
+}));
+
+
+
+// --- the chart's visual upgrade ---------------------------------------------
+// Logos, the highlight strip, the thick gradient bar and the glass control are
+// the things that make the section read as a benchmark rather than a list.
+section('/: chart visual design');
+assert('/ home marks every framework with a logo', await page.$$eval('#chart .jetz-chart-logo', els => els.length), 5);
+assert('/ home draws the rival marks as inline svg', await page.$$eval('#chart .jetz-chart-logo svg', els => els.length), 4);
+assert('/ home keeps the real Jetz logo as an image', (await page.$$eval('#chart .jetz-chart-logo img', els => els.map(el => el.getAttribute('alt')).join('|'))), 'Jetz Framework logo');
+assert('/ home gives every mark a readable box', await page.$eval('#chart .jetz-chart-logo', el => getComputedStyle(el).width), '26px');
+
+assert('/ home shows three highlight cards', await page.$$eval('#chart .jetz-chart-highlight', els => els.length), 3);
+assert('/ home derives the highlights from the measured bars', (await page.$$eval('#chart .jetz-chart-highlight-body > strong', els => els.map(el => el.textContent).join('|'))), '0.00 ms|53% less memory|1.9× faster mount');
+assert('/ home labels what each highlight compares', (await page.$$eval('#chart .jetz-chart-highlight-body > small', els => els.map(el => el.textContent).join('|'))), 'single row partial update|than React 19 at 50,000 rows|than React 19 for 500 rows');
+
+assert('/ home draws the bars thick', await page.$eval('#chart .jetz-chart-track', el => getComputedStyle(el).height), '18px');
+assertTrue('/ home rounds the bars fully', await page.$eval('#chart .jetz-chart-track', el => getComputedStyle(el).borderRadius) === '999px');
+assertTrue('/ home gives the Jetz bar the neon gradient', (await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-fill', el => getComputedStyle(el).backgroundImage)).includes('linear-gradient'));
+assertTrue('/ home glows the Jetz bar', (await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-fill', el => getComputedStyle(el).boxShadow)).includes('34, 211, 238'));
+assert('/ home keeps the rival bars a flat slate', await page.$eval('#chart .jetz-chart-bar:not(.jetz-chart-bar-jetz) .jetz-chart-fill', el => getComputedStyle(el).backgroundImage), 'none');
+assert('/ home outlines the framework badge in neon', await page.$eval('#chart .jetz-chart-badge', el => getComputedStyle(el).borderTopColor), 'rgb(8, 145, 178)');
+assert('/ home rounds the tab control into a pill', await page.$eval('#chart .jetz-chart-tabs', el => getComputedStyle(el).borderRadius), '999px');
+assert('/ home lights the active tab as a white pill', await page.$eval('#chart .jetz-chart-tab.is-active', el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+assertTrue('/ home glows the active tab', (await page.$eval('#chart .jetz-chart-tab.is-active', el => getComputedStyle(el).boxShadow)).includes('34, 211, 238'));
+
+// bars grow from nothing to their target, staggered row by row
+const growth = await page.evaluate(() => ({
+	grown: document.querySelector('#chart .jetz-chart-panel').classList.contains('is-grown'),
+	delays: [...document.querySelectorAll('#chart .jetz-chart-fill')].map(el => el.style.transitionDelay).join('|'),
+	collapsed: (() => {
+		const el = document.querySelector('#chart .jetz-chart-fill');
+		const panel = document.querySelector('#chart .jetz-chart-panel');
+		// suppress the transition so the reading is the resting value rather
+		// than whatever the animation happens to be at this instant
+		el.style.transition = 'none';
+		panel.classList.remove('is-grown');
+		const before = getComputedStyle(el).transform;
+		panel.classList.add('is-grown');
+		el.style.transition = '';
+		return before;
+	})()
+}));
+assertTrue('/ home grows the bars when the chart arrives', growth.grown, true);
+assert('/ home staggers the rows as they grow', growth.delays, '0ms|90ms|180ms|270ms|360ms');
+assertTrue('/ home holds the bars at zero width before they grow', growth.collapsed.includes('matrix(0,'), true);
+
+
+
+// the chart follows the theme like everything else on the page. The chart name
+// cross-fades between themes, so this has to let the transition settle before
+// reading the colour rather than catching it mid-flight.
+const chartThemed = await page.evaluate(async () => {
+	const settle = () => new Promise(resolve => setTimeout(resolve, 400));
 	document.documentElement.classList.add('jetz-theme-dark');
+	await settle();
 	const read = () => getComputedStyle(document.querySelector('#chart .jetz-chart-bar-jetz .jetz-chart-name')).color;
 	const dark = read();
+	const darkTrack = getComputedStyle(document.querySelector('#chart .jetz-chart-track')).backgroundColor;
 	document.documentElement.classList.remove('jetz-theme-dark');
-	return { dark, light: read() };
+	await settle();
+	return { dark, light: read(), darkTrack };
 });
 assert('/ home lightens the chart accent in the dark theme', chartThemed.dark, 'rgb(34, 211, 238)');
 assert('/ home restores the chart accent in the light theme', chartThemed.light, 'rgb(8, 145, 178)');
+assert('/ home darkens the chart track in the dark theme', chartThemed.darkTrack, 'rgb(22, 41, 58)');
 
 // --- the dark theme ----------------------------------------------------------
 // The whole page is styled from the --jetz-* tokens, so a theme switch is one
