@@ -10,6 +10,76 @@
     <link rel="icon" href="data:,">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!--
+        JETZ DARK THEME
+        ----------------------------------------------------------------------------
+        This page is styled with Tailwind utilities, so rather than restyling
+        every element in stress-test.js the palette itself is remapped to the
+        landing page's dark tokens (the `html.jetz-theme-dark` block in
+        public/css/style.css). The component keeps reading as ordinary Tailwind
+        - `bg-slate-950` still says "the page background" - it just resolves to
+        Jetz navy instead of neutral slate.
+
+        The shades below are the landing page's tokens laid onto Tailwind's
+        50..950 scale, so `slate-100`/`slate-400`/`slate-950` land exactly on
+        --jetz-ink / --jetz-muted / --jetz-page.
+    -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // deep navy-teal, taken from the landing page's surfaces
+                        slate: {
+                            50: '#f4f9fd',
+                            100: '#e6f0f7',   // --jetz-ink
+                            200: '#c0d4e1',   // --jetz-ink-soft
+                            300: '#a6bfd0',
+                            400: '#8fa8b9',   // --jetz-muted
+                            500: '#6d8899',   // --jetz-faint
+                            600: '#4e6779',
+                            700: '#354b5a',
+                            800: '#12293a',   // --jetz-card-accent
+                            900: '#10202c',   // --jetz-card
+                            950: '#0a1620'    // --jetz-page
+                        },
+
+                        // a cool white, so every white/5 and white/10 overlay
+                        // tints toward the accent instead of reading as grey haze
+                        white: '#e6f0f7',
+
+                        // --jetz-blue
+                        sky: {
+                            300: '#a5daf9',
+                            400: '#6cc2f2',
+                            500: '#3498db'
+                        },
+
+                        // --jetz-green
+                        emerald: {
+                            200: '#b6ecd0',
+                            300: '#86e0ac',
+                            400: '#4fd18b',
+                            500: '#34b981'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        /* one faint cyan wash at the top, echoing the landing page's hero so the
+           two dark pages read as the same product rather than two projects */
+        body {
+            background:
+                radial-gradient(1100px 540px at 50% -200px,
+                    rgba(108, 194, 242, 0.10),
+                    transparent 70%),
+                #0a1620;
+            color: #e6f0f7;
+        }
+    </style>
 </head>
 <body class="bg-slate-950">
     <div id="app"></div>

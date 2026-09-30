@@ -780,7 +780,7 @@ Jetz.style(`
     #grid-body tr:last-child { border-bottom: 0; }
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb { background: rgba(143, 168, 185, 0.35); border-radius: 9999px; }
 `);
 
 const mountStart = performance.now();
