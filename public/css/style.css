@@ -150,6 +150,36 @@ body:has(#welcome-page) {
 
     --jetz-line: #dce8ef;
 
+    /* surfaces: the only literals the stylesheet used to hardcode. Declaring them
+       here is what makes a theme switch a variable swap instead of a rewrite. */
+    --jetz-page: #ffffff;
+    --jetz-card: #ffffff;
+    --jetz-card-soft: #f8fbfd;
+    --jetz-card-accent: #f7fcfe;
+    --jetz-header-bg: rgba(255, 255, 255, 0.92);
+    --jetz-header-line: rgba(220, 232, 239, 0.9);
+    --jetz-faint: #9bb0be;
+
+    /* gradient endpoints: the hero wash and the closing call to action */
+    --jetz-hero-from: #ffffff;
+    --jetz-hero-to: #f7fbfd;
+    --jetz-cta-from: #eaf7fd;
+    --jetz-cta-to: #f4fbf7;
+
+    /* the glass card floating in the call to action */
+    --jetz-cta-card: rgba(255, 255, 255, 0.7);
+    --jetz-cta-card-line: rgba(52, 152, 219, 0.13);
+    --jetz-cta-shadow: 0 25px 70px rgba(36, 118, 173, 0.08);
+
+    /* filled surfaces that have to invert with the theme */
+    --jetz-invert-bg: #10202f;
+    --jetz-invert-text: #ffffff;
+
+    /* the primary button keeps its blue in both themes */
+    --jetz-btn-from: #3498db;
+    --jetz-btn-to: #2476ad;
+    --jetz-btn-text: #ffffff;
+
     background: var(--jetz-white);
     color: var(--jetz-ink);
 
@@ -304,8 +334,8 @@ div#app:has(#welcome-page)>main>footer {
 
     height: 72px;
 
-    background: rgba(255, 255, 255, 0.92);
-    border-bottom: 1px solid rgba(220, 232, 239, 0.9);
+    background: var(--jetz-header-bg);
+    border-bottom: 1px solid var(--jetz-header-line);
 
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -388,7 +418,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 9px;
 
-    background: white;
+    background: var(--jetz-card);
 
     color: var(--jetz-ink) !important;
 
@@ -419,8 +449,8 @@ div#app:has(#welcome-page)>main>footer {
             rgba(46, 204, 113, 0.08),
             transparent 24%),
         linear-gradient(180deg,
-            #ffffff 0%,
-            #f7fbfd 100%);
+            var(--jetz-hero-from) 0%,
+            var(--jetz-hero-to) 100%);
 }
 
 
@@ -585,10 +615,10 @@ div#app:has(#welcome-page)>main>footer {
 
     background:
         linear-gradient(135deg,
-            var(--jetz-blue),
-            var(--jetz-blue-dark));
+            var(--jetz-btn-from),
+            var(--jetz-btn-to));
 
-    color: white !important;
+    color: var(--jetz-btn-text) !important;
 
     box-shadow:
         0 10px 24px rgba(36, 118, 173, 0.22);
@@ -596,7 +626,7 @@ div#app:has(#welcome-page)>main>footer {
 
 
 .jetz-btn-primary:hover {
-    color: white !important;
+    color: var(--jetz-btn-text) !important;
 
     transform: translateY(-2px);
 
@@ -608,7 +638,7 @@ div#app:has(#welcome-page)>main>footer {
 .jetz-btn-secondary {
     border: 1px solid var(--jetz-line);
 
-    background: white;
+    background: var(--jetz-card);
 
     color: var(--jetz-ink) !important;
 }
@@ -811,7 +841,7 @@ div#app:has(#welcome-page)>main>footer {
 
 
 .jetz-section-white {
-    background: white;
+    background: var(--jetz-page);
 }
 
 
@@ -873,7 +903,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 14px;
 
-    background: white;
+    background: var(--jetz-card);
 
     transition:
         transform 180ms ease,
@@ -893,7 +923,7 @@ div#app:has(#welcome-page)>main>footer {
 
 
 .jetz-card-number {
-    color: #9bb0be;
+    color: var(--jetz-faint);
 
     font-family: Consolas, monospace;
     font-size: 11px;
@@ -1094,7 +1124,7 @@ div#app:has(#welcome-page)>main>footer {
 
 
 .jetz-flow-arrow {
-    color: #4e7084;
+    color: var(--jetz-faint);
 
     font-size: 20px;
 }
@@ -1110,7 +1140,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 15px;
 
-    background: #ffffff;
+    background: var(--jetz-card);
 
     box-shadow:
         0 18px 50px rgba(16, 32, 47, 0.07);
@@ -1126,7 +1156,7 @@ div#app:has(#welcome-page)>main>footer {
 
     border-bottom: 1px solid var(--jetz-line);
 
-    background: #f8fbfd;
+    background: var(--jetz-card-soft);
 }
 
 
@@ -1154,14 +1184,14 @@ div#app:has(#welcome-page)>main>footer {
 .jetz-code-tab:hover {
     color: var(--jetz-ink);
 
-    background: white;
+    background: var(--jetz-card);
 }
 
 
 .jetz-code-tab.is-active {
-    background: var(--jetz-ink);
+    background: var(--jetz-invert-bg);
 
-    color: white;
+    color: var(--jetz-invert-text);
 }
 
 
@@ -1302,7 +1332,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 12px;
 
-    background: #f8fbfd;
+    background: var(--jetz-card-soft);
 }
 
 
@@ -1420,7 +1450,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 12px;
 
-    background: white;
+    background: var(--jetz-card);
 
     transition:
         transform 160ms ease,
@@ -1444,7 +1474,7 @@ div#app:has(#welcome-page)>main>footer {
 
     margin-bottom: 30px;
 
-    color: #9bb0be;
+    color: var(--jetz-faint);
 
     font-family: Consolas, monospace;
     font-size: 11px;
@@ -1493,7 +1523,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 13px;
 
-    background: white;
+    background: var(--jetz-card);
 
     transition:
         transform 160ms ease,
@@ -1573,8 +1603,8 @@ div#app:has(#welcome-page)>main>footer {
 
     background:
         linear-gradient(135deg,
-            #eaf7fd 0%,
-            #f4fbf7 100%);
+            var(--jetz-cta-from) 0%,
+            var(--jetz-cta-to) 100%);
 }
 
 
@@ -1585,15 +1615,14 @@ div#app:has(#welcome-page)>main>footer {
 
     padding: 60px 30px;
 
-    border: 1px solid rgba(52, 152, 219, 0.13);
+    border: 1px solid var(--jetz-cta-card-line);
     border-radius: 18px;
 
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--jetz-cta-card);
 
     text-align: center;
 
-    box-shadow:
-        0 25px 70px rgba(36, 118, 173, 0.08);
+    box-shadow: var(--jetz-cta-shadow);
 }
 
 
@@ -1674,9 +1703,9 @@ div#app:has(#welcome-page)>main>footer {
 
     border-top: 1px solid var(--jetz-line);
 
-    background: white;
+    background: var(--jetz-page);
 
-    color: #8095a4;
+    color: var(--jetz-faint);
 
     font-size: 11px;
 }
@@ -1716,7 +1745,7 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 15px;
 
-    background: white;
+    background: var(--jetz-card);
 
     box-shadow:
         0 18px 50px rgba(16, 32, 47, 0.06);
@@ -1749,7 +1778,7 @@ div#app:has(#welcome-page)>main>footer {
 
 
 .jetz-compare-head {
-    background: #f8fbfd;
+    background: var(--jetz-card-soft);
 }
 
 
@@ -1781,7 +1810,7 @@ div#app:has(#welcome-page)>main>footer {
 
 
 .jetz-compare-jetz {
-    background: #f7fcfe;
+    background: var(--jetz-card-accent);
 
     color: var(--jetz-ink-soft);
     font-weight: 600;
@@ -1804,272 +1833,50 @@ div#app:has(#welcome-page)>main>footer {
 
 
 /* ============================================================================
-   BENCHMARK & PERFORMANCE
+   BENCHMARK
+   ---------------------------------------------------------------------------
+   The section reuses the page's existing pieces: the eyebrow, the benefit-card
+   shell and the comparison table. Only the measured-figure trio and the proof
+   strip are specific to it, so they follow the same tokens (blue accent, 14px
+   radius, --jetz-line border, muted copy) as everything around them.
    ============================================================================ */
 
-/* Dark tech panel: the one section that leaves the light rhythm of the page so
-   the numbers read like an instrument readout rather than marketing copy. */
-.jetz-bench {
-    position: relative;
-
-    background:
-        radial-gradient(circle at 12% 0%,
-            rgba(34, 197, 94, 0.16),
-            transparent 38%),
-        radial-gradient(circle at 88% 12%,
-            rgba(52, 152, 219, 0.16),
-            transparent 42%),
-        #06121c;
-
-    color: #d7e6f0;
-}
-
-
-/* a faint grid keeps the dark panel from reading as a flat block */
-.jetz-bench::before {
-    content: "";
-
-    position: absolute;
-    inset: 0;
-
-    background-image:
-        linear-gradient(rgba(120, 200, 160, 0.05) 1px,
-            transparent 1px),
-        linear-gradient(90deg,
-            rgba(120, 200, 160, 0.05) 1px,
-            transparent 1px);
-
-    background-size: 52px 52px;
-
-    pointer-events: none;
-}
-
-
-.jetz-bench>.container {
-    position: relative;
-}
-
-
-.jetz-bench-eyebrow {
-    color: #4ade80;
-}
-
-
-.jetz-bench-pulse {
-    width: 8px;
-    height: 8px;
-
-    border-radius: 50%;
-
-    background: #4ade80;
-
-    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.65);
-
-    animation: jetz-bench-pulse 2.2s infinite;
-}
-
-
-@keyframes jetz-bench-pulse {
-    70% {
-        box-shadow: 0 0 0 12px rgba(74, 222, 128, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
-    }
-}
-
-
-.jetz-bench-title {
-    color: #f2fbf6 !important;
-
-    text-shadow: 0 0 34px rgba(74, 222, 128, 0.18);
-}
-
-
-/* the headline number is its own text node, so it gets the neon treatment
-   without turning the sentence into markup */
-.jetz-bench-title>span,
-.jetz-bench-title>em {
-    color: #4ade80;
-}
-
-
-.jetz-bench-subtitle {
-    max-width: 760px;
-
-    margin-inline: auto;
-
-    color: #8fb0c4;
+/* the figure inside the headline takes the hero's gradient treatment */
+.jetz-bench-figure {
+    display: inline;
 }
 
 
 /* -- metric cards ---------------------------------------------------------- */
 
-.jetz-bench-metrics {
-    display: grid;
-
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 24px;
-}
-
-
-.jetz-bench-card {
-    height: 100%;
-
-    padding: 30px 28px;
-
-    border: 1px solid rgba(74, 222, 128, 0.22);
-    border-radius: 16px;
-
-    background:
-        linear-gradient(180deg,
-            rgba(74, 222, 128, 0.07),
-            rgba(6, 18, 28, 0.4));
-
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-
-.jetz-bench-value {
-    display: block;
-
-    color: #4ade80;
-
-    font-size: clamp(2.4rem, 4.5vw, 3.4rem);
-    font-weight: 800;
-    line-height: 1;
-
-    letter-spacing: -0.02em;
-
-    text-shadow: 0 0 28px rgba(74, 222, 128, 0.35);
-}
-
-
-.jetz-bench-label {
-    display: block;
-
-    margin-top: 16px;
-
-    color: #e6f6ee;
-
-    font-size: 12px;
-    font-weight: 800;
-
-    letter-spacing: 0.13em;
-
-    text-transform: uppercase;
-}
-
-
-.jetz-bench-note {
-    margin: 10px 0 0;
-
-    color: #8fb0c4;
-
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-
-/* -- measured proof strip --------------------------------------------------- */
-
-.jetz-bench-proof {
-    display: grid;
-
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-
-    margin-top: 26px;
-
-    padding: 22px 26px;
-
-    border: 1px solid rgba(120, 200, 160, 0.16);
-    border-radius: 14px;
-
-    background: rgba(4, 12, 20, 0.55);
-}
-
-
-.jetz-bench-proof-item {
+.jetz-metric-card {
     display: flex;
     flex-direction: column;
-    gap: 5px;
 }
 
 
-.jetz-bench-proof-item>strong {
-    color: #4ade80;
+.jetz-metric-value {
+    display: block;
 
-    font-size: 22px;
-    font-weight: 800;
+    color: var(--jetz-blue-dark);
+
+    font-size: clamp(2.2rem, 4vw, 3rem);
+    font-weight: 820;
+
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+
+    /* the values are read in a column, so keep the digits from dancing */
+    font-variant-numeric: tabular-nums;
 }
 
 
-.jetz-bench-proof-item>span {
-    color: #7f9db1;
+.jetz-metric-label {
+    display: block;
 
-    font-size: 12px;
-    line-height: 1.5;
-}
+    margin: 14px 0 0;
 
-
-.jetz-bench-source {
-    margin: 16px 0 0;
-
-    color: #6f8ea3;
-
-    font-size: 12px;
-    line-height: 1.7;
-}
-
-
-/* -- comparison table ------------------------------------------------------- */
-
-.jetz-bench-table {
-    overflow: hidden;
-
-    margin-top: 30px;
-
-    border: 1px solid rgba(120, 200, 160, 0.18);
-    border-radius: 15px;
-
-    background: rgba(4, 12, 20, 0.5);
-}
-
-
-.jetz-bench-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
-}
-
-
-.jetz-bench-row+.jetz-bench-row {
-    border-top: 1px solid rgba(120, 200, 160, 0.12);
-}
-
-
-.jetz-bench-row>* {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-
-    padding: 17px 22px;
-}
-
-
-.jetz-bench-row>*+* {
-    border-left: 1px solid rgba(120, 200, 160, 0.12);
-}
-
-
-.jetz-bench-head {
-    background: rgba(74, 222, 128, 0.08);
-}
-
-
-.jetz-bench-head>span {
-    color: #4ade80;
+    color: var(--jetz-ink);
 
     font-size: 11px;
     font-weight: 800;
@@ -2080,93 +1887,71 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
-.jetz-bench-concern {
-    color: #e6f6ee;
+.jetz-metric-note {
+    margin: 10px 0 0;
 
-    font-size: 13px;
-    font-weight: 800;
-}
-
-
-.jetz-bench-cell {
-    color: #8fb0c4;
+    color: var(--jetz-muted);
 
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.7;
 }
 
 
-/* the Jetz column is the one that gets the glow */
-.jetz-bench-jetz {
-    background: rgba(74, 222, 128, 0.06);
+/* -- proof strip ------------------------------------------------------------ */
 
-    color: #dff7e9;
-    font-weight: 600;
+.jetz-bench-proof {
+    display: grid;
+
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+
+    margin-top: 26px;
+
+    padding: 24px 28px;
+
+    border: 1px solid var(--jetz-line);
+    border-radius: 14px;
+
+    background: var(--jetz-card);
+
+    box-shadow: 0 18px 50px rgba(16, 32, 47, 0.05);
 }
 
 
-/* hidden on wide screens; each cell carries its own label on narrow ones */
-.jetz-bench-tag {
-    display: none;
-
-    color: #4ade80;
-
-    font-size: 10px;
-    font-weight: 800;
-
-    letter-spacing: 0.13em;
-
-    text-transform: uppercase;
-}
-
-
-.jetz-bench-vdom .jetz-bench-tag {
-    color: #7f9db1;
-}
-
-
-/* -- call to action --------------------------------------------------------- */
-
-.jetz-bench-actions {
+.jetz-bench-proof-item {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-
-    margin-top: 34px;
+    flex-direction: column;
+    gap: 6px;
 }
 
 
-.jetz-bench-btn-primary {
-    background: #22c55e !important;
+.jetz-bench-proof-item>strong {
+    color: var(--jetz-blue-dark);
 
-    color: #052e16 !important;
+    font-size: 21px;
+    font-weight: 820;
 
-    font-weight: 800;
+    letter-spacing: -0.02em;
 
-    box-shadow: 0 12px 34px rgba(34, 197, 94, 0.3);
+    font-variant-numeric: tabular-nums;
 }
 
 
-.jetz-bench-btn-primary:hover {
-    background: #4ade80 !important;
+.jetz-bench-proof-item>span {
+    color: var(--jetz-muted);
+
+    font-size: 12px;
+    line-height: 1.55;
 }
 
 
-.jetz-bench-btn-secondary {
-    border-color: rgba(74, 222, 128, 0.4) !important;
+.jetz-bench-source {
+    margin: 16px 0 30px;
 
-    background: transparent;
+    color: var(--jetz-faint);
 
-    color: #9fe9bd !important;
-}
-
-
-.jetz-bench-btn-secondary:hover {
-    border-color: #4ade80 !important;
-
-    background: rgba(74, 222, 128, 0.1) !important;
+    font-size: 12px;
+    line-height: 1.7;
 }
 
 
@@ -2199,13 +1984,13 @@ div#app:has(#welcome-page)>main>footer {
     border: 1px solid var(--jetz-line);
     border-radius: 14px;
 
-    background: white;
+    background: var(--jetz-card);
 }
 
 
 .jetz-fit-card-alt {
     background: linear-gradient(180deg,
-            #ffffff,
+            var(--jetz-card),
             var(--jetz-surface));
 }
 
@@ -2259,6 +2044,138 @@ div#app:has(#welcome-page)>main>footer {
     content: "\2192";
 
     color: var(--jetz-blue);
+}
+
+
+/* ============================================================================
+   DARK THEME
+   ---------------------------------------------------------------------------
+   Applied by toggling `jetz-theme-dark` on <html> (see Home() in
+   home-component.js). The light theme is left completely untouched: this block
+   only re-declares the tokens and the handful of surfaces the stylesheet still
+   hardcodes, so switching a theme never depends on editing the base rules.
+
+   Sections that are already dark on purpose - the hero code window and the Prism
+   token colours - are deliberately not listed: they read the same in both themes.
+   ============================================================================ */
+
+html.jetz-theme-dark body:has(#welcome-page) {
+    /* palette */
+    --jetz-ink: #e6f0f7;
+    --jetz-ink-soft: #c0d4e1;
+    --jetz-muted: #8fa8b9;
+
+    /* the accent is a *text* colour on this theme, so it has to lighten */
+    --jetz-blue: #6cc2f2;
+    --jetz-blue-dark: #93d4f8;
+    --jetz-blue-soft: #10293c;
+
+    --jetz-green: #4fd18b;
+    --jetz-green-soft: #0e2a1f;
+
+    --jetz-white: #0a1620;
+    --jetz-surface: #0c1a25;
+    --jetz-surface-2: #11222e;
+    --jetz-line: #1e3644;
+
+    /* surfaces */
+    --jetz-page: #0a1620;
+    --jetz-card: #10202c;
+    --jetz-card-soft: #142734;
+    --jetz-card-accent: #12293a;
+    --jetz-header-bg: rgba(10, 22, 32, 0.88);
+    --jetz-header-line: rgba(30, 54, 68, 0.9);
+    --jetz-faint: #6d8899;
+
+    /* gradient endpoints, tuned to sit a shade off the page so the hero wash and
+       the call to action still read as a wash instead of flat fill */
+    --jetz-hero-from: #0a1620;
+    --jetz-hero-to: #0d1c28;
+    --jetz-cta-from: #0d2130;
+    --jetz-cta-to: #0c2018;
+
+    /* the call-to-action card is glass, so it lifts off the wash with a light film
+       rather than a solid plate */
+    --jetz-cta-card: rgba(255, 255, 255, 0.05);
+    --jetz-cta-card-line: rgba(124, 194, 242, 0.18);
+    --jetz-cta-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+
+    /* filled surfaces invert */
+    --jetz-invert-bg: #e6f0f7;
+    --jetz-invert-text: #08161f;
+}
+
+
+/* Everything else follows the tokens above. Only the surfaces that are not
+   reached through a token need a rule here. */
+html.jetz-theme-dark .jetz-header {
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+
+/* the code explorer's inline note sits on the card surface and keeps a light plate
+   for the prism output, which is already dark in both themes */
+html.jetz-theme-dark .jetz-code-explorer .jetz-code {
+    background: var(--jetz-card-soft);
+}
+
+
+html.jetz-theme-dark .jetz-theme-toggle {
+    border-color: var(--jetz-line);
+
+    background: var(--jetz-card);
+
+    color: var(--jetz-ink-soft);
+}
+
+
+html.jetz-theme-dark .jetz-theme-toggle:hover {
+    border-color: var(--jetz-blue);
+
+    background: var(--jetz-blue-soft);
+
+    color: var(--jetz-ink);
+}
+
+
+/* ============================================================================
+   THEME TOGGLE
+   ============================================================================ */
+
+.jetz-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    /* 40px keeps the switch at a comfortable tap target on a phone */
+    width: 40px;
+    height: 40px;
+
+    padding: 0;
+
+    border: 1px solid var(--jetz-line);
+    border-radius: 10px;
+
+    background: var(--jetz-card);
+
+    color: var(--jetz-ink);
+
+    font-size: 16px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease;
+}
+
+
+.jetz-theme-toggle:hover {
+    border-color: var(--jetz-blue);
+
+    transform: translateY(-1px);
 }
 
 
@@ -2322,42 +2239,13 @@ div#app:has(#welcome-page)>main>footer {
     .jetz-card-grid,
     .jetz-step-grid,
     .jetz-example-grid,
-    .jetz-fit-grid,
-    .jetz-bench-metrics {
+    .jetz-fit-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
 
     .jetz-bench-proof {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-
-    /* the column headers would repeat the per-cell labels, so they are hidden
-       and each cell shows its own tag instead - same rule as the compare table */
-    .jetz-bench-head {
-        display: none;
-    }
-
-
-    .jetz-bench-row {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-
-    .jetz-bench-row>* {
-        padding: 16px 18px;
-    }
-
-
-    .jetz-bench-row>*+* {
-        border-left: 0;
-        border-top: 1px solid rgba(120, 200, 160, 0.12);
-    }
-
-
-    .jetz-bench-tag {
-        display: block;
     }
 
 

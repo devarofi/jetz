@@ -1,5 +1,5 @@
 import { link } from "../../lib/jetz-router.js";
-import { html, ifElse, stateOf } from "../../lib/jetz.js";
+import { html, ifElse, rememberOf, stateOf } from "../../lib/jetz.js";
 
 import {
     a,
@@ -38,6 +38,35 @@ import '../../../public/css/style.css';
 import Prism from "prismjs/components/prism-core.js";
 import "prismjs/components/prism-clike.js";
 import "prismjs/components/prism-javascript.js";
+
+
+// ---------------------------------------------------------------------------
+// Theme
+//
+// The whole page is styled from the `--jetz-*` tokens declared in style.css, so
+// switching themes means adding one class to <html>. That class is set from a
+// remembered state, which keeps the choice across reloads.
+//
+// The stored value is applied at module scope, before `Jetz.mount()` runs, so a
+// returning dark-theme visitor never sees a light flash first.
+// ---------------------------------------------------------------------------
+
+const THEME_KEY = 'theme';
+const THEME_DARK = 'dark';
+const THEME_LIGHT = 'light';
+
+const applyTheme = value => {
+    const isDark = value === THEME_DARK;
+    document.documentElement.classList.toggle('jetz-theme-dark', isDark);
+    // the attribute mirrors the class for anyone inspecting or scripting it
+    document.documentElement.setAttribute('data-theme', isDark ? THEME_DARK : THEME_LIGHT);
+};
+
+// module scope: runs on import, ahead of the first render
+const storedTheme = rememberOf(THEME_KEY, THEME_LIGHT);
+applyTheme(storedTheme.getValue());
+// later writes (the toggle) re-apply through the same subscription
+storedTheme.subscribe(next => applyTheme(next));
 
 
 export function Home() {
@@ -304,10 +333,38 @@ button(
 
 
     // -------------------------------------------------------------------------
-    // Comparison row
+    // Comparison table
+    //
+    // One builder serves both tables on the page, so the authoring comparison and
+    // the benchmark comparison can never drift apart. The column labels are the
+    // only thing that differs, hence the optional `labels` argument - callers that
+    // omit it render exactly what they always did.
     // -------------------------------------------------------------------------
 
-    const compareRow = (concern, jetz, others) => div(
+    const COMPARE_DEFAULT_LABELS = {
+        concern: 'Concern',
+        jetz: 'Jetz',
+        others: 'Other frameworks'
+    };
+
+    // the authoring comparison keeps its own third-column wording
+    const SPECIAL_LABELS = {
+        concern: 'Concern',
+        jetz: 'Jetz',
+        others: 'JSX and template frameworks'
+    };
+
+    const compareHead = (labels = COMPARE_DEFAULT_LABELS) => div(
+        css`jetz-compare-row jetz-compare-head`,
+
+        span(labels.concern),
+
+        span(labels.jetz),
+
+        span(labels.others)
+    );
+
+    const compareRow = (concern, jetz, others, labels = COMPARE_DEFAULT_LABELS) => div(
         css`jetz-compare-row`,
 
         strong(
@@ -320,7 +377,7 @@ button(
 
             small(
                 css`jetz-compare-tag`,
-                'Jetz'
+                labels.jetz
             ),
 
             jetz
@@ -331,7 +388,7 @@ button(
 
             small(
                 css`jetz-compare-tag`,
-                'Other frameworks'
+                labels.others
             ),
 
             others
@@ -393,66 +450,45 @@ button(
 
     // -------------------------------------------------------------------------
     // Metric card
+    //
+    // Reuses the benefit-card shell so it picks up the same border, radius,
+    // padding and hover lift as every other card on the page. Only the value /
+    // label / note trio is specific to a measured figure.
     // -------------------------------------------------------------------------
 
     const metricCard = ({ value, label, note }) => article(
-        css`jetz-bench-card`,
+        css`jetz-benefit-card jetz-metric-card`,
 
-        strong(
-            css`jetz-bench-value`,
+        span(
+            css`jetz-metric-value`,
             value
         ),
 
-        span(
-            css`jetz-bench-label`,
+        strong(
+            css`jetz-metric-label`,
             label
         ),
 
         p(
-            css`jetz-bench-note`,
+            css`jetz-metric-note`,
             note
         )
     );
 
 
     // -------------------------------------------------------------------------
-    // Benchmark comparison row
+    // Benchmark comparison
     //
-    // Same three-column shape as the authoring comparison above, so the two
-    // tables read as one system. The Jetz column is listed second here: the
-    // point of this section is the contrast, not a tie.
+    // The benchmark reuses `compareRow()`/`compareHead()` and only swaps the
+    // column labels, so both tables are literally the same component. Jetz stays
+    // in the tinted column, which is what the eye should land on.
     // -------------------------------------------------------------------------
 
-    const benchRow = (concern, vdom, jetz) => div(
-        css`jetz-bench-row`,
-
-        strong(
-            css`jetz-bench-concern`,
-            concern
-        ),
-
-        span(
-            css`jetz-bench-cell jetz-bench-vdom`,
-
-            small(
-                css`jetz-bench-tag`,
-                'Virtual DOM'
-            ),
-
-            vdom
-        ),
-
-        span(
-            css`jetz-bench-cell jetz-bench-jetz`,
-
-            small(
-                css`jetz-bench-tag`,
-                'Jetz'
-            ),
-
-            jetz
-        )
-    );
+    const BENCH_LABELS = {
+        concern: 'Fitur / Metrik',
+        jetz: 'Jetz Framework',
+        others: 'Virtual DOM (React-like)'
+    };
 
 
     // -------------------------------------------------------------------------
@@ -552,6 +588,39 @@ button(
                                 href: '#playground'
                             },
                             'Playground'
+                        )
+                    ),
+
+                    button(
+                        {
+                            class: 'jetz-theme-toggle',
+                            // callbacks, not values: the label has to follow the
+                            // toggle. Read through `.value` on purpose - `.getValue()`
+                            // is the untracked read, so the computed behind these
+                            // attributes would never re-run.
+                            'aria-label': () => storedTheme.value === THEME_DARK
+                                ? 'Beralih ke tema terang'
+                                : 'Beralih ke tema gelap',
+                            title: () => storedTheme.value === THEME_DARK
+                                ? 'Tema terang'
+                                : 'Tema gelap',
+                            onclick() {
+                                // an event handler is not a tracked context, so the
+                                // cheap untracked read is the right one here
+                                storedTheme.setState(
+                                    storedTheme.getValue() === THEME_DARK ? THEME_LIGHT : THEME_DARK
+                                );
+                            }
+                        },
+
+                        // one branch is rendered at a time, so `ifElse()` swaps the
+                        // glyph instead of stacking both
+                        ifElse(
+                            () => storedTheme.getValue() === THEME_DARK,
+
+                            () => span('☀'),
+
+                            () => span('☾')
                         )
                     ),
 
@@ -1476,15 +1545,7 @@ button(
                 div(
                     css`jetz-compare`,
 
-                    div(
-                        css`jetz-compare-row jetz-compare-head`,
-
-                        span('Concern'),
-
-                        span('Jetz'),
-
-                        span('JSX and template frameworks')
-                    ),
+                    compareHead(SPECIAL_LABELS),
 
                     compareRow(
                         'Authoring',
@@ -1582,7 +1643,7 @@ button(
         section(
             {
                 id: 'benchmark',
-                class: 'jetz-section jetz-bench'
+                class: 'jetz-section jetz-section-soft'
             },
 
             div(
@@ -1595,28 +1656,29 @@ button(
                 div(
                     css`jetz-section-heading text-center`,
 
-                    span(
-                        css`jetz-label jetz-bench-eyebrow`,
+                    div(
+                        css`jetz-eyebrow`,
 
                         span(
-                            css`jetz-bench-pulse`
+                            css`jetz-eyebrow-dot`
                         ),
 
                         'BENCHMARK & PERFORMANCE'
                     ),
 
                     h2(
-                        css`jetz-bench-title`,
-
                         'Skala ',
 
-                        benchmark.rows,
+                        span(
+                            css`jetz-gradient-text jetz-bench-figure`,
+
+                            benchmark.rows
+                        ),
 
                         ' Data Tanpa Kompromi Memori'
                     ),
 
                     p(
-                        css`jetz-bench-subtitle`,
                         'Didesain dengan arsitektur Fine-Grained Signals murni. Tanpa Virtual DOM overhead, tanpa memory leak, dan super hemat RAM.'
                     )
                 ),
@@ -1625,10 +1687,10 @@ button(
                 // -- key metric cards ------------------------------------------
 
                 div(
-                    css`jetz-bench-metrics`,
+                    css`jetz-card-grid`,
 
                     metrics.map(metric => div(
-                        css`jetz-bench-metric-col`,
+                        css`jetz-card-col`,
 
                         metricCard(metric)
                     ))
@@ -1690,52 +1752,50 @@ button(
                 // -- comparison table -----------------------------------------
 
                 div(
-                    css`jetz-bench-table`,
+                    css`jetz-compare`,
 
-                    div(
-                        css`jetz-bench-row jetz-bench-head`,
+                    compareHead(BENCH_LABELS),
 
-                        span('Fitur / Metrik'),
-
-                        span('Virtual DOM (React-like)'),
-
-                        span('Jetz Framework')
-                    ),
-
-                    benchRow(
+                    compareRow(
                         'Arsitektur Reaktivitas',
+                        'Fine-Grained Direct DOM',
                         'Virtual DOM Diffing',
-                        'Fine-Grained Direct DOM'
+                        BENCH_LABELS
                     ),
 
-                    benchRow(
+                    compareRow(
                         'Single Row Update',
+                        `${benchmark.rowUpdateMs} ms (Mendekati Instan)`,
                         'Membutuhkan re-render komponen (belasan ms)',
-                        `${benchmark.rowUpdateMs} ms (Mendekati Instan)`
+                        BENCH_LABELS
                     ),
 
-                    benchRow(
+                    compareRow(
                         'Pembersihan Memory (Unmount)',
+                        'Automatic Lifecycle & Subscription Cleanup',
                         'Bergantung pada Hooks/GC overhead',
-                        'Automatic Lifecycle & Subscription Cleanup'
+                        BENCH_LABELS
                     ),
 
-                    benchRow(
-                        'Footprint Memori (50.000 items)',
+                    compareRow(
+                        `Footprint Memori (${benchmark.rows} items)`,
+                        `Super Ringan (${benchmark.heapMb} MB)`,
                         'Tinggi (~300MB - 1GB+)',
-                        `Super Ringan (${benchmark.heapMb} MB)`
+                        BENCH_LABELS
                     ),
 
-                    benchRow(
+                    compareRow(
                         'Detached DOM Nodes',
+                        `${benchmark.detachedNodes} - dibersihkan otomatis`,
                         'Perlu dipantau manual',
-                        `${benchmark.detachedNodes} - dibersihkan otomatis`
+                        BENCH_LABELS
                     ),
 
-                    benchRow(
+                    compareRow(
                         'Stabilitas Sweep',
+                        `Stabil melewati ${benchmark.sweepCycles} siklus`,
                         'Heap naik seiring pagination',
-                        `Stabil melewati ${benchmark.sweepCycles} siklus`
+                        BENCH_LABELS
                     )
                 ),
 
@@ -1743,11 +1803,11 @@ button(
                 // -- call to action -------------------------------------------
 
                 div(
-                    css`jetz-bench-actions`,
+                    css`jetz-cta-actions`,
 
                     a(
                         {
-                            class: 'jetz-btn-primary jetz-bench-btn-primary',
+                            class: 'jetz-btn-primary',
                             href: '/stress.html'
                         },
 
@@ -1758,7 +1818,7 @@ button(
 
                     a(
                         {
-                            class: 'jetz-btn-secondary jetz-bench-btn-secondary',
+                            class: 'jetz-btn-secondary',
                             href: 'https://github.com/devarofi/jetz#7-keyed-list-reconciliation-loop',
                             target: '_blank',
                             rel: 'noreferrer'

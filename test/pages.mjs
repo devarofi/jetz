@@ -26,6 +26,10 @@ const assert = (name, actual, expected) => {
 	results.push(`${pass ? 'PASS' : 'FAIL'} :: ${name} | actual: ${JSON.stringify(actual)} | expected: ${JSON.stringify(expected)}`);
 };
 const assertTrue = (name, actual) => assert(name, !!actual, true);
+const assertContains = (name, actual, expected) => {
+	const pass = String(actual).includes(expected);
+	results.push(`${pass ? 'PASS' : 'FAIL'} :: ${name} | actual: ${JSON.stringify(actual)} | expected to contain: ${JSON.stringify(expected)}`);
+};
 const section = name => results.push(`# ${name}`);
 
 // Jetz drops lifecycle hooks (onMount/onDestroy/...) registered outside a render
@@ -102,6 +106,39 @@ const probe = () => page.evaluate(() => {
 		demoFooterHidden: styleOf('#app > main > footer', 'display') === 'none',
 		welcomePage: document.querySelector('#welcome-page') !== null,
 		welcomeExamples: document.querySelectorAll('.welcome-example-link').length,
+		// the theme is one class on <html>; everything else reads the tokens
+		themeClass: document.documentElement.classList.contains('jetz-theme-dark'),
+		themeAttr: document.documentElement.getAttribute('data-theme'),
+		themeLabel: document.querySelector('.jetz-theme-toggle')?.getAttribute('aria-label') ?? 'NO TOGGLE',
+		themeTitle: document.querySelector('.jetz-theme-toggle')?.getAttribute('title') ?? 'NO TOGGLE',
+		themeGlyph: document.querySelector('.jetz-theme-toggle')?.textContent.trim() ?? 'NO TOGGLE',
+		themeTag: document.querySelector('.jetz-theme-toggle')?.tagName ?? 'NO TOGGLE',
+		// the storage key is built from the pathname, so look the entry up by its
+		// `__key__theme` suffix instead of hardcoding the mangled path
+		themeStored: (() => {
+			const store = JSON.parse(localStorage.getItem('app-remember-state') || '{}');
+			for (const collection of Object.values(store)) {
+				for (const [key, value] of Object.entries(collection)) {
+					if (key.endsWith('__key__theme')) return value;
+				}
+			}
+			return null;
+		})(),
+		themeSurfaces: {
+			page: styleOf('body', 'backgroundColor'),
+			card: styleOf('.jetz-benefit-card', 'backgroundColor'),
+			header: styleOf('.jetz-header', 'backgroundColor'),
+			table: styleOf('.jetz-compare', 'backgroundColor'),
+			heroWash: styleOf('.jetz-hero', 'backgroundImage'),
+			ctaWash: styleOf('.jetz-cta', 'backgroundImage'),
+		},
+		themeInk: styleOf('body', 'color'),
+		themeToggleBox: (() => {
+			const el = document.querySelector('.jetz-theme-toggle');
+			if (!el) return null;
+			const r = el.getBoundingClientRect();
+			return { w: Math.round(r.width), h: Math.round(r.height) };
+		})(),
 		todoPage: document.querySelector('#todo-page') !== null,
 		todoTasks: document.querySelectorAll('.todo-task').length,
 		// the stress test ships as its own document, so it only appears when that
@@ -187,25 +224,91 @@ assertTrue('/ home keeps the comparison anchored on the page', await page.$eval(
 // --- the benchmark section proves the memory & speed claims ------------------
 section('/: benchmark section');
 assertTrue('/ home points the Benchmark nav link at the section', (await page.$eval('.jetz-nav a[href="#benchmark"]', el => el.textContent)) === 'Benchmark');
-assertTrue('/ home renders the benchmark section', await page.$eval('#benchmark', el => el.classList.contains('jetz-bench')));
-assert('/ home paints the benchmark section dark', await page.$eval('#benchmark', el => getComputedStyle(el).backgroundColor), 'rgb(6, 18, 28)');
-assert('/ home badges the section as a benchmark', (await page.$eval('.jetz-bench-eyebrow', el => el.textContent.trim())), 'BENCHMARK & PERFORMANCE');
-assert('/ home headlines the 50.000 row scale', (await page.$eval('.jetz-bench-title', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Skala 50.000 Data Tanpa Kompromi Memori');
-assert('/ home shows three key metric cards', await page.$$eval('#benchmark .jetz-bench-card', cards => cards.length), 3);
-assert('/ home reports the heap footprint', (await page.$$eval('.jetz-bench-value', els => els.map(el => el.textContent).join('|'))), '123 MB|0.00 ms|0%');
-assert('/ home names every metric card', (await page.$$eval('.jetz-bench-label', els => els.map(el => el.textContent).join('|'))), 'JS Heap Footprint|Single Row Update Time|Memory Leak');
-assert('/ home explains every metric card', (await page.$$eval('.jetz-bench-note', els => els.map(el => el.textContent).join('|'))), 'Penggunaan RAM murni untuk 50.000 data reaktif aktif.|Perubahan state langsung menuju DOM target tanpa diffing.|Automatic subscription cleanup saat unmount elemen.');
-assert('/ home accents the metric numbers in neon green', await page.$eval('.jetz-bench-value', el => getComputedStyle(el).color), 'rgb(74, 222, 128)');
+assertTrue('/ home renders the benchmark section', await page.$eval('#benchmark', el => el.classList.contains('jetz-section-soft')));
+assert('/ home badges the section as a benchmark', (await page.$eval('#benchmark .jetz-eyebrow', el => el.textContent.trim())), 'BENCHMARK & PERFORMANCE');
+assert('/ home headlines the 50.000 row scale', (await page.$eval('#benchmark h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Skala 50.000 Data Tanpa Kompromi Memori');
+assert('/ home shows three key metric cards', await page.$$eval('#benchmark .jetz-metric-card', cards => cards.length), 3);
+assert('/ home reuses the page card shell for its metrics', await page.$$eval('#benchmark .jetz-metric-card', cards => cards.every(card => card.classList.contains('jetz-benefit-card'))), true);
+assert('/ home reports the heap footprint', (await page.$$eval('.jetz-metric-value', els => els.map(el => el.textContent).join('|'))), '123 MB|0.00 ms|0%');
+assert('/ home names every metric card', (await page.$$eval('.jetz-metric-label', els => els.map(el => el.textContent).join('|'))), 'JS Heap Footprint|Single Row Update Time|Memory Leak');
+assert('/ home explains every metric card', (await page.$$eval('.jetz-metric-note', els => els.map(el => el.textContent).join('|'))), 'Penggunaan RAM murni untuk 50.000 data reaktif aktif.|Perubahan state langsung menuju DOM target tanpa diffing.|Automatic subscription cleanup saat unmount elemen.');
+assert('/ home accents the metric numbers in the house blue', await page.$eval('.jetz-metric-value', el => getComputedStyle(el).color), 'rgb(36, 118, 173)');
 assert('/ home backs the cards with a measured proof strip', await page.$$eval('.jetz-bench-proof-item', items => items.length), 4);
 assertTrue('/ home derives the memory saving from the two heap figures', (await page.$eval('.jetz-bench-proof', el => el.textContent)).includes('91%'));
 assertTrue('/ home cites the DevTools measurement behind the numbers', (await page.$eval('.jetz-bench-source', el => el.textContent)).includes('1,351 MB'));
-assert('/ home compares six benchmark concerns', await page.$$eval('#benchmark .jetz-bench-row:not(.jetz-bench-head)', rows => rows.length), 6);
-assert('/ home heads the comparison with both architectures', (await page.$$eval('.jetz-bench-head > span', els => els.map(el => el.textContent).join('|'))), 'Fitur / Metrik|Virtual DOM (React-like)|Jetz Framework');
-assertTrue('/ home gives the Jetz column its own class', await page.$eval('#benchmark .jetz-bench-row:not(.jetz-bench-head) .jetz-bench-jetz', el => el.classList.contains('jetz-bench-cell')));
-assertTrue('/ home states the single row update win', (await page.$eval('#benchmark .jetz-bench-table', el => el.textContent)).includes('0.00 ms (Mendekati Instan)'));
-assert('/ home sends the primary CTA to the stress test', await page.$eval('.jetz-bench-btn-primary', el => el.getAttribute('href')), '/stress.html');
-assert('/ home points the secondary CTA at the reconciler docs', await page.$eval('.jetz-bench-btn-secondary', el => el.getAttribute('href')), 'https://github.com/devarofi/jetz#7-keyed-list-reconciliation-loop');
+assert('/ home reuses the comparison table for the benchmark', await page.$$eval('#benchmark .jetz-compare', tables => tables.length), 1);
+assert('/ home compares six benchmark concerns', await page.$$eval('#benchmark .jetz-compare-row:not(.jetz-compare-head)', rows => rows.length), 6);
+assert('/ home heads the benchmark table with both architectures', (await page.$$eval('#benchmark .jetz-compare-head > span', els => els.map(el => el.textContent).join('|'))), 'Fitur / Metrik|Jetz Framework|Virtual DOM (React-like)');
+assertTrue('/ home keeps the Jetz column highlighted', await page.$eval('#benchmark .jetz-compare-jetz', el => el.classList.contains('jetz-compare-cell')));
+assertTrue('/ home leaves the authoring comparison wording alone', (await page.$eval('#special .jetz-compare-head', el => el.textContent)).includes('JSX and template frameworks'));
+assertTrue('/ home states the single row update win', (await page.$eval('#benchmark .jetz-compare', el => el.textContent)).includes('0.00 ms (Mendekati Instan)'));
+assert('/ home sends the primary CTA to the stress test', await page.$eval('#benchmark .jetz-btn-primary', el => el.getAttribute('href')), '/stress.html');
+assert('/ home points the secondary CTA at the reconciler docs', await page.$eval('#benchmark .jetz-btn-secondary', el => el.getAttribute('href')), 'https://github.com/devarofi/jetz#7-keyed-list-reconciliation-loop');
 assertTrue('/ home never renders a placeholder benchmark value', !(await page.$eval('#benchmark', el => el.textContent)).includes('[object Object]'));
+
+// --- the dark theme ----------------------------------------------------------
+// The whole page is styled from the --jetz-* tokens, so a theme switch is one
+// class on <html>. These assert the class flips, the tokens actually repaint
+// every surface that used to be a hardcoded white, and the choice is remembered.
+section('/: dark theme toggle');
+const themeOf = async () => await probe();
+const light = await themeOf();
+assert('/ home starts on the light theme', light.themeClass, false);
+assert('/ home mirrors the theme onto the document', light.themeAttr, 'light');
+assert('/ home leaves the theme switch unpressed by default', light.themeStored, null);
+assert('/ home paints a white page by default', light.themeSurfaces.page, 'rgb(255, 255, 255)');
+assert('/ home paints white cards by default', light.themeSurfaces.card, 'rgb(255, 255, 255)');
+assertContains('/ home keeps the hero wash light by default', light.themeSurfaces.heroWash, 'rgb(255, 255, 255)');
+assert('/ home keeps the primary button in the house blue', await page.$eval('.jetz-btn-primary', el => getComputedStyle(el).backgroundImage.includes('rgb(52, 152, 219)')), true);
+
+// the switch is a real button, so it is reachable and operable from the keyboard
+assert('/ home renders the switch as a button', light.themeTag, 'BUTTON');
+assert('/ home labels the switch with the action it performs', light.themeLabel, 'Beralih ke tema gelap');
+assert('/ home mirrors the label into a tooltip', light.themeTitle, 'Tema gelap');
+assert('/ home shows a moon glyph while the page is light', light.themeGlyph, '☾');
+assertTrue('/ home gives the switch a 40px tap target', light.themeToggleBox.h >= 40 && light.themeToggleBox.w >= 40);
+
+await page.click('.jetz-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 300));
+const dark = await themeOf();
+assert('/ clicking the switch turns the document dark', dark.themeClass, true);
+assert('/ clicking the switch mirrors the theme onto the document', dark.themeAttr, 'dark');
+assert('/ the dark theme is remembered for the next visit', dark.themeStored, 'dark');
+assert('/ the dark theme repaints the page', dark.themeSurfaces.page, 'rgb(10, 22, 32)');
+assert('/ the dark theme repaints the cards', dark.themeSurfaces.card, 'rgb(16, 32, 44)');
+assert('/ the dark theme repaints the comparison table', dark.themeSurfaces.table, 'rgb(16, 32, 44)');
+assert('/ the dark theme repaints the translucent header', dark.themeSurfaces.header, 'rgba(10, 22, 32, 0.88)');
+assert('/ the dark theme inverts the text colour', dark.themeInk, 'rgb(230, 240, 247)');
+// the hero and the closing call to action were light gradients: the regression
+// these two guard is a hardcoded #fff slipping back into either of them
+assertContains('/ the dark theme repaints the hero wash', dark.themeSurfaces.heroWash, 'rgb(10, 22, 32)');
+assertContains('/ the dark theme repaints the call to action', dark.themeSurfaces.ctaWash, 'rgb(13, 33, 48)');
+assertTrue('/ the dark hero wash has no light stop left', !dark.themeSurfaces.heroWash.includes('rgb(255, 255, 255)'));
+assertTrue('/ the dark call to action has no light stop left', !dark.themeSurfaces.ctaWash.includes('rgb(255, 255, 255)'));
+assert('/ the dark theme keeps the primary button in the house blue', await page.$eval('.jetz-btn-primary', el => getComputedStyle(el).backgroundImage.includes('rgb(52, 152, 219)')), true);
+assert('/ the dark theme flips the switch label to the opposite action', dark.themeLabel, 'Beralih ke tema terang');
+assert('/ the dark theme flips the tooltip too', dark.themeTitle, 'Tema terang');
+assert('/ the dark theme swaps the glyph to a sun', dark.themeGlyph, '☀');
+
+// the theme has to survive a reload, and it is applied before the first paint
+await page.reload({ waitUntil: 'load' });
+await new Promise(resolve => setTimeout(resolve, 600));
+const reloaded = await themeOf();
+assert('/ the dark theme survives a reload', reloaded.themeClass, true);
+assert('/ the reloaded dark theme still shows the sun', reloaded.themeGlyph, '☀');
+assert('/ the reloaded dark theme still repaints the page', reloaded.themeSurfaces.page, 'rgb(10, 22, 32)');
+
+// back to light, driven from the keyboard this time
+await page.focus('.jetz-theme-toggle');
+await page.keyboard.press('Enter');
+await new Promise(resolve => setTimeout(resolve, 300));
+const keyboarded = await themeOf();
+assert('/ the switch is operable from the keyboard', keyboarded.themeClass, false);
+assert('/ switching back restores the light page', keyboarded.themeSurfaces.page, 'rgb(255, 255, 255)');
+assert('/ switching back remembers the light choice', keyboarded.themeStored, 'light');
+assert('/ switching back shows the moon again', keyboarded.themeGlyph, '☾');
+assert('/ switching back restores the house blue accent', await page.$eval('.jetz-metric-value', el => getComputedStyle(el).color), 'rgb(36, 118, 173)');
+assert('/ the light theme is byte-for-byte the documented colour', keyboarded.themeInk, 'rgb(16, 32, 47)');
 
 // the stress test ships as its own document because it mounts itself into #app
 section('/stress.html: benchmark page');
