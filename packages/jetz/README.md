@@ -5,7 +5,7 @@
 
   <p>
     <a href="https://github.com/devarofi/jetz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-ISC-blue.svg" alt="License: ISC" /></a>
-    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.0.0-emerald.svg" alt="Version 1.0.0" /></a>
+    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.1.1-emerald.svg" alt="Version 1.1.1" /></a>
     <a href="https://github.com/devarofi/jetz/actions"><img src="https://img.shields.io/badge/tests-passing-brightgreen.svg" alt="Tests" /></a>
     <a href="https://rspack.dev"><img src="https://img.shields.io/badge/bundled_with-Rspack-orange.svg" alt="Rspack" /></a>
   </p>
@@ -75,6 +75,11 @@ npm install @daevsoft/jetz
   - [10. Two-Way Data Binding (`bind`)](#10-two-way-data-binding-bind)
   - [11. Reactive Listeners (`listen`)](#11-reactive-listeners-listen)
   - [12. DOM Utilities & Helper Methods](#12-dom-utilities--helper-methods)
+- [Scaling Large Data Sets](#scaling-large-data-sets)
+  - [Shallow Row State (`shallowStateOf`, `rowOf`)](#shallow-row-state-shallowstateof-rowof)
+  - [Untracked Pipeline Reads (`rawOf`)](#untracked-pipeline-reads-rawof)
+  - [Automatic Cleanup Lifecycle](#automatic-cleanup-lifecycle)
+  - [Manual Cleanup (`disposeBindings`)](#manual-cleanup-disposebindings)
 - [From Small UI to Complete Application](#from-small-ui-to-complete-application)
 - [Application Features](#application-features)
   - [Router & Link Navigation](#router--link-navigation)
@@ -159,6 +164,8 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Side-Effects** | `effect(fn)` | Auto-tracking effects with instant execution and disposal cleanup. |
 | **Reactive Lists** | `listOf()`, `sequenceOf()` | Observable arrays with chainable methods (`push`, `remove`, `sort`). |
 | **Keyed Reconciliation** | `loop(list, keyFn, renderFn)` | O(1) DOM element recycling and minimal mutations on array changes. |
+| **Shallow Row State** | `shallowStateOf()`, `rowOf()` | Row-level reactivity for tables: one signal per record instead of one per cell. |
+| **Auto Cleanup Lifecycle** | `loop()` + `disposeBindings()` | Drops subscriptions, computed values and listeners when a row leaves the DOM. |
 | **Conditional UI** | `_if`, `_elseif`, `_else`, `ifElse` | Declarative, reactive conditional rendering without wrapper divs. |
 | **Component Lifecycle** | `onCreate`, `onMount`, `onUpdate`, `onDestroy` | Deterministic setup and teardown for function and class components. |
 | **Two-Way Binding** | `{ bind: state }` | Instant two-way synchronization between input elements and state. |
@@ -407,8 +414,9 @@ Follow this structured guide to master Jetz step by step:
 10. [Two-Way Binding](#10-two-way-data-binding-bind) — Synchronizing form inputs
 11. [Reactive Listeners](#11-reactive-listeners-listen) — Dynamic styling & DOM reactions with `listen`
 12. [DOM Utilities](#12-dom-utilities--helper-methods) — Fluent element manipulation helpers
-13. [Router & Middleware](#router--link-navigation) — Multi-page SPA navigation
-14. [Session Storage](#session-storage-jetzsession-sessionof) — Tab-persistent state
+13. [Scaling Large Data Sets](#scaling-large-data-sets) — Shallow rows and automatic cleanup for big tables
+14. [Router & Middleware](#router--link-navigation) — Multi-page SPA navigation
+15. [Session Storage](#session-storage-jetzsession-sessionof) — Tab-persistent state
 
 ---
 
@@ -723,6 +731,10 @@ effect(() => {
 dispose();
 ```
 
+> An `effect()` created **inside** a `loop()` item is cleaned up for you: the
+> reconciler calls its `dispose()` when that row leaves the DOM. See
+> [Automatic Cleanup Lifecycle](#automatic-cleanup-lifecycle).
+
 ---
 
 ### 6. Reactive Collections (`listOf`, `sequenceOf`)
@@ -810,6 +822,12 @@ With Keys:
 ```
 
 The classic 2-argument form `loop(list, renderFn)` remains available for backward compatibility.
+
+Beyond diffing, `loop()` also owns the **lifecycle** of each item: every
+`effect()`, `computed()`, subscription and listener created while that item
+renders is released when the reconciler drops the view. For very large data sets
+(pair `loop()` with [shallow row state](#shallow-row-state-shallowstateof-rowof))
+see [Scaling Large Data Sets](#scaling-large-data-sets).
 
 ---
 
@@ -1009,6 +1027,248 @@ box.remove();                      // Remove element from DOM
 const header = find("#main-header");      // Returns HTMLElement
 const items = findAll(".list-item");      // Returns Array<HTMLElement>
 ```
+
+## Scaling Large Data Sets
+
+A grid holding tens of thousands of rows puts two separate pressures on the
+reactive engine: **how much memory each record costs**, and **who releases a row
+once it leaves the screen**. Jetz addresses both.
+
+### Shallow Row State (`shallowStateOf`, `rowOf`)
+
+`stateOf(object)` walks the object and turns **every property** into its own
+reactive `State`. For a 12-column row that is 12 `State` instances before you
+even add `computed()` columns, and you pay for all 50 000 rows — including the
+49 500 that are off-screen.
+
+`rowOf(object)` (alias: `shallowStateOf()`) keeps the record as a plain object
+and gives it **one** version signal:
+
+```javascript
+import { computed, listOf, loop, rowOf } from "jetz";
+import { table, tbody, tr, td, button } from "jetz/ui";
+
+// One signal per row, not one per cell
+const employees = listOf(
+  rowOf({ id: 1, name: "Alice", dept: "Engineering", score: 92 }),
+  rowOf({ id: 2, name: "Bob", dept: "Design", score: 78 })
+);
+
+const grid = table(
+  tbody(loop(employees, emp => emp.id, emp => tr(
+    td(emp.name),                          // immutable column: read once, free
+    td({ class: () => emp.dept }),         // reactive: re-read on every bump
+    td(computed(() => emp.score)),         // reactive: recomputes on every bump
+    td(button("+1", {
+      onclick: () => { emp.score = emp.score + 1; } // one write, one row refresh
+    }))
+  )))
+);
+```
+
+**Result:** clicking **+1** sets `emp.score = 93`, which bumps that row's single
+version signal. Only that one `<tr>` re-renders; the sibling row and the rest of
+the grid are untouched, and no property-per-`State` object was ever allocated.
+
+#### Which Forms Re-read the Row
+
+A row bump only refreshes the bindings that *tracked* the row, so it matters how
+you read it:
+
+| Form | Re-reads on row bump? | Use for |
+|---|---|---|
+| `td(emp.score)` | no | columns that never change |
+| `td(() => emp.score)` | **no** — a bare function child is called once | function components |
+| `td(computed(() => emp.score))` | yes | mutable text cells |
+| `td({ "data-x": () => emp.score })` | yes | reactive attributes |
+| `td(css\`cell ${() => emp.dept}\`)` | yes | reactive classes |
+| `td({ style: { width: () => emp.score + "px" } })` | yes | reactive styles |
+
+> This is the one rule to remember: a **bare value or bare function child is
+> evaluated once**. Wrap mutable cell text in `computed()` — or move it into an
+> attribute, `class` or `style` — and the row bump reaches it. Immutable columns
+> should stay plain, which is exactly where shallow rows save the most.
+
+| Layout | Reactive objects per row (4 cells) | Heap for 50 000 rows |
+|---|---|---|
+| `stateOf({ ... })` + `computed()` columns | 4 `State` + 4 `computed` per row | baseline |
+| `rowOf({ ... })` | **1 version `State`** per row | **~7x lower** |
+
+Each shallow row carries four helpers:
+
+| Member | Description |
+|---|---|
+| `row.touch()` | Bump the row version (row-level refresh) |
+| `row.set({ patch })` | Merge a patch and bump once |
+| `row.peek(key)` | Read a property **untracked**, like `rawOf()` |
+| `row.toObject()` | Plain, non-reactive copy of the record |
+
+> `rowOf()` falls back to plain `stateOf()` for primitives, arrays and
+> `JetzElement`s, so you can map it over mixed data without branching.
+
+### Untracked Pipeline Reads (`rawOf`)
+
+A tracked read inside a `computed()` or an `effect()` **subscribes** it. That is
+what you want while rendering a cell, and exactly what you do not want in a
+filter/sort pass that walks all 50 000 rows — one read per row would pin the
+pipeline to the whole dataset.
+
+`rawOf(row)` returns the underlying plain object, bypassing the row version
+signal, so the read stays untracked:
+
+```javascript
+import { computed, listOf, loop, rawOf, rowOf, stateOf } from "jetz";
+import { table, tbody, tr, td } from "jetz/ui";
+
+const all = listOf(...fetchEmployees().map(rowOf));   // the full dataset
+const page = stateOf(1);
+const query = stateOf("");
+
+// rawOf() keeps these reads untracked: the pipeline is re-run from scratch on
+// every keystroke, but the reactive graph never gains a dependency per row.
+function visibleRows() {
+  return all
+    .filter(emp => rawOf(emp).name.toLowerCase().includes(query.value.toLowerCase()))
+    .sort((a, b) => rawOf(a).score - rawOf(b).score);
+}
+
+// `computed()` is happy with a primitive - the count of matches:
+const matchCount = computed(() => visibleRows().length);
+
+// For the rows themselves, drive the rendered list instead:
+const employees = listOf(...visibleRows());
+query.subscribe(() => employees.set(visibleRows()));
+
+const grid = table(tbody(loop(employees, emp => emp.id, emp => tr(
+  td(emp.name),                            // immutable column
+  td(computed(() => emp.score))             // mutable column
+))));
+```
+
+**Result:** typing in the filter box re-runs `visibleRows()` over all 50 000
+rows, yet the reactive graph still holds only two subscriptions (`query` and the
+rendered page) instead of one per row per column. `rawOf()` is a no-op on values
+that are not shallow rows, so it is safe to call on mixed data.
+
+> `computed()` should return a primitive. `stateOf()` walks an array/object
+> argument and would rewrite the values handed to it, so derive a count (or any
+> scalar) with `computed()` and push the list itself through `list.set()`.
+
+For a bulk edit, write the plain data first and bump once per row:
+
+```javascript
+import { batch, rawOf, touchRow } from "jetz";
+
+batch(() => {
+  for (const emp of employees.values) {
+    const data = rawOf(emp);   // untracked write target
+    data.score += 1;
+  }
+  for (const emp of employees.values) {
+    touchRow(emp);             // one refresh per row, coalesced by batch()
+  }
+});
+```
+
+### Automatic Cleanup Lifecycle
+
+A rendered view is not just DOM: it also owns `effect()` runs, `computed()`
+dependency subscriptions, state subscriptions, style containers and event
+listeners. If a row is removed while those stay subscribed, the state keeps the
+whole detached `<tr>` subtree reachable — the classic "the grid scrolls for ten
+minutes and the heap keeps climbing" leak.
+
+Jetz gives every `loop()` item its own **disposal scope**. Everything created
+while that item renders registers its teardown there:
+
+```javascript
+import { computed, effect, listOf, loop, rowOf } from "jetz";
+import { table, tbody, tr, td } from "jetz/ui";
+
+const employees = listOf(...fetchEmployees().map(rowOf));
+
+const grid = table(tbody(loop(employees, emp => emp.id, emp => {
+  // created inside the item scope - disposed automatically with the row
+  effect(() => { trackRowInAnalytics(emp.name); });
+
+  return tr(
+    td({ class: () => emp.dept }),
+    td(computed(() => emp.score))
+  );
+})));
+
+// pagination / filter change -> rows are dropped
+employees.set(nextPage);
+```
+
+**Result:** `employees.set(nextPage)` releases, for every removed row:
+
+| Released | How |
+|---|---|
+| `effect()` runs | the effect's own `dispose()` is called |
+| `computed()` values | unsubscribed from all their dependencies |
+| state subscriptions | attribute, `class`, `bind`, style and text bindings |
+| event listeners | `removeEventListener` for every `on*` handler |
+| state containers | text/element nodes and `StyleState` containers detached |
+
+The scope is opened by `loop()` itself, so no extra code is needed for keyed
+removal, item swap under the same key, a full classic refresh, or `removeAt()`.
+Nothing changes for state created outside a `loop()` — it is never registered in
+a scope and keeps living exactly as before.
+
+The same teardown runs wherever a subtree is genuinely dropped: `empty()`,
+`ifElse()` branch swaps, and `Jetz.unmount(container)`.
+
+Measured on the bundled stress test (80 page swaps x 500 rows = 40 000 rows
+rendered, jsdom + `--expose-gc`):
+
+| | Before cleanup | With cleanup lifecycle |
+|---|---|---|
+| Heap growth over the run | 302.68 MB | **15.10 MB** |
+| Row states still pinning a DOM node | 40 500 | **500** |
+
+> Teardown is deliberately **not** wired into `element.remove()`: `_if` / `_else`
+> remove a node only to re-insert the same node later, so releasing bindings
+> there would break them. The reconciler knows which views are really gone.
+
+### Manual Cleanup (`disposeBindings`)
+
+The same routine is public, for the cases the reconciler cannot see — a dialog
+you close yourself, a widget you re-create, a subtree you move elsewhere:
+
+```javascript
+import { Jetz, div, span } from "jetz";
+import { button } from "jetz/ui";
+
+const panel = div(span("Live region"), button("Close", {
+  onclick: () => {
+    panel.disposeBindings(); // subscriptions, computed, listeners, containers
+    panel.remove();          // then detach the node
+  }
+}));
+
+// Or let unmount do both for a whole container:
+Jetz.unmount("#app");
+```
+
+**Result:** after `disposeBindings()` the state no longer writes into the
+detached nodes, and a later `setState()` cannot resurrect them:
+
+```javascript
+const label = stateOf("before");
+const box   = div(span(label));
+Jetz.mount(box, "#app");
+
+box.o.querySelector("span").textContent;   // "before"
+
+box.disposeBindings();
+label.setState("after");
+box.o.querySelector("span").textContent;   // still "before" - no live binding left
+```
+
+`disposeBindings()` is idempotent, so calling it twice is safe.
+
+---
 
 ---
 
@@ -1413,11 +1673,16 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`computed(fn)`](#4-computed-state-computed): Auto-tracked derived state.
 * [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`).
 * [`listen(callback)`](#11-reactive-listeners-listen): Reactive inline listener attached to element.
+* [`shallowStateOf(object)`](#shallow-row-state-shallowstateof-rowof): Row-level record with one shared version signal.
+* [`rowOf(object)`](#shallow-row-state-shallowstateof-rowof): Alias of `shallowStateOf()` tuned for table records.
+* [`rawOf(row)`](#untracked-pipeline-reads-rawof): Untracked read of a shallow row's plain data.
+* [`touchRow(row)`](#untracked-pipeline-reads-rawof): Manually bump a shallow row's version.
 
 ### Collections & Reconciliation
 * [`listOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive array with helper mutation methods.
 * [`sequenceOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive unique sequence array.
-* [`loop(list, keyFn, renderFn)`](#7-keyed-list-reconciliation-loop): Key-reconciled list rendering.
+* [`loop(list, keyFn, renderFn)`](#7-keyed-list-reconciliation-loop): Key-reconciled list rendering; each item gets an automatic disposal scope.
+* [`element.disposeBindings()`](#manual-cleanup-disposebindings): Release every reactive binding of an element and its subtree.
 
 ### Conditional Rendering
 * [`_if(conditionFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Conditional branch render.
