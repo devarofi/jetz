@@ -414,7 +414,9 @@ button(
     // -------------------------------------------------------------------------
 
     const benchmark = {
-        rows: '50.000',
+        // English thousands separator: the old '50.000' spelling reads as "50.0"
+        // to an English reader
+        rows: '50,000',
         // heap after GC with the full dataset resident
         heapMb: 123,
         // the same dataset before the row-level memory work
@@ -437,17 +439,17 @@ button(
         {
             value: `${benchmark.heapMb} MB`,
             label: 'JS Heap Footprint',
-            note: `Penggunaan RAM murni untuk ${benchmark.rows} data reaktif aktif.`
+            note: `Raw RAM usage for ${benchmark.rows} live reactive rows.`
         },
         {
             value: `${benchmark.rowUpdateMs} ms`,
             label: 'Single Row Update Time',
-            note: 'Perubahan state langsung menuju DOM target tanpa diffing.'
+            note: 'State changes go straight to the target DOM node, with no diffing.'
         },
         {
             value: '0%',
             label: 'Memory Leak',
-            note: 'Automatic subscription cleanup saat unmount elemen.'
+            note: 'Automatic subscription cleanup when an element unmounts.'
         }
     ];
 
@@ -489,7 +491,7 @@ button(
     // -------------------------------------------------------------------------
 
     const BENCH_LABELS = {
-        concern: 'Fitur / Metrik',
+        concern: 'Feature / Metric',
         jetz: 'Jetz Framework',
         others: 'Virtual DOM (React-like)'
     };
@@ -1873,7 +1875,7 @@ button(
                     ),
 
                     h2(
-                        'Skala ',
+                        'Scale ',
 
                         span(
                             css`jetz-gradient-text jetz-bench-figure`,
@@ -1881,11 +1883,11 @@ button(
                             benchmark.rows
                         ),
 
-                        ' Data Tanpa Kompromi Memori'
+                        ' Data Without Memory Compromise'
                     ),
 
                     p(
-                        'Didesain dengan arsitektur Fine-Grained Signals murni. Tanpa Virtual DOM overhead, tanpa memory leak, dan super hemat RAM.'
+                        'Built on a pure Fine-Grained Signals architecture. No Virtual DOM overhead, no memory leaks, and extremely RAM-efficient.'
                     )
                 ),
 
@@ -1915,7 +1917,7 @@ button(
                             `${benchmark.heapMb} MB`
                         ),
 
-                        span('JS Heap setelah GC')
+                        span('JS Heap after GC')
                     ),
 
                     div(
@@ -1925,7 +1927,7 @@ button(
                             `${benchmark.savingPercent}%`
                         ),
 
-                        span('Lebih hemat dari versi lama')
+                        span('Lighter than the previous version')
                     ),
 
                     div(
@@ -1935,7 +1937,7 @@ button(
                             `${benchmark.mountPerRowMs} ms`
                         ),
 
-                        span(`Per baris untuk mount ${benchmark.pageSize} baris`)
+                        span(`Per row to mount ${benchmark.pageSize} rows`)
                     ),
 
                     div(
@@ -1945,13 +1947,13 @@ button(
                             benchmark.sweepCycles
                         ),
 
-                        span('Siklus paginasi stabil')
+                        span('Stable pagination cycles')
                     )
                 ),
 
                 p(
                     css`jetz-bench-source`,
-                    `Diukur pada Chrome DevTools dengan stress test ${benchmark.rows} baris reaktif. Footprint ${benchmark.heapMb} MB (post-GC) dibanding ${benchmark.heapBeforeMb.toLocaleString('en-US')} MB sebelum optimasi memori, dengan ${benchmark.detachedNodes} detached DOM element tersisa.`
+                    `Measured in Chrome DevTools against the ${benchmark.rows} reactive row stress test. Footprint of ${benchmark.heapMb} MB (post-GC) versus ${benchmark.heapBeforeMb.toLocaleString('en-US')} MB before the memory work, with ${benchmark.detachedNodes} detached DOM elements left behind.`
                 ),
 
 
@@ -1963,7 +1965,7 @@ button(
                     compareHead(BENCH_LABELS),
 
                     compareRow(
-                        'Arsitektur Reaktivitas',
+                        'Reactivity Architecture',
                         'Fine-Grained Direct DOM',
                         'Virtual DOM Diffing',
                         BENCH_LABELS
@@ -1971,36 +1973,36 @@ button(
 
                     compareRow(
                         'Single Row Update',
-                        `${benchmark.rowUpdateMs} ms (Mendekati Instan)`,
-                        'Membutuhkan re-render komponen (belasan ms)',
+                        `${benchmark.rowUpdateMs} ms (Near Instant)`,
+                        'Requires a component re-render (tens of ms)',
                         BENCH_LABELS
                     ),
 
                     compareRow(
-                        'Pembersihan Memory (Unmount)',
+                        'Memory Cleanup (Unmount)',
                         'Automatic Lifecycle & Subscription Cleanup',
-                        'Bergantung pada Hooks/GC overhead',
+                        'Depends on hooks/GC overhead',
                         BENCH_LABELS
                     ),
 
                     compareRow(
-                        `Footprint Memori (${benchmark.rows} items)`,
-                        `Super Ringan (${benchmark.heapMb} MB)`,
-                        'Tinggi (~300MB - 1GB+)',
+                        `Memory Footprint (${benchmark.rows} items)`,
+                        `Ultra Lightweight (${benchmark.heapMb} MB)`,
+                        'High (~300MB - 1GB+)',
                         BENCH_LABELS
                     ),
 
                     compareRow(
                         'Detached DOM Nodes',
-                        `${benchmark.detachedNodes} - dibersihkan otomatis`,
-                        'Perlu dipantau manual',
+                        `${benchmark.detachedNodes} - cleaned up automatically`,
+                        'Must be watched by hand',
                         BENCH_LABELS
                     ),
 
                     compareRow(
-                        'Stabilitas Sweep',
-                        `Stabil melewati ${benchmark.sweepCycles} siklus`,
-                        'Heap naik seiring pagination',
+                        'Sweep Stability',
+                        `Stable across ${benchmark.sweepCycles} cycles`,
+                        'Heap grows with pagination',
                         BENCH_LABELS
                     )
                 ),
@@ -2017,7 +2019,7 @@ button(
                             href: '/stress.html'
                         },
 
-                        'Coba Stress Test Demo',
+                        'Try the Stress Test Demo',
 
                         span('→')
                     ),
@@ -2030,7 +2032,7 @@ button(
                             rel: 'noreferrer'
                         },
 
-                        'Baca Dokumentasi Reconciler',
+                        'Read the Reconciler Docs',
 
                         span('↗')
                     )
