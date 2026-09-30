@@ -180,6 +180,14 @@ body:has(#welcome-page) {
     --jetz-btn-to: #2476ad;
     --jetz-btn-text: #ffffff;
 
+    /* benchmark chart: the highlighted bar and the muted ones behind it. The
+       others are deliberately desaturated so the eye lands on the Jetz bar, but
+       the muted fill still has to sit clearly above its own track. */
+    --jetz-chart-jetz: #0891b2;
+    --jetz-chart-jetz-soft: #cffafe;
+    --jetz-chart-bar: #9fb0c0;
+    --jetz-chart-track: #e7edf2;
+
     background: var(--jetz-white);
     color: var(--jetz-ink);
 
@@ -1955,6 +1963,223 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
+/* -- performance chart ------------------------------------------------------- */
+
+/* the tab row reuses the code-tab shape, so the two filter strips on the page
+   read as one family rather than two unrelated controls */
+.jetz-chart-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+
+    margin-top: 34px;
+    padding: 10px;
+
+    border: 1px solid var(--jetz-line);
+    border-radius: 12px;
+
+    background: var(--jetz-card-soft);
+}
+
+
+.jetz-chart-tab {
+    padding: 10px 16px;
+
+    border: 0;
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: var(--jetz-muted);
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        color 150ms ease,
+        background 150ms ease;
+}
+
+.jetz-chart-tab:hover {
+    color: var(--jetz-ink);
+
+    background: var(--jetz-card);
+}
+
+.jetz-chart-tab.is-active {
+    background: var(--jetz-invert-bg);
+
+    color: var(--jetz-invert-text);
+}
+
+
+/* the panel is the card the bars sit in; only the active one is ever rendered */
+.jetz-chart-panel {
+    margin-top: 22px;
+
+    padding: 30px 32px;
+
+    border: 1px solid var(--jetz-line);
+    border-radius: 16px;
+
+    background: var(--jetz-card);
+
+    box-shadow: 0 18px 50px rgba(16, 32, 47, 0.05);
+}
+
+
+/* every metric here is a cost, so the axis states the direction that wins */
+.jetz-chart-axis {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+
+    margin-bottom: 24px;
+}
+
+.jetz-chart-axis>strong {
+    color: var(--jetz-ink);
+
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.jetz-chart-axis>span {
+    color: var(--jetz-muted);
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+
+.jetz-chart-bar {
+    margin-top: 18px;
+}
+
+.jetz-chart-bar:first-of-type {
+    margin-top: 0;
+}
+
+
+/* name, badge and value share one line above the track, so a short bar never
+   squeezes the figure out of the row */
+.jetz-chart-bar-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    margin-bottom: 8px;
+}
+
+.jetz-chart-name {
+    color: var(--jetz-ink-soft);
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+/* the highlighted row is the only one with colour, weight and a badge */
+.jetz-chart-bar-jetz .jetz-chart-name {
+    color: var(--jetz-chart-jetz);
+
+    font-weight: 800;
+}
+
+
+.jetz-chart-badge {
+    padding: 3px 8px;
+
+    border-radius: 999px;
+
+    background: var(--jetz-chart-jetz-soft);
+
+    color: var(--jetz-chart-jetz);
+
+    font-size: 9px;
+    font-weight: 800;
+
+    letter-spacing: 0.11em;
+    white-space: nowrap;
+}
+
+
+/* pushed to the right edge so every figure lines up into a readable column */
+.jetz-chart-value {
+    margin-left: auto;
+
+    color: var(--jetz-muted);
+
+    font-size: 13px;
+    font-weight: 700;
+
+    font-variant-numeric: tabular-nums;
+}
+
+.jetz-chart-bar-jetz .jetz-chart-value {
+    color: var(--jetz-chart-jetz);
+    font-weight: 800;
+}
+
+
+.jetz-chart-track {
+    height: 10px;
+
+    border-radius: 999px;
+
+    background: var(--jetz-chart-track);
+
+    overflow: hidden;
+}
+
+.jetz-chart-fill {
+    height: 100%;
+
+    border-radius: 999px;
+
+    background: var(--jetz-chart-bar);
+
+    transition: width 320ms ease;
+}
+
+.jetz-chart-bar-jetz .jetz-chart-fill {
+    background: linear-gradient(90deg,
+            var(--jetz-chart-jetz),
+            var(--jetz-blue));
+}
+
+
+.jetz-chart-method-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    color: var(--jetz-blue-dark) !important;
+
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.jetz-chart-method-link:hover {
+    color: var(--jetz-blue) !important;
+}
+
+.jetz-chart-method-link>span {
+    transition: transform 150ms ease;
+}
+
+.jetz-chart-method-link:hover>span {
+    transform: translateX(3px);
+}
+
+
 /* ============================================================================
    FIT CARDS
    ============================================================================ */
@@ -2103,6 +2328,13 @@ html.jetz-theme-dark body:has(#welcome-page) {
     /* filled surfaces invert */
     --jetz-invert-bg: #e6f0f7;
     --jetz-invert-text: #08161f;
+
+    /* the chart's cyan has to lighten to stay legible on a dark card, and the
+       muted bars have to go darker or they out-shout the highlighted one */
+    --jetz-chart-jetz: #22d3ee;
+    --jetz-chart-jetz-soft: rgba(34, 211, 238, 0.16);
+    --jetz-chart-bar: #33485c;
+    --jetz-chart-track: #16293a;
 }
 
 

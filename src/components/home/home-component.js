@@ -73,6 +73,10 @@ export function Home() {
 
     const activeTab = stateOf('state');
 
+    // which benchmark metric the chart is currently showing. The panels read it
+    // to decide which one renders, so it is the only state the chart needs.
+    const chartMetric = stateOf('update');
+
 
     // -------------------------------------------------------------------------
     // Code examples
@@ -492,6 +496,201 @@ button(
 
 
     // -------------------------------------------------------------------------
+    // Performance chart
+    //
+    // Three measured metrics over the same five frameworks, switchable by the
+    // tabs below. Each metric keeps its own ordered bar list because the ranking
+    // is not the same everywhere - Jetz wins the update metric outright, sits
+    // second on memory, and third on mount time, and the chart has to show that
+    // rather than imply a clean sweep.
+    //
+    // Every metric is "lower is better", so the bars are drawn against the
+    // slowest framework in that metric and read left-to-right as cost.
+    // -------------------------------------------------------------------------
+
+    const JETZ_NAME = 'Jetz Framework';
+
+    const CHART_METRICS = {
+        update: {
+            tab: 'Partial Update Speed (ms)',
+            title: 'Single Row Partial Update Time',
+            bars: [
+                { name: 'SolidJS', value: 0.05, display: '0.05 ms' },
+                { name: JETZ_NAME, value: 0, display: '0.00 ms', jetz: true },
+                { name: 'Svelte 5', value: 0.1, display: '0.10 ms' },
+                { name: 'Vue 3', value: 3.2, display: '3.20 ms' },
+                { name: 'React 19', value: 12.5, display: '12.50 ms' }
+            ]
+        },
+        memory: {
+            tab: 'Memory Footprint (MB)',
+            title: 'Memory Footprint After Garbage Collection',
+            bars: [
+                { name: 'SolidJS', value: 110, display: '110 MB' },
+                { name: JETZ_NAME, value: 123, display: '123 MB', jetz: true },
+                { name: 'Svelte 5', value: 135, display: '135 MB' },
+                { name: 'Vue 3', value: 180, display: '180 MB' },
+                { name: 'React 19', value: 260, display: '260 MB' }
+            ]
+        },
+        mount: {
+            tab: 'DOM Mount Speed (ms)',
+            title: 'Mounting 500 Rows to the DOM',
+            bars: [
+                { name: 'SolidJS', value: 58, display: '58 ms' },
+                { name: 'Svelte 5', value: 65, display: '65 ms' },
+                { name: JETZ_NAME, value: 77, display: '77 ms', jetz: true },
+                { name: 'Vue 3', value: 95, display: '95 ms' },
+                { name: 'React 19', value: 150, display: '150 ms' }
+            ]
+        }
+    };
+
+    // A measured 0.00 ms is a real result, but scaled against 12.50 ms it would
+    // render as nothing at all - and the bar we most want seen is exactly that
+    // one. The fill therefore has a floor, so the fastest framework still shows a
+    // visible sliver. The printed figure is always the true one; only the drawn
+    // length is floored, and the note under the chart says so.
+    const CHART_MIN_FILL = 1.5;
+
+    const chartFill = bars => {
+        const slowest = Math.max(...bars.map(bar => bar.value));
+        return bar => Math.max(CHART_MIN_FILL, (bar.value / slowest) * 100);
+    };
+
+
+    // -------------------------------------------------------------------------
+    // One bar row
+    //
+    // Name and value sit in a flex head above a full-width track, so the printed
+    // figure always sits at the right edge of the row and never competes with a
+    // short bar for space.
+    // -------------------------------------------------------------------------
+
+    const chartBar = (bar, fill) => div(
+        css`jetz-chart-bar${bar.jetz ? ' jetz-chart-bar-jetz' : ''}`,
+
+        div(
+            css`jetz-chart-bar-head`,
+
+            strong(
+                css`jetz-chart-name`,
+                bar.name
+            ),
+
+            // the badge is what makes the highlighted row readable as "yours"
+            ifElse(
+                () => bar.jetz,
+
+                () => small(
+                    css`jetz-chart-badge`,
+                    'YOUR FRAMEWORK'
+                ),
+
+                () => null
+            ),
+
+            span(
+                css`jetz-chart-value`,
+                bar.display
+            )
+        ),
+
+        div(
+            css`jetz-chart-track`,
+
+            div(
+                css`jetz-chart-fill`,
+
+                // data-driven geometry has to be a style callback: a bare width
+                // would be read once and never repaint
+                {
+                    style: {
+                        width: `${fill(bar)}%`
+                    }
+                }
+            )
+        )
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Chart tabs and panels
+    //
+    // The tab list and the panels are declared from the same array, so a metric
+    // can never get a tab without a panel. Only the active panel renders, which
+    // is also why the bar widths can be plain values: an inactive panel is torn
+    // down and rebuilt with its own metric.
+    // -------------------------------------------------------------------------
+
+    const CHART_TABS = [
+        { key: 'update', label: CHART_METRICS.update.tab },
+        { key: 'memory', label: CHART_METRICS.memory.tab },
+        { key: 'mount', label: CHART_METRICS.mount.tab }
+    ];
+
+    const chartTab = (key, label) => ifElse(
+        () => chartMetric.value === key,
+
+        () => button(
+            {
+                class: 'jetz-chart-tab is-active',
+                type: 'button',
+                role: 'tab',
+                'aria-selected': 'true',
+                onclick() {
+                    chartMetric.value = key;
+                }
+            },
+            label
+        ),
+
+        () => button(
+            {
+                class: 'jetz-chart-tab',
+                type: 'button',
+                role: 'tab',
+                'aria-selected': 'false',
+                onclick() {
+                    chartMetric.value = key;
+                }
+            },
+            label
+        )
+    );
+
+    const chartPanel = key => ifElse(
+        () => chartMetric.value === key,
+
+        () => {
+            const metric = CHART_METRICS[key];
+            const fill = chartFill(metric.bars);
+
+            return div(
+                {
+                    class: 'jetz-chart-panel',
+                    role: 'tabpanel'
+                },
+
+                div(
+                    css`jetz-chart-axis`,
+
+                    strong(metric.title),
+
+                    // every metric here is a cost, so the axis says which
+                    // direction wins rather than leaving it to be guessed
+                    span('Lower is better')
+                ),
+
+                ...metric.bars.map(bar => chartBar(bar, fill))
+            );
+        },
+
+        () => null
+    );
+
+
+    // -------------------------------------------------------------------------
     // Page
     // -------------------------------------------------------------------------
 
@@ -571,6 +770,13 @@ button(
                             href: '#benchmark'
                         },
                         'Benchmark'
+                    ),
+
+                    a(
+                        {
+                            href: '#chart'
+                        },
+                        'Chart'
                     ),
 
                     a(
@@ -1828,6 +2034,83 @@ button(
 
                         span('↗')
                     )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // PERFORMANCE CHART
+        // =====================================================================
+
+        section(
+            {
+                id: 'chart',
+                class: 'jetz-section'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                // -- header ----------------------------------------------------
+
+                div(
+                    css`jetz-section-heading text-center`,
+
+                    div(
+                        css`jetz-eyebrow`,
+
+                        span(
+                            css`jetz-eyebrow-dot`
+                        ),
+
+                        'BENCHMARK & SPEED SPECTRUM'
+                    ),
+
+                    h2('Performa Kelas Atas Tanpa Virtual DOM Overhead'),
+
+                    p(
+                        'Lihat bagaimana arsitektur Fine-Grained Direct DOM Jetz mengungguli framework berbasis Virtual DOM dalam kecepatan dan efisiensi memori.'
+                    )
+                ),
+
+
+                // -- metric tabs ------------------------------------------------
+
+                div(
+                    {
+                        class: 'jetz-chart-tabs',
+                        role: 'tablist'
+                    },
+
+                    ...CHART_TABS.map(tab => chartTab(tab.key, tab.label))
+                ),
+
+
+                // -- the bars ---------------------------------------------------
+
+                ...CHART_TABS.map(tab => chartPanel(tab.key)),
+
+
+                // -- methodology ----------------------------------------------
+
+                p(
+                    css`jetz-bench-source`,
+
+                    '* Dites menggunakan Chrome DevTools pada Intel i7/M-Series, 50.000 dataset reaktif, 500 baris DOM aktif. Benchmark dilakukan setelah memicu Garbage Collector (Post-GC). Panjang bar diskalakan terhadap framework terlambat di tiap metrik, dengan lebar minimum agar hasil 0.00 ms tetap terlihat.'
+                ),
+
+                a(
+                    {
+                        class: 'jetz-chart-method-link',
+                        href: '/stress.html'
+                    },
+
+                    'Lihat Methodologi & Stress Test Interactive Demo',
+
+                    span('→')
                 )
             )
         ),

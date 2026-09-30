@@ -246,6 +246,79 @@ assert('/ home sends the primary CTA to the stress test', await page.$eval('#ben
 assert('/ home points the secondary CTA at the reconciler docs', await page.$eval('#benchmark .jetz-btn-secondary', el => el.getAttribute('href')), 'https://github.com/devarofi/jetz#7-keyed-list-reconciliation-loop');
 assertTrue('/ home never renders a placeholder benchmark value', !(await page.$eval('#benchmark', el => el.textContent)).includes('[object Object]'));
 
+// --- the performance chart answers "how fast, really?" ----------------------
+section('/: performance chart section');
+assert('/ home renders the chart section', await page.$eval('#chart', el => el.classList.contains('jetz-section')), true);
+assert('/ home badges the chart as a speed spectrum', (await page.$eval('#chart .jetz-eyebrow', el => el.textContent.trim())), 'BENCHMARK & SPEED SPECTRUM');
+assert('/ home headlines the chart on the no-overhead claim', (await page.$eval('#chart h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Performa Kelas Atas Tanpa Virtual DOM Overhead');
+assertTrue('/ home subheads the chart with the fine-grained claim', (await page.$eval('#chart .jetz-section-heading p', el => el.textContent)).includes('Fine-Grained Direct DOM'));
+assert('/ home offers three metric tabs', await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.length), 3);
+assert('/ home labels every metric tab', (await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.map(tab => tab.textContent.trim()).join('|'))), 'Partial Update Speed (ms)|Memory Footprint (MB)|DOM Mount Speed (ms)');
+assert('/ home marks one metric tab as selected by default', await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.filter(tab => tab.getAttribute('aria-selected') === 'true').length), 1);
+assert('/ home marks the first metric tab active by default', await page.$eval('#chart .jetz-chart-tab', tab => tab.classList.contains('is-active')), true);
+// only the active panel is in the DOM, so the bars can never disagree with the tab
+assert('/ home renders exactly one chart panel at a time', await page.$$eval('#chart .jetz-chart-panel', panels => panels.length), 1);
+assert('/ home titles the default metric panel', (await page.$eval('#chart .jetz-chart-panel .jetz-chart-axis strong', el => el.textContent)), 'Single Row Partial Update Time');
+// "lower is better" is stated, because a shorter bar winning is otherwise ambiguous
+assert('/ home states the direction that wins', (await page.$eval('#chart .jetz-chart-axis span', el => el.textContent)), 'Lower is better');
+assert('/ home draws one bar per framework', await page.$$eval('#chart .jetz-chart-bar', bars => bars.length), 5);
+assert('/ home names every framework on the default metric', (await page.$$eval('#chart .jetz-chart-name', els => els.map(el => el.textContent).join('|'))), 'SolidJS|Jetz Framework|Svelte 5|Vue 3|React 19');
+assert('/ home prints the update figures', (await page.$$eval('#chart .jetz-chart-value', els => els.map(el => el.textContent).join('|'))), '0.05 ms|0.00 ms|0.10 ms|3.20 ms|12.50 ms');
+assert('/ home badges exactly the Jetz bar', (await page.$$eval('#chart .jetz-chart-badge', els => els.map(el => el.textContent).join('|'))), 'YOUR FRAMEWORK');
+assert('/ home highlights only the Jetz bar', await page.$$eval('#chart .jetz-chart-bar', bars => bars.filter(bar => bar.classList.contains('jetz-chart-bar-jetz')).length), 1);
+assert('/ home colours the Jetz bar in the house cyan', await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-name', el => getComputedStyle(el).color), 'rgb(8, 145, 178)');
+assert('/ home mutes the competing bars', await page.$eval('#chart .jetz-chart-bar:not(.jetz-chart-bar-jetz) .jetz-chart-name', el => getComputedStyle(el).color), 'rgb(36, 59, 83)');
+// the fastest result is 0.00 ms, so the fill has a floor or the bar would vanish
+assertTrue('/ home keeps the 0.00 ms Jetz bar visible', parseFloat(await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-fill', el => el.style.width)) > 0);
+assert('/ home scales the slowest bar to full width', await page.$eval('#chart .jetz-chart-bar:last-child .jetz-chart-fill', el => el.style.width), '100%');
+assertTrue('/ home cites the methodology under the chart', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).includes('Intel i7/M-Series'));
+assertTrue('/ home discloses the post-GC condition', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).includes('Post-GC'));
+assert('/ home links the chart to the stress test', await page.$eval('#chart .jetz-chart-method-link', el => el.getAttribute('href')), '/stress.html');
+assertTrue('/ home names the methodology link', (await page.$eval('#chart .jetz-chart-method-link', el => el.textContent)).includes('Methodologi'));
+assertTrue('/ home never renders a placeholder chart value', !(await page.$eval('#chart', el => el.textContent)).includes('[object Object]'));
+assertTrue('/ home points the Chart nav link at the section', (await page.$eval('.jetz-nav a[href="#chart"]', el => el.textContent)) === 'Chart');
+
+// switching tabs swaps the whole panel, values and bar order included
+const switchTo = async label => {
+	await page.evaluate(text => [...document.querySelectorAll('#chart .jetz-chart-tab')]
+		.find(tab => tab.textContent.trim() === text).click(), label);
+	await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+	return page.evaluate(() => ({
+		title: document.querySelector('#chart .jetz-chart-panel .jetz-chart-axis strong').textContent,
+		names: [...document.querySelectorAll('#chart .jetz-chart-name')].map(el => el.textContent).join('|'),
+		values: [...document.querySelectorAll('#chart .jetz-chart-value')].map(el => el.textContent).join('|'),
+		panels: document.querySelectorAll('#chart .jetz-chart-panel').length,
+		selected: [...document.querySelectorAll('#chart .jetz-chart-tab')].filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.textContent.trim()).join('|'),
+		widths: [...document.querySelectorAll('#chart .jetz-chart-fill')].map(el => el.style.width).join('|')
+	}));
+};
+
+const memory = await switchTo('Memory Footprint (MB)');
+assert('/ home switches the chart to the memory metric', memory.title, 'Memory Footprint After Garbage Collection');
+assert('/ home prints the memory figures', memory.values, '110 MB|123 MB|135 MB|180 MB|260 MB');
+assert('/ home keeps the memory bar order', memory.names, 'SolidJS|Jetz Framework|Svelte 5|Vue 3|React 19');
+assert('/ home still shows one panel after switching', memory.panels, 1);
+assert('/ home moves the selected tab with the panel', memory.selected, 'Memory Footprint (MB)');
+
+const mount = await switchTo('DOM Mount Speed (ms)');
+assert('/ home switches the chart to the mount metric', mount.title, 'Mounting 500 Rows to the DOM');
+assert('/ home prints the mount figures', mount.values, '58 ms|65 ms|77 ms|95 ms|150 ms');
+// on this metric Jetz is third, so the rendered order has to actually change
+assert('/ home re-ranks the bars for the mount metric', mount.names, 'SolidJS|Svelte 5|Jetz Framework|Vue 3|React 19');
+assert('/ home repaints the bars on every switch', mount.widths !== memory.widths, true);
+assert('/ home keeps the Jetz bar highlighted across switches', await page.$$eval('#chart .jetz-chart-bar-jetz .jetz-chart-value', els => els.map(el => el.textContent).join('|')), '77 ms');
+
+// the chart follows the theme like everything else on the page
+const chartThemed = await page.evaluate(() => {
+	document.documentElement.classList.add('jetz-theme-dark');
+	const read = () => getComputedStyle(document.querySelector('#chart .jetz-chart-bar-jetz .jetz-chart-name')).color;
+	const dark = read();
+	document.documentElement.classList.remove('jetz-theme-dark');
+	return { dark, light: read() };
+});
+assert('/ home lightens the chart accent in the dark theme', chartThemed.dark, 'rgb(34, 211, 238)');
+assert('/ home restores the chart accent in the light theme', chartThemed.light, 'rgb(8, 145, 178)');
+
 // --- the dark theme ----------------------------------------------------------
 // The whole page is styled from the --jetz-* tokens, so a theme switch is one
 // class on <html>. These assert the class flips, the tokens actually repaint
