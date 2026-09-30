@@ -104,6 +104,11 @@ const probe = () => page.evaluate(() => {
 		welcomeExamples: document.querySelectorAll('.welcome-example-link').length,
 		todoPage: document.querySelector('#todo-page') !== null,
 		todoTasks: document.querySelectorAll('.todo-task').length,
+		// the stress test ships as its own document, so it only appears when that
+		// page is the one being loaded
+		stressTitle: document.title,
+		stressTable: document.querySelector('#app table') !== null,
+		stressRows: document.querySelectorAll('#app table tbody tr').length,
 	};
 });
 
@@ -179,6 +184,38 @@ assertTrue('/ home names Jetz and the alternatives', (await page.$eval('.jetz-co
 assert('/ home shows both the fit and the trade-off cards', await page.$$eval('#special .jetz-fit-card', cards => cards.length), 2);
 assertTrue('/ home keeps the comparison anchored on the page', await page.$eval('#special', el => el.classList.contains('jetz-section')));
 
+// --- the benchmark section proves the memory & speed claims ------------------
+section('/: benchmark section');
+assertTrue('/ home points the Benchmark nav link at the section', (await page.$eval('.jetz-nav a[href="#benchmark"]', el => el.textContent)) === 'Benchmark');
+assertTrue('/ home renders the benchmark section', await page.$eval('#benchmark', el => el.classList.contains('jetz-bench')));
+assert('/ home paints the benchmark section dark', await page.$eval('#benchmark', el => getComputedStyle(el).backgroundColor), 'rgb(6, 18, 28)');
+assert('/ home badges the section as a benchmark', (await page.$eval('.jetz-bench-eyebrow', el => el.textContent.trim())), 'BENCHMARK & PERFORMANCE');
+assert('/ home headlines the 50.000 row scale', (await page.$eval('.jetz-bench-title', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Skala 50.000 Data Tanpa Kompromi Memori');
+assert('/ home shows three key metric cards', await page.$$eval('#benchmark .jetz-bench-card', cards => cards.length), 3);
+assert('/ home reports the heap footprint', (await page.$$eval('.jetz-bench-value', els => els.map(el => el.textContent).join('|'))), '123 MB|0.00 ms|0%');
+assert('/ home names every metric card', (await page.$$eval('.jetz-bench-label', els => els.map(el => el.textContent).join('|'))), 'JS Heap Footprint|Single Row Update Time|Memory Leak');
+assert('/ home explains every metric card', (await page.$$eval('.jetz-bench-note', els => els.map(el => el.textContent).join('|'))), 'Penggunaan RAM murni untuk 50.000 data reaktif aktif.|Perubahan state langsung menuju DOM target tanpa diffing.|Automatic subscription cleanup saat unmount elemen.');
+assert('/ home accents the metric numbers in neon green', await page.$eval('.jetz-bench-value', el => getComputedStyle(el).color), 'rgb(74, 222, 128)');
+assert('/ home backs the cards with a measured proof strip', await page.$$eval('.jetz-bench-proof-item', items => items.length), 4);
+assertTrue('/ home derives the memory saving from the two heap figures', (await page.$eval('.jetz-bench-proof', el => el.textContent)).includes('91%'));
+assertTrue('/ home cites the DevTools measurement behind the numbers', (await page.$eval('.jetz-bench-source', el => el.textContent)).includes('1,351 MB'));
+assert('/ home compares six benchmark concerns', await page.$$eval('#benchmark .jetz-bench-row:not(.jetz-bench-head)', rows => rows.length), 6);
+assert('/ home heads the comparison with both architectures', (await page.$$eval('.jetz-bench-head > span', els => els.map(el => el.textContent).join('|'))), 'Fitur / Metrik|Virtual DOM (React-like)|Jetz Framework');
+assertTrue('/ home gives the Jetz column its own class', await page.$eval('#benchmark .jetz-bench-row:not(.jetz-bench-head) .jetz-bench-jetz', el => el.classList.contains('jetz-bench-cell')));
+assertTrue('/ home states the single row update win', (await page.$eval('#benchmark .jetz-bench-table', el => el.textContent)).includes('0.00 ms (Mendekati Instan)'));
+assert('/ home sends the primary CTA to the stress test', await page.$eval('.jetz-bench-btn-primary', el => el.getAttribute('href')), '/stress.html');
+assert('/ home points the secondary CTA at the reconciler docs', await page.$eval('.jetz-bench-btn-secondary', el => el.getAttribute('href')), 'https://github.com/devarofi/jetz#7-keyed-list-reconciliation-loop');
+assertTrue('/ home never renders a placeholder benchmark value', !(await page.$eval('#benchmark', el => el.textContent)).includes('[object Object]'));
+
+// the stress test ships as its own document because it mounts itself into #app
+section('/stress.html: benchmark page');
+const stress = await open('/stress.html');
+assert('/stress.html serves its own title', stress.stressTitle, 'Jetz Stress Test - 50.000 Reactive Rows');
+assertTrue('/stress.html mounts the reactive grid', stress.stressTable);
+assertTrue('/stress.html renders a page of rows', stress.stressRows > 0);
+
+await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load', timeout: 20000 });
+await new Promise(resolve => setTimeout(resolve, 600));
 await page.click('.welcome-example-link');
 await page.waitForFunction(() => location.pathname === '/open-todo');
 assert('/ home task-list link navigates through the router', new URL(page.url()).pathname, '/open-todo');

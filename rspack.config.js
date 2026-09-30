@@ -7,9 +7,16 @@ export default (env, argv) => {
     const isProd = argv.mode === 'production';
     return {
         mode: isProd ? 'production' : 'development',
-        entry: './index.js',
+        // Two entries: the routed app, plus the stress test. The stress test is a
+        // self-mounting benchmark page (it mounts itself into #app and measures
+        // its own timings), so it ships as its own document instead of a route -
+        // mounting it through the router would double-render it into #app.
+        entry: {
+            main: './index.js',
+            stress: './src/components/stress/stress-test.js'
+        },
         output: {
-            filename: isProd ? '[name].bundle.js' : 'bundle.js',
+            filename: '[name].bundle.js',
             path: path.resolve(__dirname, 'dist')
         },
         devtool: isProd ? false : 'inline-source-map',
@@ -53,7 +60,14 @@ export default (env, argv) => {
         },
         plugins: [
             new HtmlWebpackPlugin({
-                template: './public/index.html'
+                template: './public/index.html',
+                chunks: ['main']
+            }),
+            new HtmlWebpackPlugin({
+                template: './public/stress.html',
+                filename: 'stress.html',
+                chunks: ['stress'],
+                inject: 'body'
             })
         ],
         devServer: {

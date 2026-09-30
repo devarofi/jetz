@@ -1804,8 +1804,385 @@ div#app:has(#welcome-page)>main>footer {
 
 
 /* ============================================================================
+   BENCHMARK & PERFORMANCE
+   ============================================================================ */
+
+/* Dark tech panel: the one section that leaves the light rhythm of the page so
+   the numbers read like an instrument readout rather than marketing copy. */
+.jetz-bench {
+    position: relative;
+
+    background:
+        radial-gradient(circle at 12% 0%,
+            rgba(34, 197, 94, 0.16),
+            transparent 38%),
+        radial-gradient(circle at 88% 12%,
+            rgba(52, 152, 219, 0.16),
+            transparent 42%),
+        #06121c;
+
+    color: #d7e6f0;
+}
+
+
+/* a faint grid keeps the dark panel from reading as a flat block */
+.jetz-bench::before {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+
+    background-image:
+        linear-gradient(rgba(120, 200, 160, 0.05) 1px,
+            transparent 1px),
+        linear-gradient(90deg,
+            rgba(120, 200, 160, 0.05) 1px,
+            transparent 1px);
+
+    background-size: 52px 52px;
+
+    pointer-events: none;
+}
+
+
+.jetz-bench>.container {
+    position: relative;
+}
+
+
+.jetz-bench-eyebrow {
+    color: #4ade80;
+}
+
+
+.jetz-bench-pulse {
+    width: 8px;
+    height: 8px;
+
+    border-radius: 50%;
+
+    background: #4ade80;
+
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.65);
+
+    animation: jetz-bench-pulse 2.2s infinite;
+}
+
+
+@keyframes jetz-bench-pulse {
+    70% {
+        box-shadow: 0 0 0 12px rgba(74, 222, 128, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+    }
+}
+
+
+.jetz-bench-title {
+    color: #f2fbf6 !important;
+
+    text-shadow: 0 0 34px rgba(74, 222, 128, 0.18);
+}
+
+
+/* the headline number is its own text node, so it gets the neon treatment
+   without turning the sentence into markup */
+.jetz-bench-title>span,
+.jetz-bench-title>em {
+    color: #4ade80;
+}
+
+
+.jetz-bench-subtitle {
+    max-width: 760px;
+
+    margin-inline: auto;
+
+    color: #8fb0c4;
+}
+
+
+/* -- metric cards ---------------------------------------------------------- */
+
+.jetz-bench-metrics {
+    display: grid;
+
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+}
+
+
+.jetz-bench-card {
+    height: 100%;
+
+    padding: 30px 28px;
+
+    border: 1px solid rgba(74, 222, 128, 0.22);
+    border-radius: 16px;
+
+    background:
+        linear-gradient(180deg,
+            rgba(74, 222, 128, 0.07),
+            rgba(6, 18, 28, 0.4));
+
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+
+.jetz-bench-value {
+    display: block;
+
+    color: #4ade80;
+
+    font-size: clamp(2.4rem, 4.5vw, 3.4rem);
+    font-weight: 800;
+    line-height: 1;
+
+    letter-spacing: -0.02em;
+
+    text-shadow: 0 0 28px rgba(74, 222, 128, 0.35);
+}
+
+
+.jetz-bench-label {
+    display: block;
+
+    margin-top: 16px;
+
+    color: #e6f6ee;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    letter-spacing: 0.13em;
+
+    text-transform: uppercase;
+}
+
+
+.jetz-bench-note {
+    margin: 10px 0 0;
+
+    color: #8fb0c4;
+
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+
+/* -- measured proof strip --------------------------------------------------- */
+
+.jetz-bench-proof {
+    display: grid;
+
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+
+    margin-top: 26px;
+
+    padding: 22px 26px;
+
+    border: 1px solid rgba(120, 200, 160, 0.16);
+    border-radius: 14px;
+
+    background: rgba(4, 12, 20, 0.55);
+}
+
+
+.jetz-bench-proof-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+
+.jetz-bench-proof-item>strong {
+    color: #4ade80;
+
+    font-size: 22px;
+    font-weight: 800;
+}
+
+
+.jetz-bench-proof-item>span {
+    color: #7f9db1;
+
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+
+.jetz-bench-source {
+    margin: 16px 0 0;
+
+    color: #6f8ea3;
+
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+
+/* -- comparison table ------------------------------------------------------- */
+
+.jetz-bench-table {
+    overflow: hidden;
+
+    margin-top: 30px;
+
+    border: 1px solid rgba(120, 200, 160, 0.18);
+    border-radius: 15px;
+
+    background: rgba(4, 12, 20, 0.5);
+}
+
+
+.jetz-bench-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
+}
+
+
+.jetz-bench-row+.jetz-bench-row {
+    border-top: 1px solid rgba(120, 200, 160, 0.12);
+}
+
+
+.jetz-bench-row>* {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    padding: 17px 22px;
+}
+
+
+.jetz-bench-row>*+* {
+    border-left: 1px solid rgba(120, 200, 160, 0.12);
+}
+
+
+.jetz-bench-head {
+    background: rgba(74, 222, 128, 0.08);
+}
+
+
+.jetz-bench-head>span {
+    color: #4ade80;
+
+    font-size: 11px;
+    font-weight: 800;
+
+    letter-spacing: 0.13em;
+
+    text-transform: uppercase;
+}
+
+
+.jetz-bench-concern {
+    color: #e6f6ee;
+
+    font-size: 13px;
+    font-weight: 800;
+}
+
+
+.jetz-bench-cell {
+    color: #8fb0c4;
+
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+
+/* the Jetz column is the one that gets the glow */
+.jetz-bench-jetz {
+    background: rgba(74, 222, 128, 0.06);
+
+    color: #dff7e9;
+    font-weight: 600;
+}
+
+
+/* hidden on wide screens; each cell carries its own label on narrow ones */
+.jetz-bench-tag {
+    display: none;
+
+    color: #4ade80;
+
+    font-size: 10px;
+    font-weight: 800;
+
+    letter-spacing: 0.13em;
+
+    text-transform: uppercase;
+}
+
+
+.jetz-bench-vdom .jetz-bench-tag {
+    color: #7f9db1;
+}
+
+
+/* -- call to action --------------------------------------------------------- */
+
+.jetz-bench-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+
+    margin-top: 34px;
+}
+
+
+.jetz-bench-btn-primary {
+    background: #22c55e !important;
+
+    color: #052e16 !important;
+
+    font-weight: 800;
+
+    box-shadow: 0 12px 34px rgba(34, 197, 94, 0.3);
+}
+
+
+.jetz-bench-btn-primary:hover {
+    background: #4ade80 !important;
+}
+
+
+.jetz-bench-btn-secondary {
+    border-color: rgba(74, 222, 128, 0.4) !important;
+
+    background: transparent;
+
+    color: #9fe9bd !important;
+}
+
+
+.jetz-bench-btn-secondary:hover {
+    border-color: #4ade80 !important;
+
+    background: rgba(74, 222, 128, 0.1) !important;
+}
+
+
+/* ============================================================================
    FIT CARDS
    ============================================================================ */
+
+.jetz-fit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+
+    margin-top: 26px;
+}
+
+
 
 .jetz-fit-grid {
     display: grid;
@@ -1898,6 +2275,11 @@ div#app:has(#welcome-page)>main>footer {
     }
 
 
+    .jetz-bench-proof {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+
     .jetz-step-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1940,8 +2322,42 @@ div#app:has(#welcome-page)>main>footer {
     .jetz-card-grid,
     .jetz-step-grid,
     .jetz-example-grid,
-    .jetz-fit-grid {
+    .jetz-fit-grid,
+    .jetz-bench-metrics {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+
+    .jetz-bench-proof {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+
+    /* the column headers would repeat the per-cell labels, so they are hidden
+       and each cell shows its own tag instead - same rule as the compare table */
+    .jetz-bench-head {
+        display: none;
+    }
+
+
+    .jetz-bench-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+
+    .jetz-bench-row>* {
+        padding: 16px 18px;
+    }
+
+
+    .jetz-bench-row>*+* {
+        border-left: 0;
+        border-top: 1px solid rgba(120, 200, 160, 0.12);
+    }
+
+
+    .jetz-bench-tag {
+        display: block;
     }
 
 

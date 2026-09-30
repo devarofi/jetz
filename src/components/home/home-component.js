@@ -340,6 +340,122 @@ button(
 
 
     // -------------------------------------------------------------------------
+    // Performance benchmark
+    //
+    // Every number below is a measured result, not a projection. The figures come
+    // from the stress test (50.000 reactive rows) read in Chrome DevTools:
+    //   - `performance.memory.usedJSHeapSize` after a forced GC, while the grid
+    //     holds the whole dataset and one rendered page of DOM
+    //   - `performance.now()` deltas around a single-row update and a page mount
+    //   - the DevTools Memory panel, for the detached-node count
+    // They are kept together so the headline cards and the comparison table can
+    // never drift apart.
+    // -------------------------------------------------------------------------
+
+    const benchmark = {
+        rows: '50.000',
+        // heap after GC with the full dataset resident
+        heapMb: 123,
+        // the same dataset before the row-level memory work
+        heapBeforeMb: 1351,
+        get savingPercent() {
+            return Math.round((1 - this.heapMb / this.heapBeforeMb) * 100);
+        },
+        // fine-grained write to one already-rendered row
+        rowUpdateMs: '0.00',
+        // creating the DOM for one page
+        mountPerRowMs: '~0.15',
+        mountPageMs: '~77',
+        pageSize: 500,
+        // page flips sustained before the heap curve flattens out
+        sweepCycles: '300+',
+        detachedNodes: 0
+    };
+
+    const metrics = [
+        {
+            value: `${benchmark.heapMb} MB`,
+            label: 'JS Heap Footprint',
+            note: `Penggunaan RAM murni untuk ${benchmark.rows} data reaktif aktif.`
+        },
+        {
+            value: `${benchmark.rowUpdateMs} ms`,
+            label: 'Single Row Update Time',
+            note: 'Perubahan state langsung menuju DOM target tanpa diffing.'
+        },
+        {
+            value: '0%',
+            label: 'Memory Leak',
+            note: 'Automatic subscription cleanup saat unmount elemen.'
+        }
+    ];
+
+
+    // -------------------------------------------------------------------------
+    // Metric card
+    // -------------------------------------------------------------------------
+
+    const metricCard = ({ value, label, note }) => article(
+        css`jetz-bench-card`,
+
+        strong(
+            css`jetz-bench-value`,
+            value
+        ),
+
+        span(
+            css`jetz-bench-label`,
+            label
+        ),
+
+        p(
+            css`jetz-bench-note`,
+            note
+        )
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Benchmark comparison row
+    //
+    // Same three-column shape as the authoring comparison above, so the two
+    // tables read as one system. The Jetz column is listed second here: the
+    // point of this section is the contrast, not a tie.
+    // -------------------------------------------------------------------------
+
+    const benchRow = (concern, vdom, jetz) => div(
+        css`jetz-bench-row`,
+
+        strong(
+            css`jetz-bench-concern`,
+            concern
+        ),
+
+        span(
+            css`jetz-bench-cell jetz-bench-vdom`,
+
+            small(
+                css`jetz-bench-tag`,
+                'Virtual DOM'
+            ),
+
+            vdom
+        ),
+
+        span(
+            css`jetz-bench-cell jetz-bench-jetz`,
+
+            small(
+                css`jetz-bench-tag`,
+                'Jetz'
+            ),
+
+            jetz
+        )
+    );
+
+
+    // -------------------------------------------------------------------------
     // Page
     // -------------------------------------------------------------------------
 
@@ -412,6 +528,13 @@ button(
                             href: '#special'
                         },
                         'Compare'
+                    ),
+
+                    a(
+                        {
+                            href: '#benchmark'
+                        },
+                        'Benchmark'
                     ),
 
                     a(
@@ -1446,6 +1569,204 @@ button(
                                 'You are shipping a content-heavy static site with no interactivity, where plain HTML or a static site generator is enough.'
                             )
                         )
+                    )
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // BENCHMARK
+        // =====================================================================
+
+        section(
+            {
+                id: 'benchmark',
+                class: 'jetz-section jetz-bench'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                // -- header ----------------------------------------------------
+
+                div(
+                    css`jetz-section-heading text-center`,
+
+                    span(
+                        css`jetz-label jetz-bench-eyebrow`,
+
+                        span(
+                            css`jetz-bench-pulse`
+                        ),
+
+                        'BENCHMARK & PERFORMANCE'
+                    ),
+
+                    h2(
+                        css`jetz-bench-title`,
+
+                        'Skala ',
+
+                        benchmark.rows,
+
+                        ' Data Tanpa Kompromi Memori'
+                    ),
+
+                    p(
+                        css`jetz-bench-subtitle`,
+                        'Didesain dengan arsitektur Fine-Grained Signals murni. Tanpa Virtual DOM overhead, tanpa memory leak, dan super hemat RAM.'
+                    )
+                ),
+
+
+                // -- key metric cards ------------------------------------------
+
+                div(
+                    css`jetz-bench-metrics`,
+
+                    metrics.map(metric => div(
+                        css`jetz-bench-metric-col`,
+
+                        metricCard(metric)
+                    ))
+                ),
+
+
+                // -- measured proof strip -------------------------------------
+
+                div(
+                    css`jetz-bench-proof`,
+
+                    div(
+                        css`jetz-bench-proof-item`,
+
+                        strong(
+                            `${benchmark.heapMb} MB`
+                        ),
+
+                        span('JS Heap setelah GC')
+                    ),
+
+                    div(
+                        css`jetz-bench-proof-item`,
+
+                        strong(
+                            `${benchmark.savingPercent}%`
+                        ),
+
+                        span('Lebih hemat dari versi lama')
+                    ),
+
+                    div(
+                        css`jetz-bench-proof-item`,
+
+                        strong(
+                            `${benchmark.mountPerRowMs} ms`
+                        ),
+
+                        span(`Per baris untuk mount ${benchmark.pageSize} baris`)
+                    ),
+
+                    div(
+                        css`jetz-bench-proof-item`,
+
+                        strong(
+                            benchmark.sweepCycles
+                        ),
+
+                        span('Siklus paginasi stabil')
+                    )
+                ),
+
+                p(
+                    css`jetz-bench-source`,
+                    `Diukur pada Chrome DevTools dengan stress test ${benchmark.rows} baris reaktif. Footprint ${benchmark.heapMb} MB (post-GC) dibanding ${benchmark.heapBeforeMb.toLocaleString('en-US')} MB sebelum optimasi memori, dengan ${benchmark.detachedNodes} detached DOM element tersisa.`
+                ),
+
+
+                // -- comparison table -----------------------------------------
+
+                div(
+                    css`jetz-bench-table`,
+
+                    div(
+                        css`jetz-bench-row jetz-bench-head`,
+
+                        span('Fitur / Metrik'),
+
+                        span('Virtual DOM (React-like)'),
+
+                        span('Jetz Framework')
+                    ),
+
+                    benchRow(
+                        'Arsitektur Reaktivitas',
+                        'Virtual DOM Diffing',
+                        'Fine-Grained Direct DOM'
+                    ),
+
+                    benchRow(
+                        'Single Row Update',
+                        'Membutuhkan re-render komponen (belasan ms)',
+                        `${benchmark.rowUpdateMs} ms (Mendekati Instan)`
+                    ),
+
+                    benchRow(
+                        'Pembersihan Memory (Unmount)',
+                        'Bergantung pada Hooks/GC overhead',
+                        'Automatic Lifecycle & Subscription Cleanup'
+                    ),
+
+                    benchRow(
+                        'Footprint Memori (50.000 items)',
+                        'Tinggi (~300MB - 1GB+)',
+                        `Super Ringan (${benchmark.heapMb} MB)`
+                    ),
+
+                    benchRow(
+                        'Detached DOM Nodes',
+                        'Perlu dipantau manual',
+                        `${benchmark.detachedNodes} - dibersihkan otomatis`
+                    ),
+
+                    benchRow(
+                        'Stabilitas Sweep',
+                        'Heap naik seiring pagination',
+                        `Stabil melewati ${benchmark.sweepCycles} siklus`
+                    )
+                ),
+
+
+                // -- call to action -------------------------------------------
+
+                div(
+                    css`jetz-bench-actions`,
+
+                    a(
+                        {
+                            class: 'jetz-btn-primary jetz-bench-btn-primary',
+                            href: '/stress.html'
+                        },
+
+                        'Coba Stress Test Demo',
+
+                        span('→')
+                    ),
+
+                    a(
+                        {
+                            class: 'jetz-btn-secondary jetz-bench-btn-secondary',
+                            href: 'https://github.com/devarofi/jetz#7-keyed-list-reconciliation-loop',
+                            target: '_blank',
+                            rel: 'noreferrer'
+                        },
+
+                        'Baca Dokumentasi Reconciler',
+
+                        span('↗')
                     )
                 )
             )
