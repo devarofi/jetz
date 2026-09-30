@@ -239,6 +239,63 @@ let _activeLifecycle = null;
  * When set, any State.value read will register itself here.
  */
 let _trackingEffect = null;
+/**
+ * Disposal scope used while one item of a `loop()` is rendered.
+ *
+ * Anything created in that window - an `effect()`, a `computed()`, an attribute
+ * subscription, a DOM listener, a bound state container - registers its teardown
+ * here, so the reconciler can release the whole item at once when it drops the
+ * view. Outside a scope nothing is registered and every API behaves exactly as
+ * before; a scope nested in another one is owned by it and disposed with it.
+ */
+class ReactiveScope {
+	#disposers = new Set();
+	#disposed = false;
+	constructor(parent = null) {
+		if (parent) parent.add(() => this.dispose());
+	}
+	get disposed() {
+		return this.#disposed;
+	}
+	add(disposer) {
+		if (typeof disposer !== 'function') return;
+		// registering into a scope that already closed runs the teardown at once
+		if (this.#disposed) { disposer(); return; }
+		this.#disposers.add(disposer);
+	}
+	dispose() {
+		if (this.#disposed) return;
+		this.#disposed = true;
+		this.#disposers.forEach(disposer => {
+			try { disposer(); } catch (error) { console.error(error); }
+		});
+		this.#disposers.clear();
+	}
+}
+/** Scope collecting teardown work for the render currently in progress. */
+let _activeScope = null;
+/** Runs `callback` inside a fresh scope and returns it together with that scope. */
+function withReactiveScope(callback) {
+	const previous = _activeScope;
+	const scope = new ReactiveScope(previous);
+	_activeScope = scope;
+	try {
+		return { value: callback(), scope };
+	} finally {
+		_activeScope = previous;
+	}
+}
+/** Registers teardown work in the active scope, if there is one. */
+function registerDisposable(disposer) {
+	if (_activeScope) _activeScope.add(disposer);
+}
+/** Releases the scope a rendered view was built in (idempotent). */
+function disposeViewScope(view) {
+	const scope = view?.__scope;
+	if (!scope) return;
+	view.__scope = null;
+	scope.dispose();
+}
 let _batchDepth = 0;
 let _isFlushingBatch = false;
 const _pendingBatchStates = new Map();
@@ -391,6 +448,10 @@ class JetzElement {
 	// recomposed instead of being frozen at its mount-time value
 	#classParts = [];
 	#classUnsubs = [];
+	/** Reactive bindings created for this element (listeners, subscriptions, containers). */
+	#disposers = new Set();
+	/** Scope this element was rendered in by a `loop()` item, if any. */
+	__scope = null;
 	listener = [];
 	parent;
 	position;
@@ -419,6 +480,48 @@ class JetzElement {
 		this.children = children;
 	}
 
+	/**
+	 * Records the teardown of one binding this element created and mirrors it
+	 * into the active reactive scope, so dropping the element (or the `loop()`
+	 * item that owns it) releases it deterministically.
+	 */
+	#bindTeardown(disposer) {
+		const entry = () => {
+			if (!this.#disposers.delete(entry)) return;
+			try { disposer(); } catch (error) { console.error(error); }
+		};
+		this.#disposers.add(entry);
+		registerDisposable(entry);
+	}
+	/**
+	 * Releases every binding this element created, then its subtree.
+	 * Idempotent, and never called implicitly on `remove()`: `if/else` removes an
+	 * element only to re-insert the same node later, so teardown is driven by the
+	 * reconciler (`loop()`) and by `empty()` where the subtree is really dropped.
+	 */
+	disposeBindings() {
+		this.#releaseBindings();
+		this.children.forEach(child => {
+			if (child instanceof JetzElement) child.disposeBindings();
+		});
+		return this;
+	}
+	/** Releases only this element's own bindings (not its subtree). */
+	#releaseBindings() {
+		[...this.#disposers].forEach(entry => entry());
+		this.#unbindClassParts();
+		disposeViewScope(this);
+		// the static remount registry is a strong root; drop entries owned by a
+		// subtree that is being discarded, or it pins the whole detached tree
+		if (Jetz.remountByAttr.includes(this)) {
+			Jetz.remountByAttr = Jetz.remountByAttr.filter(item => item !== this);
+		}
+		// conditional children (ifElse branches) hold references to their nodes
+		this.collectionConditionalChild.forEach(child => {
+			if (typeof child?.disposeBindings === 'function') child.disposeBindings();
+		});
+		this.collectionConditionalChild = [];
+	}
 	#atLifecycles(main) {
 		if (this.lifecycles.onStart) {
 			this.lifecycles.onStart();
@@ -440,6 +543,14 @@ class JetzElement {
 	render(parent = null, renderPosition = 0) {
 		this.renderPosition = renderPosition;
 		this.parent = parent; // Parent JetzElement
+		// re-rendering replaces `this.o` with a brand new node, so the bindings
+		// made for the previous node are stale: drop them instead of piling up.
+		// The item scope is untouched: it belongs to the render call that created
+		// this element, not to this element's own node.
+		if (this.o) {
+			[...this.#disposers].forEach(entry => entry());
+			this.#unbindClassParts();
+		}
 		this.#atLifecycles(() => {
 			this.o = document.createElement(this.tagName);
 			this.assignAttributes();
@@ -495,8 +606,15 @@ class JetzElement {
 			if (Object.hasOwnProperty.call(this.attributes, attr)) {
 				const attrValue = this.attributes[attr];
 				if (attr.substring(0, 2) == 'on') {
-					if (typeof attrValue === "function")
-						this.o.addEventListener(attr.substring(2), attrValue.bind(this));
+					if (typeof attrValue === "function") {
+						const eventName = attr.substring(2);
+						const handler = attrValue.bind(this);
+						const node = this.o;
+						node.addEventListener(eventName, handler);
+						// detach on teardown: a listener bound to `this` is the edge
+						// that keeps a removed row (and its captured data) alive
+						this.#bindTeardown(() => node.removeEventListener(eventName, handler));
+					}
 				} else if (attr === 'bind') {
 					this.#bindInputValue(attrValue);
 				} else if (attr === "style") {
@@ -547,9 +665,11 @@ class JetzElement {
 			this.#addListener('change', e => {
 				stateTarget.value = e.target.checked;
 			});
-			stateTarget.subscribe(value => {
+			const sync = value => {
 				this.o.checked = Boolean(value);
-			});
+			};
+			stateTarget.subscribe(sync);
+			this.#bindTeardown(() => stateTarget.unsubscribe(sync));
 			return;
 		}
 		this.#addListener('input', e => {
@@ -565,6 +685,9 @@ class JetzElement {
 				if (value instanceof State) {
 					const styleState = new StyleState(this.o.style, key, value);
 					value.addContainer(styleState);
+					// the container holds this element's CSSStyleDeclaration, so it
+					// must be dropped when the element (row) leaves the tree
+					this.#bindTeardown(() => value.removeContainer(styleState));
 					this.o.style[key] = value.value;
 				} else {
 					this.o.style[key] = value;
@@ -605,6 +728,11 @@ class JetzElement {
 				_child = child.getElement();
 			} else if (child instanceof State || child.prototype instanceof State) {
 				_child = child.generateMutable();
+				// the state keeps a strong reference to this node; without this the
+				// text/element node of a removed row stays reachable from the row's
+				// state and keeps the whole detached subtree with it
+				const node = _child;
+				this.#bindTeardown(() => child.removeContainers(node, this.o));
 			} else if (child instanceof ListState) {
 				child.assignParent(this);
 				return this;
@@ -828,6 +956,7 @@ class JetzElement {
 				const update = value => this.#setAttributeValue(attrName, value);
 				update(attrValue.getValue());
 				attrValue.subscribe(update);
+				this.#bindTeardown(() => attrValue.unsubscribe(update));
 			} else if (typeof attrValue === 'object') {
 				if (attrValue !== null && attrValue.constructor.prototype instanceof JetzArgument) {
 					attrValue.setElement(this);
@@ -884,7 +1013,9 @@ class JetzElement {
 		parts.forEach(part => {
 			if (!(part instanceof State)) return;
 			part.subscribe(compose);
-			this.#classUnsubs.push(() => part.unsubscribe(compose));
+			const off = () => part.unsubscribe(compose);
+			this.#classUnsubs.push(off);
+			this.#bindTeardown(off);
 		});
 		compose();
 	}
@@ -980,6 +1111,10 @@ class JetzElement {
 				if ($ instanceof JetzElement) $.destroyLifecycle();
 			});
 		}
+		// the children are dropped for good here, so release their bindings too
+		this.children.forEach(child => {
+			if (child instanceof JetzElement) child.disposeBindings();
+		});
 		this.children = [];
 		this.o.innerHTML = "";
 		return this;
@@ -1160,7 +1295,7 @@ class Jetz {
 		app.install(Jetz);
 	}
 	static get version() {
-		return '1.0.0';
+		return '1.1.1';
 	}
 	/** Clears the target container (string selector or element). */
 	static unmount(target) {
@@ -1171,7 +1306,11 @@ class Jetz {
 			// fire onDestroy for components rendered inside the container
 			[...target.querySelectorAll('*')].forEach(node => {
 				const $ = node.$;
-				if ($ instanceof JetzElement) $.destroyLifecycle();
+				if ($ instanceof JetzElement) {
+					$.destroyLifecycle();
+					// the container is being wiped: release reactive bindings too
+					$.disposeBindings();
+				}
 			});
 			target.innerHTML = '';
 		}
@@ -1203,6 +1342,24 @@ class State {
 	}
 	addContainer(container) {
 		this.container.push(container)
+	}
+	/** Detaches a container previously added with `addContainer`/`generateMutable`. */
+	removeContainer(container) {
+		this.container = this.container.filter(item => item !== container);
+		return this;
+	}
+	/**
+	 * Detaches every container bound to `node` or to a node inside `root`.
+	 * A state that renders an element swaps its container on every update, so the
+	 * exact node is not always the one still held; `root` covers the replacements.
+	 */
+	removeContainers(node, root = null) {
+		this.container = this.container.filter(item => {
+			if (item === node) return false;
+			if (root != null && item instanceof Node && root.contains?.(item)) return false;
+			return true;
+		});
+		return this;
 	}
 	generateMutable() {
 		let element = null;
@@ -1242,7 +1399,12 @@ class State {
 			if (this.#value instanceof JetzElement) {
 				this.#value.render();
 				let element = this.#value.getElement();
+				// the swapped-out node is detached for good: release its bindings
+				const previous = container.$;
 				container.replaceWith(element);
+				if (previous instanceof JetzElement && previous !== this.#value) {
+					previous.disposeBindings?.();
+				}
 				// trigger lifecycle
 				if (this.#value.lifecycles.onRendered)
 					this.#value.lifecycles.onRendered();
@@ -1273,6 +1435,10 @@ class State {
 		}
 	}
 	getValue() {
+		return this.#value;
+	}
+	/** Untracked read: returns the value without registering in computed/effect. */
+	peek() {
 		return this.#value;
 	}
 	get value() {
@@ -1500,6 +1666,14 @@ export class ListState extends Array {
 		this.set([]);
 	}
 	createItemView(parent, item, index) {
+		// Each item render gets its own scope: every effect/computed/binding it
+		// creates is registered there and released together when the reconciler
+		// drops this view (keyed removal, item swap, or a full refresh).
+		const { value: view, scope } = withReactiveScope(() => this.#buildItemView(parent, item, index));
+		if (view != null && typeof view === 'object') view.__scope = scope;
+		return view;
+	}
+	#buildItemView(parent, item, index) {
 		var renderedItem = this.renderCallback(item, index);
 		// a render function may return several nodes for one item: keep them as
 		// siblings instead of collapsing them into a carrier element
@@ -1528,7 +1702,9 @@ export class ListState extends Array {
 	}
 	/** Removes a stored view whatever shape it has. */
 	#removeView(view) {
-		if (view instanceof JetzElement) { view.remove(); return; }
+		// release the item's reactive scope before detaching its nodes
+		disposeViewScope(view);
+		if (view instanceof JetzElement) { view.disposeBindings?.(); view.remove(); return; }
 		if (view instanceof ListViewGroup) { view.remove(); return; }
 		view?.remove?.();
 	}
@@ -1930,6 +2106,80 @@ function stateOf(value, handler = { get(value) { return value } }) {
 	return instance;
 }
 /**
+ * Shallow row state: Proxy-based lazy getters at row granularity.
+ *
+ * Data stays a plain object in a WeakMap; every property read goes through ONE
+ * shared version State (no per-cell State/computed). `rawOf()` reads the plain
+ * object directly (untracked, for the filter/sort pipeline); tracked reads and
+ * any write bump the single row version so only that row's cells re-render.
+ */
+/** Registry for shallow rows: untracked raw access without `in`-operator traps. */
+const _shallowRows = new WeakSet();
+const _shallowData = new WeakMap();
+function shallowStateOf(value, handler = { get(value) { return value } }) {
+	if (value === null || typeof value !== 'object' || value instanceof JetzElement || Array.isArray(value)) {
+		return stateOf(value, handler);
+	}
+	const data = value;
+	const version = new State(0);
+	const bump = () => version.setState(version.peek() + 1);
+	const proxy = new Proxy(data, {
+		get(target, prop, receiver) {
+			if (prop === '__sig') return version;
+			if (prop === '__data') return target;
+			if (prop === 'toObject') return () => ({ ...target });
+			if (prop === 'touch') return bump;
+			if (prop === 'set') return (patch) => {
+				if (patch != null && typeof patch === 'object') Object.assign(target, patch);
+				bump();
+			};
+			if (prop === 'peek') return (key) => target[key];
+			// Symbols / then / prototype: never subscribe, never wrap.
+			if (typeof prop !== 'string') {
+				const fallback = target[prop];
+				if (typeof fallback === 'function') return fallback.bind(target);
+				return fallback;
+			}
+			// Own data keys: tracked read on the single row version signal.
+			if (Object.hasOwnProperty.call(target, prop)) {
+				version.value;
+				return target[prop];
+			}
+			const fallback = target[prop];
+			if (typeof fallback === 'function') return fallback.bind(target);
+			return fallback;
+		},
+		set(target, prop, next) {
+			target[prop] = next;
+			bump();
+			return true;
+		},
+		has(target, prop) {
+			return prop in target;
+		}
+	});
+	_shallowRows.add(proxy);
+	_shallowData.set(proxy, data);
+	return proxy;
+}
+/** Alias tuned for table/grid records: `rowOf({...})` === `shallowStateOf({...})`. */
+function rowOf(value) {
+	return shallowStateOf(value);
+}
+/** Untracked access to a shallow row's plain data (for filter/sort pipelines). */
+function rawOf(row) {
+	if (row != null && (typeof row === 'object' || typeof row === 'function')) {
+		try { if (_shallowRows.has(row)) return _shallowData.get(row) ?? row; } catch (e) { /* fall through */ }
+	}
+	return row;
+}
+/** Manually bump a shallow row's version (row-level refresh). No-op for other values. */
+function touchRow(row) {
+	try {
+		if (row != null && typeof row.touch === 'function') row.touch();
+	} catch (e) { /* ignore */ }
+}
+/**
  * Merges objects into a new object without mutating the inputs.
  * Conflicting values are collected into arrays; array values are concatenated.
  */
@@ -2147,6 +2397,7 @@ class IfElse {
 	targetParent;
 	marker = null;
 	currentNodes = [];
+	currentViews = [];
 	lastCondition;
 	rendered = false;
 
@@ -2194,6 +2445,8 @@ class IfElse {
 		}
 		if (result instanceof JetzElement) {
 			result.render(this.targetParent);
+			// tracked so a later branch swap can release the previous branch
+			this.currentViews.push(result);
 			return [result.getElement()];
 		}
 		if (result instanceof State || result.prototype instanceof State) {
@@ -2210,6 +2463,14 @@ class IfElse {
 		return [document.createTextNode(result)];
 	}
 
+	/** Releases the branch currently on screen (its bindings and nodes). */
+	disposeBindings() {
+		this.currentNodes.forEach(node => node.remove());
+		this.currentNodes = [];
+		this.currentViews.forEach(view => view.disposeBindings?.());
+		this.currentViews = [];
+		return this;
+	}
 	trigger() {
 		if (!this.targetParent || typeof this.targetParent.o === 'undefined') return;
 		this.#initMarker();
@@ -2218,6 +2479,10 @@ class IfElse {
 		// remove the previously rendered branch
 		this.currentNodes.forEach(node => node.remove());
 		this.currentNodes = [];
+		// each trigger renders a brand new branch, so the previous one is really
+		// dropped here: release its subscriptions/listeners before re-rendering
+		this.currentViews.forEach(view => view.disposeBindings?.());
+		this.currentViews = [];
 		const branch = condition ? this.trueCallback : this.falseCallback;
 		const branchResult = (typeof branch === 'function') ? branch.call() : branch;
 		this.currentNodes = this.#resolveBranch(branchResult ?? null);
@@ -2379,6 +2644,15 @@ function computed(computeFn) {
 		return result;
 	};
 
+	// Scope teardown: drop every dependency subscription this computed holds.
+	// Only registered while a `loop()` item is being rendered, so a computed
+	// created outside a loop keeps living until it is garbage collected.
+	registerDisposable(() => {
+		_unsubs.forEach(fn => fn());
+		_unsubs = [];
+		_deps = new Set();
+	});
+
 	return derivedState;
 }
 
@@ -2437,12 +2711,15 @@ function effect(effectFn) {
 	run();
 
 	// Return dispose function
-	return function dispose() {
+	function dispose() {
 		_disposed = true;
 		_unsubs.forEach(fn => fn());
 		_unsubs = [];
 		_deps.clear();
-	};
+	}
+	// scope teardown for effects created inside a `loop()` item
+	registerDisposable(dispose);
+	return dispose;
 }
 
-export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, computed, effect, batch, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };
+export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };

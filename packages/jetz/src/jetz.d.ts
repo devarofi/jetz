@@ -41,6 +41,9 @@ export declare class State<T = any> {
     /** Read current value directly without invoking getter traps. */
     getValue(): T;
 
+    /** Untracked read: returns the value without registering in computed/effect. */
+    peek(): T;
+
     /** Update the state value and trigger fine-grained DOM and subscriber updates. */
     setState(newValue: T): void;
 
@@ -52,6 +55,15 @@ export declare class State<T = any> {
 
     /** Internal: attach a DOM container (Text, Attr, Element, StyleState). */
     addContainer(container: any): void;
+
+    /** Detaches a container previously attached with `addContainer`/`generateMutable`. */
+    removeContainer(container: any): this;
+
+    /**
+     * Detaches every container bound to `node` or to a node inside `root`.
+     * Used by the reconciler so a removed row leaves no node referenced here.
+     */
+    removeContainers(node: Node | null, root?: Node | null): this;
 
     /** Generates a mutable DOM Text or Element node for element interpolation. */
     generateMutable(): Text | HTMLElement;
@@ -262,6 +274,14 @@ export declare class JetzElement {
     /** Fires destruction lifecycle hooks for this element and descendants. */
     destroyLifecycle(): void;
 
+    /**
+     * Releases every reactive binding created for this element and its subtree:
+     * state subscriptions, computed/effect scope, DOM listeners and state
+     * containers. Called automatically when `loop()` drops a view, by `empty()`
+     * and by `Jetz.unmount()`. Idempotent.
+     */
+    disposeBindings(): this;
+
     /** Disables the element. */
     disable(): this;
 
@@ -366,6 +386,35 @@ export declare function stateOf<T>(value: T, handler?: StateHandler<T>): Reactiv
  */
 export declare function rememberOf<T>(key: string, value: T): Remembered<T>;
 export declare function rememberOf<T>(value: T): Remembered<T>;
+
+/**
+ * Creates a row-level reactive record (shallow): the object stays a plain
+ * POJO with ONE version signal instead of one State per property.
+ *
+ * @example
+ * const row = rowOf({ id: 1, score: 10 });
+ * row.score; // tracked read
+ */
+export declare function shallowStateOf<T extends object>(value: T): T & {
+    touch(): void;
+    set(patch: Partial<T>): void;
+    peek<K extends keyof T>(key: K): T[K];
+    toObject(): T;
+};
+
+/** Alias tuned for table/grid records: `rowOf({...})` === `shallowStateOf({...})`. */
+export declare function rowOf<T extends object>(value: T): T & {
+    touch(): void;
+    set(patch: Partial<T>): void;
+    peek<K extends keyof T>(key: K): T[K];
+    toObject(): T;
+};
+
+/** Untracked access to a shallow row's plain data (for filter/sort pipelines). */
+export declare function rawOf<T>(row: T): T;
+
+/** Manually bump a shallow row's version (row-level refresh). */
+export declare function touchRow(row: any): void;
 
 /**
  * Creates a derived reactive state that automatically tracks dependencies.

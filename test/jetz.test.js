@@ -744,6 +744,110 @@ describe('listOf / ListState', () => {
 	});
 });
 
+describe('view cleanup lifecycle', () => {
+	it('disposes effects created inside a removed loop item', () => {
+		const ticks = stateOf(0);
+		const runs = [];
+		const rows = listOf({ id: 1 }, { id: 2 });
+		mount(ul(loop(rows, row => row.id, row => {
+			effect(() => { runs.push(row.id); ticks.value; });
+			return li(row.id);
+		})));
+
+		expect(runs).toEqual([1, 2]);
+		rows.set([]);
+		ticks.value = 5;
+		// both item scopes were released: no effect re-ran after the list emptied
+		expect(runs).toEqual([1, 2]);
+		expect(rows.size).toBe(0);
+	});
+	it('unsubscribes attribute/state bindings of a removed keyed view', () => {
+		const flag = stateOf('on');
+		const items = listOf({ id: 1 }, { id: 2 });
+		mount(ul(loop(items, i => i.id, i => li({ 'data-flag': flag }))));
+		expect(document.querySelectorAll('li[data-flag="on"]').length).toBe(2);
+
+		items.removeAt(0);
+		flag.setState('off');
+		// the removed row must not have been updated by the state any more
+		expect(document.querySelectorAll('ul > li').length).toBe(1);
+		expect(document.querySelector('li').getAttribute('data-flag')).toBe('off');
+	});
+	it('drops the text-node container of a removed view', () => {
+		const label = stateOf('hello');
+		const items = listOf('a');
+		mount(ul(loop(items, item => li(label))));
+		const before = label.container.length;
+
+		items.removeAt(0);
+		expect(label.container.length).toBeLessThan(before);
+	});
+	it('detaches the click handler of a removed view', () => {
+		const hits = vi.fn();
+		const items = listOf('a');
+		mount(ul(loop(items, item => li(item, { onclick: hits }))));
+		const row = document.querySelector('ul > li');
+		row.click();
+		expect(hits).toHaveBeenCalledTimes(1);
+
+		items.removeAt(0);
+		// the detached node keeps no listener: calling it must not reach the handler
+		row.click();
+		expect(hits).toHaveBeenCalledTimes(1);
+	});
+	it('keeps surviving rows reactive when a sibling is removed', () => {
+		const count = stateOf(0);
+		const items = listOf(1, 2);
+		const target = mount(ul(loop(items, id => li(id, {
+			onclick: () => { count.value = id; }
+		}))));
+		const rows = [...target.querySelectorAll('li')];
+
+		rows[0].click();
+		expect(count.value).toBe(1);
+		items.removeAt(0);
+		rows[1].click();
+		expect(count.value).toBe(2);
+		expect([...target.querySelectorAll('li')].map(el => el.textContent)).toEqual(['2']);
+	});
+	it('releases bindings of a subtree dropped by empty()', () => {
+		const flag = stateOf('on');
+		const box = div(span({ 'data-flag': flag }));
+		const target = mount(box);
+		expect(target.querySelector('span').getAttribute('data-flag')).toBe('on');
+
+		box.empty();
+		flag.setState('off');
+		expect(target.querySelector('span')).toBe(null);
+	});
+	it('releases bindings on Jetz.unmount()', () => {
+		const flag = stateOf('on');
+		const label = stateOf('hi');
+		const target = mount(div(span(label, { 'data-flag': flag })));
+		const detached = target.querySelector('span');
+		const before = label.container.length;
+
+		Jetz.unmount(target);
+		expect(label.container.length).toBeLessThan(before);
+		// the detached node keeps no live binding either
+		flag.setState('off');
+		label.setState('bye');
+		expect(detached.getAttribute('data-flag')).toBe('on');
+		expect(detached.textContent).toBe('hi');
+	});
+	it('leaves bindings alone for elements rendered outside a loop', () => {
+		const flag = stateOf('on');
+		const target = mount(div(span({ 'data-flag': flag })));
+		flag.setState('off');
+		expect(target.querySelector('span').getAttribute('data-flag')).toBe('off');
+	});
+	it('disposeBindings() is idempotent', () => {
+		const box = div(span('x'));
+		mount(box);
+		expect(() => { box.disposeBindings(); box.disposeBindings(); }).not.toThrow();
+	});
+});
+
 describe('sequenceOf', () => {
 	it('keeps duplicate values as distinct items and still supports push', () => {
 		const seq = sequenceOf('a', 'a', 'b');
