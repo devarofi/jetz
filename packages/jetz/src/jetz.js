@@ -852,6 +852,12 @@ class JetzElement {
 				this.#bindTeardown(() => child.removeContainers(node, this.o));
 			} else if (child instanceof ListState) {
 				child.assignParent(this);
+				// releasing this element (branch swap, re-render, loop row drop)
+				// must take the views this append created with it: otherwise the
+				// list keeps pinning the detached rows, their nodes and closures
+				this.#bindTeardown(() => {
+					child.detachFrom?.(this);
+				});
 				return this;
 			} else if (
 				child instanceof UniqueString ||
@@ -864,6 +870,15 @@ class JetzElement {
 				child.attachParent(this);
 				if (!this.collectionConditionalChild.includes(child)) {
 					this.collectionConditionalChild.push(child);
+					// a branch swap re-renders this element's conditional children via
+					// triggerCondition(): the child must be released when this element
+					// leaves the tree, otherwise the swap keeps the whole detached
+					// subtree (and its closures) reachable from the IfElse instance
+					this.#bindTeardown(() => {
+						child.disposeBindings?.();
+						this.collectionConditionalChild =
+							this.collectionConditionalChild.filter(item => item !== child);
+					});
 					if (Jetz.isAllowToRemount(this)) {
 						Jetz.remountByAttr.push(this);
 					}
@@ -1843,7 +1858,7 @@ export class ListState extends Array {
 		// release the item's reactive scope before detaching its nodes
 		disposeViewScope(view);
 		if (view instanceof JetzElement) { view.disposeBindings?.(); view.remove(); return; }
-		if (view instanceof ListViewGroup) { view.remove(); return; }
+		if (view instanceof ListViewGroup) { view.elements.forEach(element => element?.disposeBindings?.()); view.remove(); return; }
 		view?.remove?.();
 	}
 	/** Attaches a freshly created view to its parent element. */
@@ -2077,6 +2092,27 @@ export class ListState extends Array {
 		this.views = views;
 		if (views.length > 0)
 			this.parentElement = views[0].parent;
+	}
+	/**
+	 * Detaches the views this list rendered into `parent` at `parentIndex`.
+	 * Used when a list lives inside an `ifElse()` branch: a branch swap must
+	 * remove exactly these nodes and release their scopes/bindings, otherwise
+	 * the inactive branch stays in the DOM and reachable from the list.
+	 */
+	detachFrom(parent, parentIndex) {
+		if (parent == null || !Array.isArray(this.parentElement)) return this;
+		// resolve the entry defensively: the stored index can shift when an
+		// earlier entry for the same list was already detached
+		const index = (parentIndex != null && this.parentElement[parentIndex] === parent)
+			? parentIndex
+			: this.parentElement.indexOf(parent);
+		if (index < 0 || !Array.isArray(this.views?.[index])) return this;
+		const views = this.views[index];
+		views.forEach(view => this.#removeView(view));
+		this.views.splice(index, 1);
+		this.parentElement.splice(index, 1);
+		this._keyMaps.splice(index, 1);
+		return this;
 	}
 	toState() {
 		return this.#commitValues(this.values.map(value => stateOf(value)));
@@ -2547,6 +2583,10 @@ class IfElse {
 	marker = null;
 	currentNodes = [];
 	currentViews = [];
+	currentStates = [];
+	currentLists = [];
+	currentListeners = [];
+	currentScope = null;
 	lastCondition;
 	rendered = false;
 
@@ -2599,11 +2639,25 @@ class IfElse {
 			return [result.getElement()];
 		}
 		if (result instanceof State || result.prototype instanceof State) {
-			return [result.generateMutable()];
+			const node = result.generateMutable();
+			// the state keeps this node alive; drop it on the next swap so a
+			// detached branch is neither pinned nor updated after unmount
+			this.currentStates.push({ state: result, node });
+			return [node];
 		}
 		if (result instanceof ListState) {
 			// list rendering is delegated to the parent element (stays reactive)
 			this.targetParent.append(result);
+			// remember which parent entry this append created so the swap can
+			// detach exactly these views again
+			this.currentLists.push({ list: result, parent: this.targetParent, index: result.parentElement.length - 1 });
+			return [];
+		}
+		if (result instanceof StateListener) {
+			// a listener renders no node but stays reachable from the parent's
+			// conditional registry + global remount list; stop it on swap
+			this.targetParent.append(result);
+			this.currentListeners.push(result);
 			return [];
 		}
 		if (result instanceof Raw) {
@@ -2614,27 +2668,68 @@ class IfElse {
 
 	/** Releases the branch currently on screen (its bindings and nodes). */
 	disposeBindings() {
-		this.currentNodes.forEach(node => node.remove());
+		this.#clearBranch();
+		return this;
+	}
+	/**
+	 * Detaches the active branch so nothing keeps it alive: nodes leave the
+	 * DOM, element bindings unsubscribe, state containers drop their nodes,
+	 * delegated lists detach their views, and the branch scope releases any
+	 * computed()/effect() created while the branch rendered. After this the
+	 * branch is immediately eligible for garbage collection.
+	 */
+	#clearBranch() {
+		this.currentNodes.forEach(node => node.remove?.());
 		this.currentNodes = [];
 		this.currentViews.forEach(view => view.disposeBindings?.());
 		this.currentViews = [];
-		return this;
+		this.currentStates.forEach(({ state, node }) => {
+			try { state.removeContainer?.(node); } catch (error) { /* ignore */ }
+		});
+		this.currentStates = [];
+		this.currentLists.forEach(({ list, parent, index }) => {
+			try { list.detachFrom?.(parent, index); } catch (error) { /* ignore */ }
+		});
+		this.currentLists = [];
+		this.currentListeners.forEach(listener => {
+			try { listener.stop?.(); } catch (error) { /* ignore */ }
+		});
+		this.currentListeners = [];
+		if (this.currentScope) {
+			try { this.currentScope.dispose(); } catch (error) { /* ignore */ }
+			this.currentScope = null;
+		}
 	}
 	trigger() {
 		if (!this.targetParent || typeof this.targetParent.o === 'undefined') return;
+		// the parent element may have been re-rendered since the last trigger
+		// (a loop() item view renders once detached, then again on attach): a
+		// marker left in the discarded node is orphaned, so re-anchor to the
+		// live node. A merely unmounted marker (pre-mount tree) is still
+		// contained by the parent and must be kept.
+		if (this.marker != null && !this.marker.isConnected && !this.targetParent.o.contains(this.marker)) {
+			this.#clearBranch();
+			this.marker = null;
+			this.rendered = false;
+		}
 		this.#initMarker();
 		const condition = this.#evaluateCondition();
 		if (this.rendered && this.lastCondition == condition) return;
-		// remove the previously rendered branch
-		this.currentNodes.forEach(node => node.remove());
-		this.currentNodes = [];
 		// each trigger renders a brand new branch, so the previous one is really
-		// dropped here: release its subscriptions/listeners before re-rendering
-		this.currentViews.forEach(view => view.disposeBindings?.());
-		this.currentViews = [];
+		// dropped here: detach nodes and release subscriptions/listeners before
+		// re-rendering, otherwise the inactive branch stays reachable
+		this.#clearBranch();
 		const branch = condition ? this.trueCallback : this.falseCallback;
-		const branchResult = (typeof branch === 'function') ? branch.call() : branch;
-		this.currentNodes = this.#resolveBranch(branchResult ?? null);
+		// evaluate AND render the branch inside one scope: computed()/effect()
+		// created while the callback runs (often as arguments of the branch's
+		// root element) are owned by the branch and released with it on the
+		// next swap - evaluating the callback outside would leave them wired
+		const scoped = withReactiveScope(() => {
+			const branchResult = (typeof branch === 'function') ? branch.call() : branch;
+			return this.#resolveBranch(branchResult ?? null);
+		});
+		this.currentScope = scoped.scope;
+		this.currentNodes = scoped.value;
 		if (this.currentNodes.length > 0) {
 			this.marker.after(...this.currentNodes);
 		}
@@ -2674,6 +2769,15 @@ class StateListener {
 			this.targetParent.collectionConditionalChild =
 				this.targetParent.collectionConditionalChild.filter(item => item !== this);
 		}
+		return this;
+	}
+	/**
+	 * Called when the parent element releases its bindings (branch swap,
+	 * re-render, `loop()` row removal): detaches the listener so it neither
+	 * fires nor keeps its closure reachable from the detached subtree.
+	 */
+	disposeBindings() {
+		this.stop();
 		return this;
 	}
 }
