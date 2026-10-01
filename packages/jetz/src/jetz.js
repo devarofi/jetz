@@ -1728,6 +1728,17 @@ export class ListState extends Array {
 			this.values.push(item);
 			this.parentElement.map((parent, i) => {
 				this.newView(i, this.views[i], item, this.values.length - 1);
+				// Keep keyed bookkeeping in sync: `newView` appends the node
+				// directly, so without registering the key here a later keyed
+				// refresh (set/insertAt/...) cannot find this item and would
+				// create a duplicate view for it.
+				if (this._useKeyedReconciliation && this._keyFn) {
+					const keyMap = this._keyMaps[i];
+					const currentView = this.views[i]?.[this.views[i].length - 1];
+					if (keyMap && currentView) {
+						keyMap.set(this._keyFn(item), { item, view: currentView });
+					}
+				}
 				return parent;
 			});
 			// remember effect

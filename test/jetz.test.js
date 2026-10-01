@@ -693,6 +693,15 @@ describe('listOf / ListState', () => {
 		items.set([{ id: 1, n: 'ONE' }]);
 		expect([...document.querySelectorAll('ul > li')].map(el => el.textContent)).toEqual(['t-ONE', 'b-ONE']);
 	});
+	it('keyed push() registers the new item for later reconciliation', () => {
+		const items = listOf({ id: 1, n: 'a' });
+		mount(ul(loop(items, i => i.id, i => li(`${i.id}-${i.n}`))));
+		items.push({ id: 2, n: 'b' });
+		expect([...document.querySelectorAll('li')].map(el => el.textContent)).toEqual(['1-a', '2-b']);
+		// a refresh after push must not duplicate the pushed item
+		items.set(items.values.slice());
+		expect([...document.querySelectorAll('li')].map(el => el.textContent)).toEqual(['1-a', '2-b']);
+	});
 	it('push adds a view and set replaces all', () => {
 		const items = listOf('a');
 		mount(ul(loop(items, item => li(item))));
