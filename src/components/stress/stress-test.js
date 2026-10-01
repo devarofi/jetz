@@ -17,7 +17,7 @@
  * Tailwind is loaded from node_modules (browser build), so no CSS build step.
  */
 import {
-    Jetz, batch, computed, effect, ifElse, listOf, loop, rawOf, rowOf, stateOf, touchRow
+    Jetz, batch, computed, effect, ifElse, listOf, loop, lazy, rawOf, rowOf, stateOf, touchRow
 } from "../../lib/jetz.js";
 import {
     button, css, div, footer, h1, header, inputCheckbox, inputNumber, inputText,
@@ -81,28 +81,27 @@ function mulberry32(seed) {
 }
 
 /**
- * Builds one row. Text columns are plain (immutable) values while the columns
- * users mutate are `stateOf` so a click updates only the cells bound to them.
- * Derived values (scoreLabel / statusClass / rowClass) are intentionally NOT
- * created here: they are built JIT inside `RowView`, so only the rows actually
- * in the DOM hold computed subscriptions and off-screen rows stay cheap
- * plain objects + 4 states. Destroyed pages are then GC-able by V8.
+ * Builds one row using shallow row state (rowOf).
+ * One version signal per row instead of one State per cell.
+ * Immutable columns (id, name, email, department, region) are plain values.
+ * Mutable columns (score, visits, status, selected) are plain values that
+ * trigger a row re-render when bumped via touchRow(row) or row.set().
  */
 function createRow(id, rnd) {
     const first = FIRST_NAMES[(rnd() * FIRST_NAMES.length) | 0];
     const last = LAST_NAMES[(rnd() * LAST_NAMES.length) | 0];
-    return {
+    return rowOf({
         id,
         idLabel: id.toLocaleString("en-US"),
         name: `${first} ${last}`,
         email: `${first}.${last}${id}@jetz.dev`.toLowerCase(),
         department: DEPARTMENTS[(rnd() * DEPARTMENTS.length) | 0],
         region: REGIONS[(rnd() * REGIONS.length) | 0],
-        score: stateOf((rnd() * 100000) | 0),
-        visits: stateOf(1 + ((rnd() * 999) | 0)),
-        status: stateOf(STATUSES[(rnd() * STATUSES.length) | 0]),
-        selected: stateOf(false)
-    };
+        score: (rnd() * 100000) | 0,
+        visits: 1 + ((rnd() * 999) | 0),
+        status: STATUSES[(rnd() * STATUSES.length) | 0],
+        selected: false
+    });
 }
 
 const numberFormat = value => value.toLocaleString("en-US");
@@ -118,7 +117,14 @@ const readHeapMb = () => {
 
 /** Bumped whenever `dataset` is replaced; computeds read it to invalidate. */
 const dataVersion = stateOf(0);
-let dataset = [];
+
+/** Lazy dataset: only generated on first access (when pipeline runs). */
+const dataset = lazy(() => {
+    const rnd = mulberry32(DEFAULT_DATASET_SIZE * 7919 + 13);
+    const rows = new Array(DEFAULT_DATASET_SIZE);
+    for (let index = 0; index < DEFAULT_DATASET_SIZE; index++) rows[index] = createRow(index + 1, rnd);
+    return rows;
+});
 
 const query = stateOf("");
 const statusFilter = stateOf("all");
@@ -164,15 +170,15 @@ const sweepAbort = stateOf(false);
 /** Mutable sample buffer; `stats` holds the derived view of it. */
 const timings = [];
 
-/** Sort comparators. Values are read through `.value` so sorting stays reactive. */
+/** Sort comparators. Use rawOf for untracked reads so the pipeline doesn't pin rows. */
 const COMPARATORS = {
     id: (a, b) => a.id - b.id,
     name: (a, b) => a.name.localeCompare(b.name),
     department: (a, b) => a.department.localeCompare(b.department),
     region: (a, b) => a.region.localeCompare(b.region),
-    score: (a, b) => a.score.value - b.score.value,
-    visits: (a, b) => a.visits.value - b.visits.value,
-    status: (a, b) => a.status.value.localeCompare(b.status.value)
+    score: (a, b) => rawOf(a).score - rawOf(b).score,
+    visits: (a, b) => rawOf(a).visits - rawOf(b).visits,
+    status: (a, b) => rawOf(a).status.localeCompare(rawOf(b).status)
 };
 
 function summarize(values) {
@@ -218,7 +224,8 @@ function loadDataset(size) {
     for (let index = 0; index < wanted; index++) rows[index] = createRow(index + 1, rnd);
     const buildMs = performance.now() - startedAt;
 
-    dataset = rows;
+    // Replace the lazy dataset's value
+    dataset.value = rows;
     timings.length = 0;
     stats.buildMs.value = +buildMs.toFixed(2);
     stats.lastMs.value = 0;
@@ -266,6 +273,7 @@ const rangeStart = stateOf(0);
 const rangeEnd = stateOf(0);
 
 // Seed the grid before the pipeline exists, so nothing renders during startup.
+// Dataset is lazy - will be generated on first access (loadDataset triggers it).
 loadDataset(DEFAULT_DATASET_SIZE);
 
 /** Signature of the filter/sort inputs: changing it sends the grid back to page 1. */
@@ -274,9 +282,8 @@ let lastFilterSignature = "";
 /**
  * The single reactive pipeline: filter -> sort -> slice -> `rows.set()`.
  *
- * Dependencies are read dynamically: per-row states are only touched when the
- * matching filter/sort is active, so an unused column never re-runs the pass,
- * while a status change under an active status filter re-runs it immediately.
+ * Uses rawOf() for untracked reads so the reactive graph never gains
+ * a dependency per row. Only the rendered page (via rows.set) stays reactive.
  */
 effect(() => {
     dataVersion.value;
@@ -297,16 +304,19 @@ effect(() => {
     }
 
     const filtered = [];
-    for (const row of dataset) {
-        if (onlySelected && !row.selected.value) continue;
-        if (status !== "all" && row.status.value !== status) continue;
+    // Access dataset.value to trigger lazy initialization and track dependency
+    const data = dataset.value;
+    for (const row of data) {
+        const r = rawOf(row);  // untracked read
+        if (onlySelected && !r.selected) continue;
+        if (status !== "all" && r.status !== status) continue;
         if (needle && !(
-            row.name.toLowerCase().includes(needle) ||
-            row.email.includes(needle) ||
-            row.department.toLowerCase().includes(needle) ||
-            row.region.toLowerCase().includes(needle)
+            r.name.toLowerCase().includes(needle) ||
+            r.email.includes(needle) ||
+            r.department.toLowerCase().includes(needle) ||
+            r.region.toLowerCase().includes(needle)
         )) continue;
-        filtered.push(row);
+        filtered.push(row);  // push the shallow row (not rawOf) so loop() gets rowOf instances
     }
     const compare = COMPARATORS[key] ?? COMPARATORS.id;
     filtered.sort(descending ? (a, b) => compare(b, a) : compare);
@@ -333,7 +343,8 @@ effect(() => {
 const selectedCount = computed(() => {
     dataVersion.value;
     let count = 0;
-    for (const row of dataset) if (row.selected.value) count++;
+    const data = dataset.value;
+    for (const row of data) if (rawOf(row).selected) count++;
     return count;
 });
 
@@ -400,31 +411,42 @@ function applyJump() {
     jumpText.setState(String(gotoPage(parsed)));
 }
 
-/** Fine-grained update: only the cells bound to `row.score` are touched. */
+/** Fine-grained update: bump the row's version signal via touchRow(). */
 function bumpRow(row) {
     const startedAt = performance.now();
-    row.score.value += 1;
+    const r = rawOf(row);
+    r.score = r.score + 1;
+    touchRow(row);  // triggers row re-render
     stats.updateMs.value = +(performance.now() - startedAt).toFixed(2);
 }
 
 function cycleStatus(row) {
     const startedAt = performance.now();
-    const next = (STATUSES.indexOf(row.status.value) + 1) % STATUSES.length;
-    row.status.value = STATUSES[next];
+    const r = rawOf(row);
+    const next = (STATUSES.indexOf(r.status) + 1) % STATUSES.length;
+    r.status = STATUSES[next];
+    touchRow(row);
     stats.updateMs.value = +(performance.now() - startedAt).toFixed(2);
 }
 
 function toggleRow(row) {
     const startedAt = performance.now();
-    row.selected.value = !row.selected.value;
+    const r = rawOf(row);
+    r.selected = !r.selected;
+    touchRow(row);
     stats.updateMs.value = +(performance.now() - startedAt).toFixed(2);
 }
 
-/** One state write per row, flushed as a single batch. */
+/** One write per row, flushed as a single batch. */
 function bumpAllScores() {
     const startedAt = performance.now();
     batch(() => {
-        for (const row of dataset) row.score.value += 1;
+        const data = dataset.value;
+        for (const row of data) {
+            const r = rawOf(row);
+            r.score = r.score + 1;
+        }
+        for (const row of data) touchRow(row);
     });
     stats.bulkMs.value = +(performance.now() - startedAt).toFixed(2);
 }
@@ -444,7 +466,12 @@ function clearSelection() {
     if (selectedCount.getValue() === 0) return;
     const startedAt = performance.now();
     batch(() => {
-        for (const row of dataset) if (row.selected.value) row.selected.value = false;
+        const data = dataset.value;
+        for (const row of data) {
+            const r = rawOf(row);
+            if (r.selected) r.selected = false;
+        }
+        for (const row of data) touchRow(row);
     });
     stats.bulkMs.value = +(performance.now() - startedAt).toFixed(2);
 }
@@ -628,23 +655,21 @@ function columnTh(column) {
 }
 
 /**
- * One table row. Plain function, no `computed()` wrapper.
+ * One table row using shallow row state (rowOf).
  *
- * Score/status/selection cells stay reactive because the mutable `State`
- * instances are passed straight through: text children subscribe via
- * `generateMutable()`, and `css(fn)` lifts a plain function into a derived
- * state internally (`#bindClassParts`). The plain derivation functions are
- * created per mounted row, so off-screen rows keep zero subscriptions and
- * destroyed pages are GC-able.
+ * Immutable columns (id, name, email, department, region) are plain values —
+ * read once on mount, no subscriptions.
  *
- * The Ticker cell is a tagged-template string: its `${() => ...}` interpolations
- * become computed text nodes, so one state write re-renders exactly those —
- * both the row's own states and the shared `stringTick` fan-out.
+ * Mutable columns (score, visits, status, selection) use computed() to track
+ * the row's version signal. A row bump via touchRow() re-evaluates only these.
+ *
+ * The Ticker cell uses a tagged-template string with ${() => ...} interpolations
+ * that become computed text nodes, re-rendering on row bump or stringTick change.
  */
 function RowView(row) {
     return tr(
         css`cursor-pointer hover:bg-white/5`,
-        css(() => row.selected.value
+        css(() => row.selected
             ? "bg-sky-500/10 ring-1 ring-inset ring-sky-400/30"
             : ""),
         { onclick: () => toggleRow(row) },
@@ -653,15 +678,15 @@ function RowView(row) {
         td(css`${CELL} text-slate-400`, row.email),
         td(css`${CELL} text-white`, row.department),
         td(css`${CELL} text-white`, row.region),
-        td(css`${CELL} text-white text-right tabular-nums`, row.score),
+        td(css`${CELL} text-white text-right tabular-nums`, computed(() => row.score)),
         td(css`${CELL}`, span(
             css`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset`,
-            css(() => STATUS_CLASSES[row.status.value]),
-            row.status
+            css(() => STATUS_CLASSES[row.status]),
+            computed(() => row.status)
         )),
-        td(css`${CELL} text-right tabular-nums text-slate-300`, row.visits),
+        td(css`${CELL} text-right tabular-nums text-slate-300`, computed(() => row.visits)),
         td(css`${CELL} stress-ticker text-right font-mono text-xs text-slate-400`,
-            text`#${row.idLabel} · ${() => row.score.value} pts · t${() => stringTick.value}`
+            text`#${row.idLabel} · ${() => row.score} pts · t${() => stringTick.value}`
         ),
         td(css`${CELL} text-right`,
             div(css`flex justify-end gap-1`,
