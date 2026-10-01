@@ -114,7 +114,7 @@ Jetz.mount(
     label: "Editable keyed tasks",
     concept: "listOf · stateOf items · loop · bind",
     source: `import { Jetz, listOf, loop, stateOf } from "@daevsoft/jetz";
-import { button, css, div, h2, inputText, li, p, ul, input, type } from "@daevsoft/jetz/ui";
+import { button, css, div, h2, input, inputText, li, p, type, ul } from "@daevsoft/jetz/ui";
 
 const tasks = listOf(
   stateOf({ id: 201, done: true, title: "Sketch the onboarding flow" }),
@@ -132,8 +132,8 @@ Jetz.mount(
       task => task.id.value,
       task => li(css\`task-row\`,
         div(
-        input(type\`checkbox\`, { bind: task.done }),
-        p(css\`task-number \$\{task.done ? 'completed' : ''\}\`, "TASK ", task.id, ' - ', task.title),
+          input(type\`checkbox\`, { bind: task.done }),
+          p(css\`task-number \$\{() => task.done.value ? "completed" : ""\}\`, "TASK ", task.id, " - ", task.title)
         ),
         inputText({
           bind: task.title,
@@ -235,6 +235,11 @@ function createPreviewDocument(source) {
     button { padding: 10px 14px; border: 0; border-radius: 4px; background: #228bc3; color: white; font: 600 13px system-ui, sans-serif; cursor: pointer; }
     button:hover { background: #176b9a; }
     .preview-list { display: grid; gap: 9px; margin: 0 0 18px; padding-left: 20px; color: #526d80; }
+    /* the editable keyed sample names these classes, so give them a definition
+       instead of letting the generic input rule stretch the checkbox to full width */
+    .task-row input[type="checkbox"] { display: inline-block; width: auto; margin: 0 8px 0 0; padding: 0; border: 0; vertical-align: middle; }
+    .task-number { display: inline; margin: 0; color: #526d80; }
+    .task-number.completed { color: #9aa9b4; text-decoration: line-through; }
     .preview-status { margin: 0 0 17px; padding: 12px; border-radius: 4px; }
     .online { color: #135f76; background: #e0f4fa; }
     .offline { color: #526d80; background: #edf2f5; }
