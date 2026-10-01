@@ -685,6 +685,43 @@ const localProbe = await readLocalProbe();
 assert('/playground preview applies the working-tree data_ form', localProbe?.counter, '7');
 assert('/playground preview applies the working-tree className alias', localProbe?.className, 'from-tree');
 
+// Regression: the editable keyed sample binds every row's checkbox and text input
+// to stateOf() fields, so a pushed item that omits a bound field makes the checkbox
+// binding read `undefined.value` and throw inside the preview frame.
+section('/playground: editable keyed sample adds a row');
+await page.select('#playground-example', 'editableTasks');
+await new Promise(resolve => setTimeout(resolve, 400));
+const clickFrameButton = async (label, timeout = 20000) => {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		for (const frame of page.frames()) {
+			if (frame === page.mainFrame()) continue;
+			try {
+				const clicked = await frame.evaluate(text => {
+					const target = [...document.querySelectorAll('button')].find(candidate => candidate.textContent.trim() === text);
+					if (!target) return false;
+					target.click();
+					return true;
+				}, label);
+				if (clicked) return frame;
+			} catch { /* frame swapped mid-poll */ }
+		}
+		await new Promise(resolve => setTimeout(resolve, 200));
+	}
+	return null;
+};
+const taskFrame = await clickFrameButton('Add a task');
+assertTrue('/playground editable sample renders the add button', taskFrame !== null);
+await new Promise(resolve => setTimeout(resolve, 500));
+const taskRows = taskFrame
+	? await taskFrame.evaluate(() => document.querySelectorAll('.task-list .task-row').length).catch(() => -1)
+	: 0;
+assert('/playground editable sample appends a keyed row', taskRows, 3);
+// A thrown handler is reported back over postMessage, which makes the pane stop
+// naming a running preview - the exact symptom of the missing bound field.
+const previewStatus = await page.evaluate(() => document.getElementById('playground-status')?.textContent ?? '');
+assertTrue('/playground editable sample keeps the preview out of an error state', !previewStatus.startsWith('Preview error'));
+
 // Regression: leaving and re-entering the route rebuilds the frame, and a pane
 // that never starts looks exactly like a blank one. The re-entry below is a real
 // same-document router round trip: home -> playground -> home -> playground.

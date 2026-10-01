@@ -144,6 +144,7 @@ Jetz.mount(
     button("Add a task", {
       onclick: () => tasks.push(stateOf({
         id: nextId++,
+        done: false,
         title: \`New task \${nextId - 1}\`
       }))
     })
