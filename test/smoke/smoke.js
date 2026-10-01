@@ -639,7 +639,7 @@ function runMainSuite() {
 	// README: framework level helpers
 	section('framework helpers');
 
-	assert('Jetz.version', Jetz.version, '1.1.1');
+	assert('Jetz.version', Jetz.version, '1.1.2');
 	const styleCount = document.head.querySelectorAll('style').length;
 	Jetz.style('body { margin: 0 }');
 	assert('Jetz.style() injects a style tag', document.head.querySelectorAll('style').length, styleCount + 1);

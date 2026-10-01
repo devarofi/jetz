@@ -5,7 +5,7 @@
 
   <p>
     <a href="https://github.com/devarofi/jetz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-ISC-blue.svg" alt="License: ISC" /></a>
-    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.1.1-emerald.svg" alt="Version 1.1.1" /></a>
+    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.1.2-emerald.svg" alt="Version 1.1.2" /></a>
     <a href="https://github.com/devarofi/jetz/actions"><img src="https://img.shields.io/badge/tests-passing-brightgreen.svg" alt="Tests" /></a>
     <a href="https://rspack.dev"><img src="https://img.shields.io/badge/bundled_with-Rspack-orange.svg" alt="Rspack" /></a>
   </p>
