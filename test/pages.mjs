@@ -146,6 +146,13 @@ const probe = () => page.evaluate(() => {
 		stressTitle: document.title,
 		stressTable: document.querySelector('#app table') !== null,
 		stressRows: document.querySelectorAll('#app table tbody tr').length,
+		// the tagged-template ticker: one reactive string per rendered row
+		stressTicker: document.querySelector('#app table tbody tr .stress-ticker')?.textContent ?? '',
+		stressTickerCells: document.querySelectorAll('#app table tbody tr .stress-ticker').length,
+		stressStringCard: (() => {
+			const label = [...document.querySelectorAll('#app div')].find(el => el.textContent === 'Reactive string');
+			return label?.parentElement?.textContent ?? '';
+		})(),
 	};
 });
 
@@ -482,6 +489,20 @@ const stress = await open('/stress.html');
 assert('/stress.html serves its own title', stress.stressTitle, 'Jetz Stress Test - 50.000 Reactive Rows');
 assertTrue('/stress.html mounts the reactive grid', stress.stressTable);
 assertTrue('/stress.html renders a page of rows', stress.stressRows > 0);
+assertContains('/stress.html renders a tagged-template ticker per row', stress.stressTicker, ' pts · t');
+assert('/stress.html one ticker cell per rendered row', stress.stressTickerCells, stress.stressRows);
+assertContains('/stress.html reports the reactive-string metric', stress.stressStringCard, 'row strings');
+
+// one shared state write has to re-render every row's tagged string
+const tickOf = value => Number(/· t(\d+)\s*$/.exec(String(value ?? '').trim())?.[1] ?? -1);
+const tickBefore = tickOf(stress.stressTicker);
+await page.evaluate(() => {
+	const button = [...document.querySelectorAll('button')].find(el => el.textContent.includes('Pulse strings'));
+	if (button) button.click();
+});
+await new Promise(resolve => setTimeout(resolve, 150));
+const pulsed = await probe();
+assert('/stress.html one pulse re-renders every tagged string', tickOf(pulsed.stressTicker), tickBefore + 1);
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load', timeout: 20000 });
 await new Promise(resolve => setTimeout(resolve, 600));

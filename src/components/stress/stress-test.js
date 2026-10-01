@@ -4,7 +4,9 @@
  * Loads thousands of rows into a reactive `<table>`, renders one page at a time
  * with `loop(list, keyFn, renderFn)` keyed reconciliation, and measures every
  * render so the cost of pagination, sorting, filtering and per-row updates is
- * visible instead of guessed.
+ * visible instead of guessed. Every row also carries a reactive tagged-template
+ * string (the Ticker column), so the interpolation path runs under the same
+ * load and gets its own timing card.
  *
  * Conventions follow the Jetz README: `stateOf` / `computed` / `effect` for
  * reactive state, `listOf` + keyed `loop` for collections, `css()` for reactive
@@ -19,7 +21,7 @@ import {
 } from "../../lib/jetz.js";
 import {
     button, css, div, footer, h1, header, inputCheckbox, inputNumber, inputText,
-    label, main, p, section, small, span, strong, table, tbody, td, th, thead, tr
+    label, main, p, section, small, span, strong, table, tbody, td, text, th, thead, tr
 } from "../../lib/jetz-ui.js";
 
 /* -------------------------------------------------------------------------- */
@@ -60,10 +62,11 @@ const COLUMNS = [
     { key: "score", label: "Score", align: "text-right" },
     { key: "status", label: "Status" },
     { key: "visits", label: "Visits", align: "text-right" },
+    { key: "ticker", label: "Ticker", align: "text-right" },
     { key: null, label: "Actions", align: "text-right" }
 ];
 /** Columns that are not sortable (email has thousands of near-duplicate values). */
-const NOT_SORTABLE = new Set(["email", null]);
+const NOT_SORTABLE = new Set(["email", "ticker", null]);
 
 /** Deterministic PRNG so a dataset size always produces the same rows. */
 function mulberry32(seed) {
@@ -126,6 +129,8 @@ const page = stateOf(1);
 const pageSize = stateOf(25);
 const jumpText = stateOf("1");
 const sizeInput = stateOf(String(DEFAULT_DATASET_SIZE));
+/** Shared tick read by every row's tagged string — one write fans out to all of them. */
+const stringTick = stateOf(0);
 
 const stats = stateOf({
     buildMs: 0,   // generating the dataset
@@ -139,6 +144,7 @@ const stats = stateOf({
     changes: 0,
     updateMs: 0,  // last single-cell reactive update
     bulkMs: 0,    // last batch update across every row
+    stringMs: 0,  // last one-write fan-out across every row's tagged string
     domRows: 0,   // <tr> currently attached to the tbody
     heapMb: 0
 });
@@ -218,6 +224,7 @@ function loadDataset(size) {
     stats.lastMs.value = 0;
     stats.updateMs.value = 0;
     stats.bulkMs.value = 0;
+    stats.stringMs.value = 0;
     sweep.totalMs.value = 0;
     sweep.avgMs.value = 0;
     sweep.maxMs.value = 0;
@@ -346,6 +353,7 @@ const maxMsLabel = computed(() => msLabel(stats.maxMs.value));
 const p95MsLabel = computed(() => msLabel(stats.p95Ms.value));
 const updateMsLabel = computed(() => msLabel(stats.updateMs.value));
 const bulkMsLabel = computed(() => msLabel(stats.bulkMs.value));
+const stringMsLabel = computed(() => msLabel(stats.stringMs.value));
 const heapLabel = computed(() => stats.heapMb.value ? `${stats.heapMb.value} MB` : "n/a");
 const selectionLabel = computed(() => `${numberFormat(selectedCount.value)} selected`);
 
@@ -419,6 +427,17 @@ function bumpAllScores() {
         for (const row of dataset) row.score.value += 1;
     });
     stats.bulkMs.value = +(performance.now() - startedAt).toFixed(2);
+}
+
+/**
+ * One state write → every visible row's tagged string re-renders. The timing is
+ * the pure fan-out cost of the interpolation path (N row strings flushing from
+ * a single write), independent of which cells are bound to the same state.
+ */
+function pulseStrings() {
+    const startedAt = performance.now();
+    stringTick.value += 1;
+    stats.stringMs.value = +(performance.now() - startedAt).toFixed(2);
 }
 
 function clearSelection() {
@@ -617,6 +636,10 @@ function columnTh(column) {
  * state internally (`#bindClassParts`). The plain derivation functions are
  * created per mounted row, so off-screen rows keep zero subscriptions and
  * destroyed pages are GC-able.
+ *
+ * The Ticker cell is a tagged-template string: its `${() => ...}` interpolations
+ * become computed text nodes, so one state write re-renders exactly those —
+ * both the row's own states and the shared `stringTick` fan-out.
  */
 function RowView(row) {
     return tr(
@@ -637,6 +660,9 @@ function RowView(row) {
             row.status
         )),
         td(css`${CELL} text-right tabular-nums text-slate-300`, row.visits),
+        td(css`${CELL} stress-ticker text-right font-mono text-xs text-slate-400`,
+            text`#${row.idLabel} · ${() => row.score.value} pts · t${() => stringTick.value}`
+        ),
         td(css`${CELL} text-right`,
             div(css`flex justify-end gap-1`,
                 button(css`${BTN_TINY}`, { onclick: event => { event.stopPropagation(); bumpRow(row); } }, "+1"),
@@ -706,6 +732,7 @@ function StatsPanel() {
             div(css`${LABEL}`, "Render metrics"),
             div(css`flex flex-wrap items-center gap-2`,
                 button(css`${BTN}`, { onclick: bumpAllScores }, "Bump every score (+1)"),
+                button(css`${BTN}`, { onclick: pulseStrings }, "Pulse strings"),
                 button(css`${BTN}`, { onclick: resetMetrics }, "Reset metrics")
             )
         ),
@@ -718,6 +745,7 @@ function StatsPanel() {
             statCard("p95 / max", computed(() => `${msLabel(stats.p95Ms.value)} / ${msLabel(stats.maxMs.value)}`), computed(() => `mount ${msLabel(stats.mountMs.value)}`)),
             statCard("Single row update", updateMsLabel, "row state write → DOM"),
             statCard("Batch all rows", bulkMsLabel, "one state write per row"),
+            statCard("Reactive string", stringMsLabel, computed(() => `one write → ${numberFormat(stats.domRows.value)} row strings`)),
             statCard("Selection", selectionLabel, "click a row to toggle"),
             statCard("JS heap", heapLabel, "Chrome only")
         )
@@ -754,7 +782,7 @@ function SweepPanel() {
 
 function Footer() {
     return footer(css`flex flex-wrap items-center justify-between gap-2 pb-2 text-[11px] text-slate-500`,
-        small("Reactive pieces: stateOf · computed · effect · listOf · keyed loop — see the Jetz README for the full API."),
+        small("Reactive pieces: stateOf · computed · effect · listOf · keyed loop · tagged templates — see the Jetz README for the full API."),
         small("Open DevTools ▸ Performance while sweeping to see layout/paint cost per page.")
     );
 }
