@@ -86,6 +86,45 @@ describe('checkbox state binding', () => {
 	});
 });
 
+describe('binding diagnostics', () => {
+	it('names the binding, the list item and the template instead of leaking an internal .value read', () => {
+		const tasks = listOf(stateOf({ id: 201, title: 'Sketch the flow' }));
+		let error = null;
+		try {
+			mount(ul(loop(
+				tasks,
+				task => task.id.value,
+				task => li(ui.input(ui.type('checkbox'), { bind: task.done }))
+			)));
+		} catch (thrown) {
+			error = thrown;
+		}
+		expect(error).toBeInstanceOf(TypeError);
+		expect(error.name).toBe('JetzBindingError');
+		expect(error.message).toContain('`bind`');
+		expect(error.message).toContain('received undefined');
+		expect(error.message).toContain('stateOf({ id, done: false, title })');
+		expect(error.message).toContain('list item at index 0');
+		expect(error.message).toContain('key 201');
+		expect(error.message).toContain('bind: task.done');
+	});
+	it('describes other invalid targets and leaves real bindings working', () => {
+		const text = stateOf('initial');
+		const target = mount(ui.inputText({ bind: text }));
+		const input = target.querySelector('input');
+		expect(input.value).toBe('initial');
+		input.value = 'typed';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(text.value).toBe('typed');
+
+		let error = null;
+		try { mount(ui.inputText({ bind: 42 })); } catch (thrown) { error = thrown; }
+		expect(error?.name).toBe('JetzBindingError');
+		expect(error.message).toContain('received number (42)');
+		expect(error.message).toContain('<input type="text">');
+	});
+});
+
 describe('route head metadata', () => {
 	it('sets metadata on navigation and replaces only prior route metadata', () => {
 		window.history.replaceState({}, '', '/');

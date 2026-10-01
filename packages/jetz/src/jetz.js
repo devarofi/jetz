@@ -296,6 +296,117 @@ function disposeViewScope(view) {
 	view.__scope = null;
 	scope.dispose();
 }
+/**
+ * Structural diagnostics.
+ *
+ * A binding is evaluated while the framework renders, so by the time its target
+ * is read the caller's frames are gone from the stack. These helpers keep enough
+ * context to name the code that has to change - the loop item being built and
+ * the template that bound it - instead of leaking an internal
+ * "Cannot read properties of undefined (reading 'value')".
+ */
+
+/** Loop item currently being built, if any. Set by ListState.createItemView(). */
+let _renderContext = null;
+/** Creation stacks, captured per element when `Jetz.devtools` is on. */
+const _elementOrigins = new WeakMap();
+/** Frames that belong to the framework rather than to the caller's code. */
+const _frameworkFrame = /(?:^|\/)(?:jetz|jetz-ui)(?:\.min)?\.js/;
+
+/**
+ * True for every value `bind` accepts: a State, a State subclass, or a custom
+ * state object exposing the same read/write/broadcast contract.
+ */
+function isBindableState(value) {
+	if (value instanceof State) return true;
+	if (value === null || value === undefined) return false;
+	if (typeof value === 'function' && value.prototype instanceof State) return true;
+	return 'value' in Object(value)
+		&& typeof value.subscribe === 'function'
+		&& typeof value.unsubscribe === 'function';
+}
+
+/** The first stack frame that is not the framework itself. */
+function firstUserFrame(stack) {
+	if (!stack) return null;
+	for (const line of String(stack).split('\n').slice(1)) {
+		const frame = line.trim();
+		if (!frame || _frameworkFrame.test(frame) || /\bnode_modules\b/.test(frame)) continue;
+		return frame;
+	}
+	return null;
+}
+
+/** Readable description of whatever the caller handed to `bind`. */
+function describeBindingTarget(value) {
+	if (value === undefined) return 'undefined';
+	if (value === null) return 'null';
+	if (Array.isArray(value)) return 'an array';
+	if (typeof value === 'function') return 'a function that is not a state';
+	if (typeof value === 'object') {
+		const keys = Object.keys(value);
+		return `a plain object with keys [${keys.length ? keys.join(', ') : 'none'}]`;
+	}
+	return `${typeof value} (${String(value)})`;
+}
+
+/** The `bind` lines of a loop item template: they name the failing expression. */
+function bindingSnippet(template) {
+	if (typeof template !== 'function') return null;
+	let source;
+	try { source = Function.prototype.toString.call(template); } catch (error) { return null; }
+	const hits = source.split('\n')
+		.map(line => line.trim())
+		.filter(line => /\bbind\b/.test(line))
+		.map(line => line.length > 200 ? `${line.slice(0, 197)}...` : line);
+	return hits.length ? hits.slice(0, 4).map(line => `    ${line}`).join('\n') : null;
+}
+
+/**
+ * Thrown when `bind` receives something that cannot be read reactively.
+ *
+ * It stays a TypeError so existing try/catch keeps working, but the message
+ * names the element, what was received and - inside `loop()` - the item and the
+ * template the developer has to fix.
+ */
+export class JetzBindingError extends TypeError {
+	constructor(message, options) {
+		super(message, options);
+		this.name = 'JetzBindingError';
+	}
+}
+
+/** Builds the guidance shown when a `bind` target is not a state. */
+function describeBindingFailure(stateTarget, element) {
+	const node = element.o;
+	const tag = (node?.tagName ?? element.tagName ?? 'element').toLowerCase();
+	const inputType = element.attributes?.type ?? node?.type;
+	const lines = [
+		`Jetz: \`bind\` on <${tag}${inputType ? ` type="${inputType}"` : ''}> expected a state but received ${describeBindingTarget(stateTarget)}.`,
+		'',
+		'A `bind` target has to come from stateOf(), computed() or rememberOf().'
+	];
+	if (stateTarget === undefined) {
+		lines.push(
+			'',
+			'`undefined` usually means the state object is missing that field, e.g.',
+			'    stateOf({ id, title })                // then `bind: task.done` reads undefined',
+			'    stateOf({ id, done: false, title })   // give every bound field a value'
+		);
+	}
+	if (_renderContext) {
+		const { index, key, template } = _renderContext;
+		lines.push('', `While rendering the list item at index ${index}${key === undefined ? '' : ` (key ${String(key)})`}.`);
+		const snippet = bindingSnippet(template);
+		if (snippet) lines.push('The item template binds:', snippet);
+	}
+	const origin = firstUserFrame(_elementOrigins.get(element));
+	if (origin) lines.push('', `The element was built by: ${origin}`);
+	else if (!_renderContext) {
+		lines.push('', 'Set `Jetz.devtools = true` to include the code that built this element.');
+	}
+	return lines.join('\n');
+}
 let _batchDepth = 0;
 let _isFlushingBatch = false;
 const _pendingBatchStates = new Map();
@@ -478,6 +589,9 @@ class JetzElement {
 		this.tagName = tag;
 		this.attributes = attributes;
 		this.children = children;
+		// Opt-in only: capturing a stack per element is measurable on large lists,
+		// so it happens only when the developer asked for binding diagnostics.
+		if (Jetz.devtools) _elementOrigins.set(this, new Error().stack);
 	}
 
 	/**
@@ -659,6 +773,9 @@ class JetzElement {
 		}
 	}
 	#bindInputValue(stateTarget) {
+		if (!isBindableState(stateTarget)) {
+			throw new JetzBindingError(describeBindingFailure(stateTarget, this));
+		}
 		const inputType = this.attributes.type ?? this.o.type;
 		if (this.o instanceof HTMLInputElement && inputType === 'checkbox') {
 			this.o.checked = Boolean(stateTarget.value);
@@ -1186,6 +1303,12 @@ class JetzElement {
 	}
 }
 class Jetz {
+	/**
+	 * When true, elements remember the stack that created them, so a binding error
+	 * can point at the offending line. Off by default: it captures a stack per
+	 * element, which is measurable on large lists.
+	 */
+	static devtools = false;
 	// Jetz Element Collection that have If Else Annotation
 	static remountByAttr = [];
 	static #onRenderedCollections = [];
@@ -1669,7 +1792,22 @@ export class ListState extends Array {
 		// Each item render gets its own scope: every effect/computed/binding it
 		// creates is registered there and released together when the reconciler
 		// drops this view (keyed removal, item swap, or a full refresh).
-		const { value: view, scope } = withReactiveScope(() => this.#buildItemView(parent, item, index));
+		const { value: view, scope } = withReactiveScope(() => {
+			// Publish which item is being built so a binding error raised by the
+			// render callback can name the item and its template instead of only
+			// the internal frame that read `.value`.
+			const previousContext = _renderContext;
+			_renderContext = {
+				index,
+				key: this._keyFn ? this._keyFn(item) : undefined,
+				template: this.renderCallback
+			};
+			try {
+				return this.#buildItemView(parent, item, index);
+			} finally {
+				_renderContext = previousContext;
+			}
+		});
 		if (view != null && typeof view === 'object') view.__scope = scope;
 		return view;
 	}

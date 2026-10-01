@@ -520,11 +520,28 @@ export declare function flatMap(arr: any[]): any[];
 export declare function createList<T>(count: number, factory: (index: number) => T): T[];
 
 /**
+ * Thrown when a `bind` target is not a reactive state. The message names the
+ * element, what was received and - inside `loop()` - the item and the template
+ * the developer has to fix.
+ */
+export declare class JetzBindingError extends TypeError {
+    name: string;
+}
+
+/**
  * Core Jetz Application singleton.
  */
 export declare const Jetz: {
     version: string;
     readonly isMounting: boolean;
+
+    /**
+     * When true, elements remember the stack that created them so a binding
+     * error can point at the offending line. Off by default: it captures a
+     * stack per element, which is measurable on large lists.
+     */
+    devtools: boolean;
+
     remountByAttr: JetzElement[];
     $route?: Router;
     $session?: JetzSession;

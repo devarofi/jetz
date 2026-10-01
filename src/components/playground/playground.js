@@ -250,16 +250,24 @@ function createPreviewDocument(source) {
     // over postMessage is what lets the pane show a real state instead of an empty
     // rectangle when the module is unreachable or never starts.
     const report = (state, detail = "") => parent.postMessage({ source: "jetz-preview", state, detail }, "*");
+    const showError = message => {
+      // the ready handler below removes #preview-error, so a failure raised after
+      // the module started has to put the element back, or the framework's
+      // message would only exist in the parent's one-line status text
+      let output = document.getElementById("preview-error");
+      if (!output) {
+        output = document.createElement("p");
+        output.id = "preview-error";
+        document.body.append(output);
+      }
+      output.textContent = message;
+      return message;
+    };
     addEventListener("error", event => {
-      const output = document.getElementById("preview-error");
-      if (output) output.textContent = event.message || "Preview error";
-      report("error", event.message || "Preview error");
+      report("error", showError(event.message || "Preview error"));
     });
     addEventListener("unhandledrejection", event => {
-      const message = event.reason?.message || String(event.reason);
-      const output = document.getElementById("preview-error");
-      if (output) output.textContent = message;
-      report("error", message);
+      report("error", showError(event.reason?.message || String(event.reason)));
     });
   </script>
   <script type="module">

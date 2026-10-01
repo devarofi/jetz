@@ -1019,6 +1019,35 @@ const SearchBox = div(
 
 Whenever the user types, `query.value` updates immediately. Conversely, setting `query.value = "something"` updates the input field's display value automatically.
 
+#### When a binding fails
+
+A `bind` target has to be a reactive state. When it is not - most often because a
+list item is missing the field its template binds - Jetz throws a
+`JetzBindingError` naming the element, what it received, and the item and
+template that have to be fixed, instead of an internal `Cannot read properties of
+undefined (reading 'value')`:
+
+```text
+Jetz: `bind` on <input type="checkbox"> expected a state but received undefined.
+
+A `bind` target has to come from stateOf(), computed() or rememberOf().
+
+`undefined` usually means the state object is missing that field, e.g.
+    stateOf({ id, title })                // then `bind: task.done` reads undefined
+    stateOf({ id, done: false, title })   // give every bound field a value
+
+While rendering the list item at index 0 (key 201).
+The item template binds:
+    task => li(input(type`checkbox`, { bind: task.done }))
+```
+
+The error stays a `TypeError`, so existing `try/catch` blocks keep working while
+the message tells you which line of *your* code to change.
+
+Outside a `loop()` there is no item template to quote, so set `Jetz.devtools = true`
+to also include the stack frame that built the element. It is off by default
+because it captures a stack per element, which is measurable on large lists.
+
 ---
 
 ### 11. Reactive Listeners (`listen`)
