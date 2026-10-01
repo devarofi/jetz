@@ -1,7 +1,12 @@
 import { JetzElement } from './jetz.js';
 
 export type ElementChild = JetzElement | HTMLElement | string | number | boolean | Function | Record<string, any> | any[] | null | undefined;
-export type ElementFactory = (...args: ElementChild[]) => JetzElement;
+/** Element factory: callable with normal arguments, or as a tagged template
+ * (div`Is online : ${...}`) for reactive function interpolation. */
+export type ElementFactory = {
+    (...args: ElementChild[]): JetzElement;
+    (strings: TemplateStringsArray, ...values: any[]): JetzElement;
+};
 export type AttrFactory = (value: any) => Record<string, any>;
 export type EventFactory = (callback: (e: any) => void) => Record<string, (e: any) => void>;
 
@@ -11,7 +16,9 @@ export type EventFactory = (callback: (e: any) => void) => Record<string, (e: an
 
 export declare function find(selector: string): HTMLElement | null;
 export declare function findAll(selector: string): NodeListOf<HTMLElement>;
-export declare function text(...content: any[]): string[];
+/** Tagged template merging static chunks with interpolated values; interpolated
+ * functions render as reactive text (div`…${fn}` works the same way). */
+export declare function text(...content: any[]): any[];
 
 // ---------------------------------------------------------------------------
 // Attribute & Style Helpers

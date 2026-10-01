@@ -2,8 +2,53 @@ import { computed, createElement, State } from './jetz.js'
 
 // ---------- factories (deduplicate the repetitive helpers below) ----------
 
-/** Creates a named element factory bound to a tag. */
-const elementOf = tag => (...args) => createElement(tag, ...args);
+/**
+ * Turns a tagged template's static chunks and interpolated values into children.
+ * An interpolated function is probed once to see what it produces:
+ * - primitives (string/number/boolean/null/undefined) become a computed()
+ *   text state, so `div`Is online : ${() => online.value ? 'Yes' : 'No'}``
+ *   re-renders whenever a state read inside the getter changes. A plain
+ *   (untagged) template literal would flatten `${fn}` to its source text and
+ *   lose the closure, which is exactly why the tag form exists;
+ * - objects (elements, components, states, arrays) keep the previous
+ *   one-shot function-child behaviour and are passed through untouched.
+ */
+function templateChildren(strings, values) {
+    const children = [];
+    strings.forEach((chunk, index) => {
+        // templates that start/end with an interpolation produce empty static
+        // chunks; skipping them avoids creating empty Text nodes that would
+        // only add DOM nodes without rendering anything
+        if (chunk !== '') children.push(chunk);
+        if (index >= values.length) return;
+        const value = values[index];
+        if (value === '') return;
+        if (typeof value !== 'function') {
+            children.push(value);
+            return;
+        }
+        let probe;
+        try { probe = value(); } catch { probe = undefined; }
+        const isTextGetter = probe == null ||
+            (typeof probe !== 'object' && typeof probe !== 'function');
+        children.push(isTextGetter
+            ? computed(() => {
+                const result = value();
+                // null/undefined/false contribute no text (same rule as cssValue)
+                return result == null || result === false ? '' : result;
+            })
+            : value);
+    });
+    return children;
+}
+
+/** Creates a named element factory bound to a tag. The factory doubles as a
+ * tagged template — div`Is online : ${...}` — see templateChildren(). */
+const elementOf = tag => (...args) => {
+    if (args.length > 0 && Array.isArray(args[0]) && Object.hasOwn(args[0], 'raw'))
+        return createElement(tag, templateChildren(args[0], args.slice(1)));
+    return createElement(tag, ...args);
+};
 
 /** Creates an attribute helper: value => ({ [key]: value }) */
 const attrOf = key => value => ({
@@ -78,16 +123,10 @@ export const wrap = {
     wrap: 'hard'
 };
 
-// tagged template: merges static strings with interpolated values
+// tagged template: merges static strings with interpolated values;
+// interpolated functions render as reactive text (see templateChildren)
 export function text(...content) {
-    const strings = content[0].raw;
-    const values = content.slice(1);
-    const merged = [];
-    strings.forEach((str, i) => {
-        merged.push(str);
-        if (i < values.length) merged.push(values[i]);
-    });
-    return merged;
+    return templateChildren(content[0], content.slice(1));
 }
 
 // ---------- elements ----------

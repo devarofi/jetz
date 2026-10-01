@@ -457,6 +457,27 @@ div(
 )
 ```
 
+#### Reactive Tag Templates
+
+Every element factory doubles as a tagged template. Interpolated **functions** are evaluated as reactive text and re-render whenever a state they read changes:
+
+```javascript
+const stateOnline = stateOf(true);
+
+div`Is Online : ${() => stateOnline.value ? "Yes" : "No"}`;
+span`Hello ${username}!`; // states can be interpolated directly
+```
+
+Components and static values keep working as children, so ``div`Status: ${Badge}``` renders the badge element.
+
+> ⚠️ The same code written as a plain string — a normal `div(...)` call with an untagged template literal — cannot work: JavaScript flattens the interpolated function to its source text and the closure is gone before jetz sees it. With `Jetz.devtools = true`, jetz warns when a text child looks like a stringified function and points at the tagged form. The `text` tag behaves the same way:
+
+```javascript
+div(text`Count : ${() => count.value}`);
+```
+
+The bundled stress page (`public/stress.html`) renders one tagged string per row — the **Ticker** column — and reports a dedicated *Reactive string* metric: a single shared write re-rendering every row's string under load.
+
 ---
 
 ### 2. Components (Functions & Classes)

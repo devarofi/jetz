@@ -185,6 +185,25 @@ export class JetzArgument {
 	}
 }
 
+/**
+ * A plain (untagged) template literal stringifies an interpolated function into
+ * its source text — `div(`online: ${() => state.value ...}`)` renders the code,
+ * not the value, and the closure is already gone. Flags that mistake while
+ * `Jetz.devtools` is on (displayed code samples can legitimately contain `=>`,
+ * so normal runs stay silent) and points at the tagged forms that stay reactive.
+ */
+const stringifiedFunctionPattern = /(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>|\bfunction\s*(?:[A-Za-z_$][\w$]*\s*)?\(/;
+function warnStringifiedFunction(child) {
+	if (!Jetz.devtools || typeof child !== 'string') return;
+	if (!stringifiedFunctionPattern.test(child)) return;
+	const snippet = child.length > 120 ? child.slice(0, 120) + '…' : child;
+	console.warn(
+		'Jetz: a text child looks like a stringified function — a plain template ' +
+		'literal flattens `${fn}` to its source code. Use a tagged template ' +
+		'instead (div`…${fn}` or text`…${fn}`) so it renders reactively. Child: ' +
+		JSON.stringify(snippet)
+	);
+}
 function createElement(tag, ...args) {
 	args = flatMap(args);
 	let attr = {};
@@ -923,6 +942,7 @@ class JetzElement {
 			return this;
 		} else {
 			_child = child;
+			warnStringifiedFunction(child);
 		}
 		if (child instanceof Component) {
 			return this.#appendComponent(child);
@@ -2663,6 +2683,7 @@ class IfElse {
 		if (result instanceof Raw) {
 			return Array.from(toNodes(result.get()));
 		}
+		warnStringifiedFunction(result);
 		return [document.createTextNode(result)];
 	}
 
