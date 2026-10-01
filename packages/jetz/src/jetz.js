@@ -76,15 +76,19 @@ const dashedAttributePrefixes = new Set(['data', 'aria']);
  * `data_`/`aria_` underscore form. Anything else is returned untouched, so a typo
  * like `cssClass` still lands in the DOM verbatim rather than being rerouted.
  */
+const _attrNameCache = new Map();
 function normalizeAttributeName(name) {
 	const key = String(name);
+	const cached = _attrNameCache.get(key);
+	if (cached !== undefined) return cached;
 	const alias = attributeNameAliases[key.toLowerCase()];
-	if (alias) return alias;
+	if (alias) return _attrNameCache.set(key, alias), alias;
 	const separator = key.indexOf('_');
 	if (separator > 0 && dashedAttributePrefixes.has(key.slice(0, separator))) {
-		return key.replace(/_/g, '-');
+		const result = key.replace(/_/g, '-');
+		return _attrNameCache.set(key, result), result;
 	}
-	return key;
+	return _attrNameCache.set(key, key), key;
 }
 const booleanAttributes = new Set([
 	'allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'controls',
@@ -611,6 +615,8 @@ class JetzElement {
 		// Opt-in only: capturing a stack per element is measurable on large lists,
 		// so it happens only when the developer asked for binding diagnostics.
 		if (Jetz.devtools) _elementOrigins.set(this, new Error().stack);
+		// Cache for bound event handlers (callback -> boundCallback)
+		this._boundHandlerCache = new Map();
 	}
 
 	/**
@@ -1052,7 +1058,13 @@ class JetzElement {
 	/** Binds and attaches a listener entry once, keeping the bound reference for off(). */
 	#attachListener(listener) {
 		if (listener.boundCallback) return;
-		listener.boundCallback = listener.callback.bind(this);
+		const cached = this._boundHandlerCache.get(listener.callback);
+		if (cached) {
+			listener.boundCallback = cached;
+		} else {
+			listener.boundCallback = listener.callback.bind(this);
+			this._boundHandlerCache.set(listener.callback, listener.boundCallback);
+		}
 		this.#addListener(listener.eventName, listener.boundCallback);
 	}
 	hide() {
@@ -1155,28 +1167,58 @@ class JetzElement {
 	#bindClassParts(value) {
 		// re-binding replaces the previous wiring; without dropping it a re-render
 		// would leave the earlier compose callback subscribed as well
-		this.#unbindClassParts();
-		const parts = (Array.isArray(value) ? value.flat(Infinity) : [value])
+		const newParts = (Array.isArray(value) ? value.flat(Infinity) : [value])
 			.map(part => (typeof part === 'function' ? computed(part) : part));
-		this.#classParts = parts;
-		const compose = () => this.#setClassAttribute(
-			this.#classParts.map(part => (part instanceof State ? part.getValue() : part))
-		);
-		parts.forEach(part => {
-			if (!(part instanceof State)) return;
+		
+		// Reuse subscriptions for unchanged parts (by identity)
+		const oldParts = this.#classParts;
+		const oldUnsubs = this.#classUnsubs;
+		const newUnsubs = [];
+		
+		newParts.forEach((part, i) => {
+			if (!(part instanceof State)) {
+				newUnsubs.push(null);
+				return;
+			}
+			// Find matching old part by identity
+			const oldPart = oldParts[i];
+			if (oldPart === part) {
+				// Same subscription, keep it
+				newUnsubs.push(oldUnsubs[i]);
+				return;
+			}
+			// New or changed part - subscribe
+			const compose = () => this.#setClassAttribute(
+				this.#classParts.map(p => (p instanceof State ? p.getValue() : p))
+			);
 			part.subscribe(compose);
 			const off = () => part.unsubscribe(compose);
-			this.#classUnsubs.push(off);
+			newUnsubs.push(off);
 			this.#bindTeardown(off);
 		});
-		compose();
+		
+		// Unsubscribe only for removed parts
+		oldParts.forEach((part, i) => {
+			if (!newParts.includes(part) && part instanceof State) {
+				oldUnsubs[i]?.();
+			}
+		});
+		
+		this.#classParts = newParts;
+		this.#classUnsubs = newUnsubs;
+		
+		// Initial compose
+		this.#setClassAttribute(
+			this.#classParts.map(part => (part instanceof State ? part.getValue() : part))
+		);
 	}
 	#unbindClassParts() {
-		this.#classUnsubs.forEach(off => off());
+		this.#classUnsubs.forEach(off => off?.());
 		this.#classUnsubs = [];
 	}
 	#setClassAttribute(value) {
-		const values = Array.isArray(value) ? flatMap(value) : [value];
+		// value is already flat from .map() - no need for recursive flatMap
+		const values = Array.isArray(value) ? value : [value];
 		const className = values
 			.filter(item => item != null && item !== false)
 			.flatMap(item => String(item).split(/\s+/))
@@ -1525,10 +1567,11 @@ class State {
 			this.#value.render();
 			element = this.#value.getElement();
 		} else {
-			element = new Text(this.#value);
+			// Reuse existing Text node if available
+			const existingText = this.container.find(c => c instanceof Text);
+			element = existingText ?? new Text(this.#value);
 		}
 		this.container.push(element);
-		// Will added in element tree
 		return element;
 	}
 	/** Registers a listener invoked as `listener(newValue, oldValue)` on every change. */
@@ -2311,6 +2354,39 @@ function stateOf(value, handler = { get(value) { return value } }) {
 	return instance;
 }
 /**
+ * Lazy signal: initializer runs only on first `.value` read.
+ * Like SolidJS's `lazy()` — defers expensive computation until actually needed.
+ * Subsequent reads return the cached value without re-running the initializer.
+ */
+function lazy(initializer) {
+	let initialized = false;
+	let value;
+	const state = new State(undefined, {
+		get() {
+			if (!initialized) {
+				initialized = true;
+				value = initializer();
+			}
+			return value;
+		},
+		set(obj, next) {
+			initialized = true;
+			value = next;
+			obj.setState(next);
+			return true;
+		}
+	});
+	// Override setState to track initialization
+	const originalSetState = state.setState.bind(state);
+	state.setState = (next) => {
+		initialized = true;
+		value = next;
+		originalSetState(next);
+	};
+	return state;
+}
+
+/**
  * Shallow row state: Proxy-based lazy getters at row granularity.
  *
  * Data stays a plain object in a WeakMap; every property read goes through ONE
@@ -2996,4 +3072,4 @@ function effect(effectFn) {
 	return dispose;
 }
 
-export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };
+export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, lazy, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };

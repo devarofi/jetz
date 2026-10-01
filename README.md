@@ -166,6 +166,7 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Reactive Lists** | `listOf()`, `sequenceOf()` | Observable arrays with chainable methods (`push`, `remove`, `sort`). |
 | **Keyed Reconciliation** | `loop(list, keyFn, renderFn)` | O(1) DOM element recycling and minimal mutations on array changes. |
 | **Shallow Row State** | `shallowStateOf()`, `rowOf()` | Row-level reactivity for tables: one signal per record instead of one per cell. |
+| **Lazy Signals** | `lazy(fn)` | Deferred initialization: initializer runs only on first `.value` read (like SolidJS). |
 | **Auto Cleanup Lifecycle** | `loop()` + `disposeBindings()` | Drops subscriptions, computed values and listeners when a row leaves the DOM. |
 | **Conditional UI** | `_if`, `_elseif`, `_else`, `ifElse` | Declarative, reactive conditional rendering without wrapper divs. |
 | **Component Lifecycle** | `onCreate`, `onMount`, `onUpdate`, `onDestroy` | Deterministic setup and teardown for function and class components. |
@@ -1208,6 +1209,59 @@ Each shallow row carries four helpers:
 > `rowOf()` falls back to plain `stateOf()` for primitives, arrays and
 > `JetzElement`s, so you can map it over mixed data without branching.
 
+### Lazy Signals (`lazy`)
+
+`lazy(initializer)` creates a signal that defers its computation until the first
+`.value` read. This mirrors SolidJS's `lazy()` and is useful for expensive
+initialization that should only happen when actually needed.
+
+```javascript
+import { lazy } from "jetz";
+
+// Initializer runs only on first access
+const heavyData = lazy(() => {
+  console.log("Computing...");  // Runs once
+  return expensiveComputation();
+});
+
+// First read triggers computation
+console.log(heavyData.value);  // Logs "Computing..." then returns result
+
+// Subsequent reads return cached value (no re-computation)
+console.log(heavyData.value);  // Returns cached result directly
+```
+
+#### Lazy Dataset Pattern
+
+For large datasets that may not be needed immediately (e.g., a tab the user
+never opens), wrap the data in `lazy()`:
+
+```javascript
+import { lazy, listOf, loop, rawOf, rowOf } from "jetz";
+import { table, tbody, tr, td } from "jetz/ui";
+
+// Dataset generated only when pipeline first runs
+const allEmployees = lazy(() => fetchEmployees().map(rowOf));
+
+const query = stateOf("");
+const page = stateOf(1);
+
+// Pipeline reads .value, triggering lazy init and tracking dependency
+effect(() => {
+  const data = allEmployees.value;  // lazy init happens here
+  const filtered = data.filter(emp => 
+    rawOf(emp).name.includes(query.value)
+  );
+  employees.set(paginate(filtered, page.value));
+});
+```
+
+**Benefits:**
+- **Startup performance** — expensive data generation skipped until needed
+- **Memory** — off-screen datasets never allocated if user doesn't visit
+- **Reactivity** — works with `computed`, `effect`, and DOM bindings like any `State`
+- **Write support** — `lazyValue.value = newData` replaces the cached value
+
 ### Untracked Pipeline Reads (`rawOf`)
 
 A tracked read inside a `computed()` or an `effect()` **subscribes** it. That is
@@ -1777,6 +1831,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`rowOf(object)`](#shallow-row-state-shallowstateof-rowof): Alias of `shallowStateOf()` tuned for table records.
 * [`rawOf(row)`](#untracked-pipeline-reads-rawof): Untracked read of a shallow row's plain data.
 * [`touchRow(row)`](#untracked-pipeline-reads-rawof): Manually bump a shallow row's version.
+* [`lazy(fn)`](#lazy-signals-lazy): Deferred signal — initializer runs only on first `.value` read.
 
 ### Collections & Reconciliation
 * [`listOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive array with helper mutation methods.

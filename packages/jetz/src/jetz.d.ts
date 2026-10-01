@@ -439,6 +439,16 @@ export declare function effect(effectFn: () => void): () => void;
 export declare function batch<T>(callback: () => T): T;
 
 /**
+ * Creates a lazy signal that only evaluates its initializer on first `.value` read.
+ * Like SolidJS's `lazy()` — defers expensive computation until actually needed.
+ *
+ * @example
+ * const heavy = lazy(() => expensiveComputation());
+ * // heavy.value triggers computation on first read only
+ */
+export declare function lazy<T>(initializer: () => T): State<T>;
+
+/**
  * Creates a reactive collection (ListState).
  *
  * @example
