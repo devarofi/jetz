@@ -1320,6 +1320,79 @@ describe('Dispatcher', () => {
 		d.dispatch('save', 42);
 		expect(got).toEqual(['save', 42]);
 	});
+
+	it('forwards every extra argument to the handler', () => {
+		let got = null;
+		const d = new Dispatcher((...args) => { got = args; });
+		d.dispatch('save', 1, 2, 3);
+		expect(got).toEqual(['save', 1, 2, 3]);
+	});
+
+	it('returns the handler result to the caller', () => {
+		const d = new Dispatcher((action, n) => n * 2);
+		expect(d.dispatch('double', 21)).toBe(42);
+	});
+
+	it('lifts an async handler into a promise', async () => {
+		const d = new Dispatcher(async action => `async:${action}`);
+		const pending = d.dispatch('go');
+		expect(pending).toBeInstanceOf(Promise);
+		await expect(pending).resolves.toBe('async:go');
+	});
+
+	it('lets a handler dispatch another action', () => {
+		const seen = [];
+		const d = new Dispatcher(action => {
+			seen.push(action);
+			if (action === 'outer') d.dispatch('inner');
+		});
+		d.dispatch('outer');
+		expect(seen).toEqual(['outer', 'inner']);
+	});
+
+	it('accepts non-string action identifiers', () => {
+		const got = [];
+		const symbolAction = Symbol('action');
+		const d = new Dispatcher(action => got.push(action));
+		d.dispatch({ type: 'LOADED' });
+		d.dispatch(symbolAction);
+		d.dispatch(123);
+		expect(got).toEqual([{ type: 'LOADED' }, symbolAction, 123]);
+	});
+
+	it('uses a safe no-op handler when constructed without a callback', () => {
+		const d = new Dispatcher();
+		expect(() => d.dispatch('anything', 1, 2)).not.toThrow();
+	});
+
+	it('drives a switch-based handler against reactive state (README pattern)', () => {
+		const page = stateOf('home');
+		const d = new Dispatcher(action => {
+			if (action === 'NAV_HOME') page.value = 'home';
+			if (action === 'NAV_ABOUT') page.value = 'about';
+		});
+		d.dispatch('NAV_ABOUT');
+		expect(page.value).toBe('about');
+		d.dispatch('NAV_HOME');
+		expect(page.value).toBe('home');
+	});
+
+	it('has no artificial recursion depth limit', () => {
+		const d = new Dispatcher(action => {
+			const n = Number(action);
+			if (n > 0) d.dispatch(String(n - 1));
+			return n;
+		});
+		expect(d.dispatch('250')).toBe(250);
+	});
+
+	// Documents current behaviour: there is a single handler and no isolation,
+	// so a throwing handler surfaces to the dispatch() caller. This test exists
+	// so a deliberate change (isolation / multi-store) cannot land unnoticed.
+	it('propagates a throwing handler to the caller', () => {
+		const d = new Dispatcher(() => { throw new Error('store blew up'); });
+		expect(() => d.dispatch('X')).toThrow('store blew up');
+	});
 });
 
 describe('Jetz helpers', () => {
