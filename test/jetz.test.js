@@ -207,6 +207,63 @@ describe('dynamic route paths', () => {
 	});
 });
 
+describe('hash routing', () => {
+	it('navigates through hash targets without touching the pathname', () => {
+		window.history.replaceState({}, '', '/');
+		let page = null;
+		const router = new Router(
+			route('/', () => div('Home')),
+			route('/product', () => {
+				page = 'product';
+				return div('Product');
+			})
+		);
+		router.install(Jetz);
+		router.to('#/product');
+		expect(page).toBe('product');
+		expect(window.location.pathname).toBe('/');
+		expect(window.location.hash).toBe('#/product');
+		const rendered = mount(router.browser().value);
+		expect(rendered.textContent).toBe('Product');
+	});
+
+	it('resolves route-shaped fragments typed or loaded directly', () => {
+		window.history.replaceState({}, '', '/#/product/42');
+		let receivedParams = null;
+		const router = new Router(
+			route('/', () => div('Home')),
+			route('/product/:productId', {
+				component: params => {
+					receivedParams = params;
+					return div(`Product ${params.productId}`);
+				}
+			})
+		);
+		router.install(Jetz);
+		expect(receivedParams).toEqual({ productId: '42' });
+		const rendered = mount(router.browser().value);
+		expect(rendered.textContent).toBe('Product 42');
+	});
+
+	it('leaves plain in-page anchors on the pathname route', () => {
+		window.history.replaceState({}, '', '/#section');
+		let page = null;
+		const router = new Router(
+			route('/', () => {
+				page = 'home';
+				return div('Home');
+			}),
+			route('/product', () => {
+				page = 'product';
+				return div('Product');
+			})
+		);
+		router.install(Jetz);
+		expect(page).toBe('home');
+		window.history.replaceState({}, '', '/');
+	});
+});
+
 describe('nested route groups', () => {
 	it('joins prefixes and runs inherited middleware before child middleware', () => {
 		window.history.replaceState({}, '', '/');

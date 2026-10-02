@@ -31,6 +31,7 @@ export class Router {
 	#routes;
 	#navigationObserver;
 	#routeHeadNodes = [];
+	#lastListenerUrl = null;
 
 	constructor(...route) {
 		if ('navigation' in window) {
@@ -48,16 +49,40 @@ export class Router {
 				this.#fallbackNavigateListener(window.location.href);
 			});
 		}
+		// Hash routing (`#/...`) works without any opt-in: a fragment shaped
+		// like a route always wins over the pathname, so static hosts without
+		// server rewrites stay navigable. Plain anchors (`#section`) fall
+		// through to the pathname route.
+		window.addEventListener('hashchange', () => {
+			this.#fallbackNavigateListener(window.location.href);
+		});
+	}
+	/**
+	 * Reads a route out of a URL fragment. Only fragments shaped like a
+	 * route (`#/product`, `#/`) qualify; anything else (e.g. `#section`)
+	 * returns null so in-page anchors never hijack routing.
+	 */
+	#routeFromHash(hash) {
+		if (typeof hash === 'string' && hash.length > 1 && hash[1] === '/')
+			return this.#fixRoutename(hash.slice(1));
+		return null;
 	}
 	#fallbackNavigateListener(url) {
-		const { pathname } = new URL(url);
-		const pathDestination = pathname;
-		const routeDestination = this.#fixRoutename(pathDestination);
+		// popstate/navigate and hashchange can both fire for one hash
+		// navigation; the second delivery carries the same URL and is skipped.
+		if (url === this.#lastListenerUrl) return;
+		this.#lastListenerUrl = url;
+		const parsed = new URL(url);
+		const routeDestination = this.#routeFromHash(parsed.hash)
+			?? this.#fixRoutename(parsed.pathname);
 		const savedParams = this.#getSavedParams(routeDestination);
 		this.#navigate(routeDestination, savedParams);
 	}
 	#fixRoutename(route) {
 		if (typeof route !== 'string') return route;
+		route = route.trim();
+		if (route[0] === '#')
+			route = route.replace(/^#+/, '');
 		if (route[0] === '/' && route.length > 1)
 			route = route.substring(1);
 		// normalize trailing slashes ('about/' -> 'about')
@@ -67,7 +92,10 @@ export class Router {
 		return route;
 	}
 	#getCurrentUri() {
-		return this.#fixRoutename(window.location.pathname);
+		// A route-shaped fragment always wins over the pathname, so loading
+		// `index.html#/product` (or typing it) boots straight into the route.
+		return this.#routeFromHash(window.location.hash)
+			?? this.#fixRoutename(window.location.pathname);
 	}
 	#setDefaultPage() {
 		let currentPath = this.#getCurrentUri();
@@ -76,9 +104,16 @@ export class Router {
 		this.#stateTarget = stateOf(defaultPathComponent)
 	}
 	to(route_name, params) {
+		// An explicit hash target (`to('#/product')`) opts that navigation
+		// into hash mode, so static hosts without server rewrites stay
+		// navigable. Plain targets keep the existing pathname behaviour.
+		const hashTarget = typeof route_name === 'string' && route_name.trim()[0] === '#';
 		route_name = this.#fixRoutename(route_name);
 		this.#saveParams(route_name, params);
-		window.history.pushState('', '', route_name === '/' ? '/' : `/${route_name}`);
+		if (hashTarget)
+			window.history.pushState('', '', route_name === '/' ? '#/' : `#/${route_name}`);
+		else
+			window.history.pushState('', '', route_name === '/' ? '/' : `/${route_name}`);
 		// scroll to top page
 		window.scroll(0, 0);
 		this.#fallbackNavigationSupport();

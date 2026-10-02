@@ -1609,6 +1609,21 @@ Jetz.use(router);
 
 The nested paths resolve to `/admin`, `/admin/users`, and `/admin/users/:id`. Parent middleware runs before child middleware, so the user detail route runs `AuthGuard`, `AdminGuard`, then `RoleGuard`.
 
+#### Hash Routing
+
+Hash routing (`#/product`) works without any opt-in: a route-shaped fragment always wins over the pathname, so apps on static hosts without server rewrites stay navigable. Register routes as usual and navigate with a `#` target:
+
+```javascript
+const router = new Router(
+  route("/", HomeView),
+  route("/product", ProductView)
+);
+
+router.to("#/product"); // URL becomes /#/product, pathname stays /
+```
+
+Loading or typing `index.html#/product` (or `#/product/42` for dynamic segments) boots straight into that route, hash back/forward works through the same `hashchange` listener, and `router.to()` output keeps whichever addressing the navigation used. Plain in-page anchors (`#section`) are never treated as routes — they fall through to the pathname route.
+
 #### Link Helpers
 
 * `asLink("/path", params)`: Event modifier to navigate to a route on click.
