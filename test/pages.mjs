@@ -153,6 +153,16 @@ const probe = () => page.evaluate(() => {
 			const label = [...document.querySelectorAll('#app div')].find(el => el.textContent === 'Reactive string');
 			return label?.parentElement?.textContent ?? '';
 		})(),
+		// the defer() task cards on the stress page (label maps to parent card text)
+		stressDeferCard: (() => {
+			const label = [...document.querySelectorAll('#app div')].find(el => el.textContent === 'Last task');
+			return label?.parentElement?.textContent ?? '';
+		})(),
+		// the click -> task gap defer() recorded for the last deferred task
+		stressGapCard: (() => {
+			const label = [...document.querySelectorAll('#app div')].find(el => el.textContent === 'Paint gap');
+			return label?.parentElement?.textContent ?? '';
+		})(),
 	};
 });
 
@@ -503,6 +513,30 @@ await page.evaluate(() => {
 await new Promise(resolve => setTimeout(resolve, 150));
 const pulsed = await probe();
 assert('/stress.html one pulse re-renders every tagged string', tickOf(pulsed.stressTicker), tickBefore + 1);
+
+// defer(): the loading signal flips synchronously on the click and the heavy
+// status-filter task runs after the next painted frame
+const deferIndicator = () => page.$eval('#app', el => {
+	const pill = [...el.querySelectorAll('span')].find(span => span.textContent.includes('defer '));
+	return pill ? pill.textContent : '';
+});
+// the click flips the loading signal synchronously, so the indicator has to be
+// read inside the same evaluate: a separate round-trip would arrive after the
+// deferred task already ran
+const pendingIndicator = await page.evaluate(() => {
+	const chip = [...document.querySelectorAll('button')].find(el => el.textContent.trim() === 'active');
+	if (chip) chip.click();
+	const pill = [...document.querySelectorAll('span')].find(span => span.textContent.includes('defer '));
+	return pill ? pill.textContent : '';
+});
+assertContains('/stress.html defer() flips the indicator before the task runs', pendingIndicator, 'task pending');
+await new Promise(resolve => setTimeout(resolve, 400));
+assertContains('/stress.html defer() clears the indicator after the task', await deferIndicator(), 'idle');
+const settled = await probe();
+assertContains('/stress.html defer() reports the task it ran', settled.stressDeferCard, 'status filter');
+// the recorded gap is the frame defer() waited out before running the task
+const gapMs = Number(/([\d.]+)\s*ms/.exec(settled.stressGapCard)?.[1] ?? 0);
+assertTrue('/stress.html defer() runs the task after a painted frame', gapMs > 0);
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load', timeout: 20000 });
 await new Promise(resolve => setTimeout(resolve, 600));

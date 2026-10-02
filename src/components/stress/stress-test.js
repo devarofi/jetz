@@ -12,12 +12,16 @@
  * reactive state, `listOf` + keyed `loop` for collections, `css()` for reactive
  * classes and Tailwind utility classes for styling.
  *
+ * Heavy interactions (dataset swaps, filtering, sorting, paging) run through
+ * `defer(task, { loadingState })`, so the loading indicator paints before the
+ * grid re-renders instead of the click blocking the frame it caused.
+ *
  * Run it with any static server that serves the project root, e.g.
  *   npx serve .        (then open http://localhost:3000)
  * Tailwind is loaded from node_modules (browser build), so no CSS build step.
  */
 import {
-    Jetz, batch, computed, effect, ifElse, listOf, loop, lazy, rawOf, rowOf, stateOf, touchRow
+    Jetz, batch, computed, defer, effect, ifElse, listOf, loop, lazy, rawOf, rowOf, stateOf, touchRow
 } from "../../lib/jetz.js";
 import {
     button, css, div, footer, h1, header, inputCheckbox, inputNumber, inputText,
@@ -145,6 +149,8 @@ const jumpText = stateOf("1");
 const sizeInput = stateOf(String(DEFAULT_DATASET_SIZE));
 /** Shared tick read by every row's tagged string — one write fans out to all of them. */
 const stringTick = stateOf(0);
+/** Loading signal for defer(): true from the click until the deferred task has rendered. */
+const isBusy = stateOf(false);
 
 const stats = stateOf({
     buildMs: 0,   // generating the dataset
@@ -160,7 +166,11 @@ const stats = stateOf({
     bulkMs: 0,    // last batch update across every row
     stringMs: 0,  // last one-write fan-out across every row's tagged string
     domRows: 0,   // <tr> currently attached to the tbody
-    heapMb: 0
+    heapMb: 0,
+    // defer(): paint-aware scheduling of the heavy interactions
+    deferOps: 0,      // deferred tasks completed
+    deferLabel: "—",  // label of the last deferred task
+    deferMs: 0        // click → task start: the frame defer() waited out
 });
 
 const sweep = stateOf({
@@ -388,6 +398,26 @@ const selectionLabel = computed(() => `${numberFormat(selectedCount.value)} sele
 
 const clampPage = value => Math.max(1, Math.min(pageCount.value, value));
 
+/**
+ * Runs a heavy mutation through defer(): the loading signal flips now, the
+ * browser paints the indicator, and the task runs one frame later — so the
+ * click that triggers a 50k-row re-render never blocks the paint it caused.
+ * Calls arriving while a task is still pending are dropped, so rapid clicks
+ * cannot pile up deferred work.
+ */
+function deferHeavy(label, task) {
+    if (isBusy.getValue()) return;
+    const startedAt = performance.now();
+    defer(() => {
+        const paintMs = performance.now() - startedAt;
+        task();
+        // written after the task: a dataset swap inside it resets its own stats
+        stats.deferLabel.value = label;
+        stats.deferMs.value = +paintMs.toFixed(2);
+        stats.deferOps.value += 1;
+    }, { loadingState: isBusy });
+}
+
 /** Page change + measurement of everything it triggers (data -> DOM). */
 function gotoPage(target, { measure = true } = {}) {
     const next = clampPage(Number(target) || 1);
@@ -603,7 +633,17 @@ function Header() {
         ),
         div(css`flex flex-wrap items-center gap-2`,
             span(css`rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-slate-400 ring-1 ring-inset ring-white/10`, "Jetz v", Jetz.version),
-            span(css`rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-slate-400 ring-1 ring-inset ring-white/10`, selectionLabel)
+            span(css`rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-slate-400 ring-1 ring-inset ring-white/10`, selectionLabel),
+            // defer(): the loading indicator that paints before the heavy task runs
+            span(
+                css(computed(() => isBusy.value
+                    ? "inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-medium text-emerald-200 ring-1 ring-inset ring-emerald-400/40"
+                    : "inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-slate-400 ring-1 ring-inset ring-white/10")),
+                ifElse(() => isBusy.value,
+                    () => span(css`size-3 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent`),
+                    () => null),
+                span(computed(() => isBusy.value ? "defer · task pending" : "defer · idle"))
+            )
         )
     );
 }
@@ -617,35 +657,35 @@ function Toolbar() {
                     ...DATASET_SIZES.map(size => chip(
                         `${numberFormat(size)} rows`,
                         () => datasetSize.value === size,
-                        () => loadDataset(size)
+                        () => deferHeavy("dataset swap", () => loadDataset(size))
                     ))
                 ),
                 div(css`mt-3 flex items-center gap-2`,
                     label(css`text-xs text-slate-400`, "Custom size"),
                     inputNumber(css`${INPUT} w-28`, { min: 1, bind: sizeInput }),
-                    button(css`${BTN}`, { onclick: () => loadDataset(Number.parseInt(sizeInput.getValue(), 10)) }, "Load")
+                    button(css`${BTN}`, { onclick: () => deferHeavy("custom dataset", () => loadDataset(Number.parseInt(sizeInput.getValue(), 10))) }, "Load")
                 )
             ),
             div(
                 div(css`${LABEL}`, "Filter"),
                 div(css`${CHIP_ROW} mt-2`,
-                    chip("All statuses", () => statusFilter.value === "all", () => statusFilter.setState("all")),
+                    chip("All statuses", () => statusFilter.value === "all", () => deferHeavy("status filter", () => statusFilter.setState("all"))),
                     ...STATUSES.map(status => chip(
                         status,
                         () => statusFilter.value === status,
-                        () => statusFilter.setState(status)
+                        () => deferHeavy("status filter", () => statusFilter.setState(status))
                     ))
                 ),
                 div(css`mt-3 flex items-center gap-2`,
                     inputText(css`${INPUT} w-full`, { bind: query, placeholder: "Search name, email, department, region…" }),
-                    button(css`${BTN}`, { onclick: () => query.setState("") }, "Clear")
+                    button(css`${BTN}`, { onclick: () => deferHeavy("clear search", () => query.setState("")) }, "Clear")
                 ),
                 div(css`mt-3 flex flex-wrap items-center gap-3`,
                     label(css`flex items-center gap-2 text-xs text-slate-400`,
                         inputCheckbox(css`size-3.5 accent-emerald-400`, { bind: selectedOnly },),
                         "Selected rows only"
                     ),
-                    button(css`${BTN}`, { onclick: clearSelection }, "Clear selection")
+                    button(css`${BTN}`, { onclick: () => deferHeavy("clear selection", clearSelection) }, "Clear selection")
                 )
             )
         )
@@ -667,7 +707,7 @@ function columnTh(column) {
         sortable ? "cursor-pointer select-none hover:text-slate-100" : ""
     ].filter(Boolean).join(" ");
     const attributes = css`${className}`;
-    if (sortable) attributes.onclick = () => toggleSort(column.key);
+    if (sortable) attributes.onclick = () => deferHeavy("sort", () => toggleSort(column.key));
     return th(attributes, column.label, span(css`text-emerald-400`, indicator));
 }
 
@@ -744,16 +784,16 @@ function PaginationBar() {
     return section(css`${PANEL}`,
         div(css`flex flex-wrap items-center justify-between gap-3`,
             div(css`flex items-center gap-2`,
-                button(css`${BTN}`, { disabled: computed(() => visiblePage.value === 1), onclick: () => gotoPage(1) }, "« First"),
-                button(css`${BTN}`, { disabled: computed(() => visiblePage.value === 1), onclick: () => gotoPage(visiblePage.value - 1) }, "‹ Prev"),
+                button(css`${BTN}`, { disabled: computed(() => visiblePage.value === 1), onclick: () => deferHeavy("page change", () => gotoPage(1)) }, "« First"),
+                button(css`${BTN}`, { disabled: computed(() => visiblePage.value === 1), onclick: () => deferHeavy("page change", () => gotoPage(visiblePage.value - 1)) }, "‹ Prev"),
                 span(css`px-2 text-xs font-medium text-slate-300`, pageLabel),
-                button(css`${BTN}`, { disabled: computed(() => visiblePage.value >= pageCount.value), onclick: () => gotoPage(visiblePage.value + 1) }, "Next ›"),
-                button(css`${BTN}`, { disabled: computed(() => visiblePage.value >= pageCount.value), onclick: () => gotoPage(pageCount.value) }, "Last »")
+                button(css`${BTN}`, { disabled: computed(() => visiblePage.value >= pageCount.value), onclick: () => deferHeavy("page change", () => gotoPage(visiblePage.value + 1)) }, "Next ›"),
+                button(css`${BTN}`, { disabled: computed(() => visiblePage.value >= pageCount.value), onclick: () => deferHeavy("page change", () => gotoPage(pageCount.value)) }, "Last »")
             ),
             div(css`flex items-center gap-2`,
                 label(css`text-xs text-slate-400`, "Go to"),
-                inputNumber(css`${INPUT} w-24`, { bind: jumpText, onkeydown: event => { if (event.key === "Enter") applyJump(); } },),
-                button(css`${BTN}`, { onclick: applyJump }, "Jump")
+                inputNumber(css`${INPUT} w-24`, { bind: jumpText, onkeydown: event => { if (event.key === "Enter") deferHeavy("page jump", applyJump); } },),
+                button(css`${BTN}`, { onclick: () => deferHeavy("page jump", applyJump) }, "Jump")
             ),
             span(css`text-xs text-slate-400`, domRowsLabel)
         ),
@@ -762,7 +802,7 @@ function PaginationBar() {
             ...PAGE_SIZES.map(size => chip(
                 String(size),
                 () => pageSize.value === size,
-                () => pageSize.setState(size)
+                () => deferHeavy("rows per page", () => pageSize.setState(size))
             ))
         )
     );
@@ -773,7 +813,7 @@ function StatsPanel() {
         div(css`flex flex-wrap items-center justify-between gap-2`,
             div(css`${LABEL}`, "Metrics by category"),
             div(css`flex flex-wrap items-center gap-2`,
-                button(css`${BTN}`, { onclick: bumpAllScores }, "Bump every score (+1)"),
+                button(css`${BTN}`, { onclick: () => deferHeavy("bulk update", bumpAllScores) }, "Bump every score (+1)"),
                 button(css`${BTN}`, { onclick: pulseStrings }, "Pulse strings"),
                 button(css`${BTN}`, { onclick: resetMetrics }, "Reset metrics")
             )
@@ -795,6 +835,14 @@ function StatsPanel() {
             statCard("Single row update", updateMsLabel, "row state write → DOM"),
             statCard("Batch all rows", bulkMsLabel, "one state write per row"),
             statCard("Reactive string", stringMsLabel, computed(() => `one write → ${numberFormat(stats.domRows.value)} row strings`))
+        ]),
+        // Paint-aware scheduling: the chips and buttons above run their heavy
+        // write through defer(), so these cards time the deferral itself.
+        cardGroup("Deferred tasks (defer)", [
+            statCard("Indicator", computed(() => isBusy.value ? "on — task pending" : "off"), "loadingState signal"),
+            statCard("Paint gap", computed(() => msLabel(stats.deferMs.value)), "click → task start"),
+            statCard("Deferred tasks", computed(() => numberFormat(stats.deferOps.value)), computed(() => `last: ${stats.deferLabel.value}`)),
+            statCard("Last task", computed(() => stats.deferLabel.value), "label passed to defer()")
         ])
     );
 }
