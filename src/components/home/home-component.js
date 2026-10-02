@@ -1,5 +1,6 @@
 import { link } from "../../lib/jetz-router.js";
-import { html, ifElse, rememberOf, stateOf } from "../../lib/jetz.js";
+import { html, ifElse, stateOf } from "../../lib/jetz.js";
+import { storedTheme, THEME_DARK, THEME_LIGHT } from "../../theme.js";
 
 import {
     a,
@@ -40,33 +41,8 @@ import "prismjs/components/prism-clike.js";
 import "prismjs/components/prism-javascript.js";
 
 
-// ---------------------------------------------------------------------------
-// Theme
-//
-// The whole page is styled from the `--jetz-*` tokens declared in style.css, so
-// switching themes means adding one class to <html>. That class is set from a
-// remembered state, which keeps the choice across reloads.
-//
-// The stored value is applied at module scope, before `Jetz.mount()` runs, so a
-// returning dark-theme visitor never sees a light flash first.
-// ---------------------------------------------------------------------------
-
-const THEME_KEY = 'theme';
-const THEME_DARK = 'dark';
-const THEME_LIGHT = 'light';
-
-const applyTheme = value => {
-    const isDark = value === THEME_DARK;
-    document.documentElement.classList.toggle('jetz-theme-dark', isDark);
-    // the attribute mirrors the class for anyone inspecting or scripting it
-    document.documentElement.setAttribute('data-theme', isDark ? THEME_DARK : THEME_LIGHT);
-};
-
-// module scope: runs on import, ahead of the first render
-const storedTheme = rememberOf(THEME_KEY, THEME_LIGHT);
-applyTheme(storedTheme.getValue());
-// later writes (the toggle) re-apply through the same subscription
-storedTheme.subscribe(next => applyTheme(next));
+// The theme is shared with every other page through `src/theme.js`: one
+// remembered signal behind one class on <html>, applied at import time.
 
 
 export function Home() {

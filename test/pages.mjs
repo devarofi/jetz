@@ -835,6 +835,70 @@ assert('/playground re-entry leaves the stage ready', reentryReady.stage, 'ready
 assertTrue('/playground re-entry renders the preview again (not blank)', (reentryPreview?.text ?? '').includes('A counter, no re-render loop'));
 
 // --- no component may silently lose its lifecycle hooks ---------------------
+// --- the playground follows the saved theme ---------------------------------
+// One remembered signal is shared by every page, so the playground honours a
+// choice made on the home page, can make one of its own, and stores it.
+section('/playground: dark theme toggle');
+const playgroundTheme = () => page.evaluate(() => ({
+  isDark: document.documentElement.classList.contains('jetz-theme-dark'),
+  attr: document.documentElement.getAttribute('data-theme'),
+  stored: (() => {
+    const store = JSON.parse(localStorage.getItem('app-remember-state') || '{}');
+    for (const collection of Object.values(store)) {
+      for (const [key, value] of Object.entries(collection)) {
+        if (key.endsWith('__key__theme')) return value;
+      }
+    }
+    return null;
+  })(),
+  shell: getComputedStyle(document.querySelector('.playground-shell')).backgroundColor,
+  header: getComputedStyle(document.querySelector('.playground-header')).backgroundColor,
+  pane: getComputedStyle(document.querySelector('.preview-pane')).backgroundColor,
+  label: document.querySelector('.playground-theme-toggle')?.getAttribute('aria-label') ?? 'NO TOGGLE',
+  glyph: document.querySelector('.playground-theme-toggle')?.textContent.trim() ?? 'NO TOGGLE',
+  size: (() => {
+    const el = document.querySelector('.playground-theme-toggle');
+    if (!el) return { w: 0, h: 0 };
+    const box = el.getBoundingClientRect();
+    return { w: Math.round(box.width), h: Math.round(box.height) };
+  })(),
+  previewDark: document.getElementById('playground-preview')?.getAttribute('srcdoc')?.includes('class="jetz-theme-dark"') ?? false,
+}));
+
+const pgLight = await playgroundTheme();
+assert('/playground starts on the light theme', pgLight.isDark, false);
+assert('/playground mirrors the theme onto the document', pgLight.attr, 'light');
+assert('/playground renders a theme switch', pgLight.label, 'Switch to the dark theme');
+assert('/playground shows a moon while the page is light', pgLight.glyph, '☾');
+assertTrue('/playground gives the switch a 37px tap target', pgLight.size.w >= 34 && pgLight.size.h >= 34);
+assert('/playground paints a light shell', pgLight.shell, 'rgb(243, 247, 250)');
+
+await page.click('.playground-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 300));
+const pgDark = await playgroundTheme();
+assert('/ the playground switch turns the document dark', pgDark.isDark, true);
+assert('/ the playground switch mirrors the theme', pgDark.attr, 'dark');
+assert('/ the playground theme is written to localStorage', pgDark.stored, 'dark');
+assert('/ the dark theme repaints the playground shell', pgDark.shell, 'rgb(10, 22, 32)');
+assert('/ the dark theme repaints the playground header', pgDark.header, 'rgb(12, 26, 37)');
+assert('/ the dark theme repaints the preview pane', pgDark.pane, 'rgb(16, 32, 44)');
+assert('/ the dark theme flips the switch label', pgDark.label, 'Switch to the light theme');
+assert('/ the dark theme swaps the glyph to a sun', pgDark.glyph, '☀');
+assertTrue('/ the dark theme reaches the sandboxed preview', pgDark.previewDark);
+
+// the preference is shared, so the home page is already dark when we go back
+await open('/');
+assertTrue('/ the playground theme follows the visitor to the home page', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')));
+
+await open('/playground');
+assert('/ the playground theme survives a reload', (await playgroundTheme()).isDark, true);
+
+// leave the suite on light, the way the home theme block above finished
+await page.click('.playground-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 300));
+assert('/ the playground can be switched back to light', (await playgroundTheme()).isDark, false);
+
+
 section('runtime hygiene: no dropped lifecycle hooks');
 assert('no lifecycle hook was registered outside a render', lifecycleWarnings.length, 0);
 

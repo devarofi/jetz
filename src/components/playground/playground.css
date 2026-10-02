@@ -85,6 +85,34 @@
   font-size: 9px;
 }
 
+.playground-theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 37px;
+  height: 37px;
+  padding: 0;
+  border: 1px solid #cbd9e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #47677c;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.playground-theme-toggle:hover {
+  border-color: #218bc4;
+  background: #eef5f9;
+  color: #218bc4;
+}
+
+.playground-theme-toggle:focus-visible {
+  outline: 2px solid #218bc4;
+  outline-offset: 2px;
+}
+
+
 .home-link {
   color: #60788a;
   font-size: 11px;
@@ -516,4 +544,95 @@
   .playground-footer span {
     width: 100%;
   }
+}
+
+/* --- dark theme -------------------------------------------------------------
+   `html.jetz-theme-dark` is set by the shared store in src/theme.js, which every
+   page imports, so the choice follows the visitor from the home page to here.
+   The editor pane is dark in both themes by design, so only the shell, the panes
+   and the preview chrome are repainted. */
+html.jetz-theme-dark {
+  color-scheme: dark;
+}
+
+html.jetz-theme-dark body {
+  background: #0a1620;
+}
+
+html.jetz-theme-dark .playground-shell {
+  color: #e6f0f7;
+  background: #0a1620;
+}
+
+html.jetz-theme-dark .playground-header {
+  border-bottom-color: #1e3644;
+  background: #0c1a25;
+}
+
+html.jetz-theme-dark .playground-controls label,
+html.jetz-theme-dark .playground-intro p,
+html.jetz-theme-dark .pane-toolbar,
+html.jetz-theme-dark .preview-toolbar,
+html.jetz-theme-dark .editor-footer,
+html.jetz-theme-dark .preview-note,
+html.jetz-theme-dark .preview-loading,
+html.jetz-theme-dark .playground-footer {
+  color: #8fa8b9;
+}
+
+html.jetz-theme-dark .playground-controls select,
+html.jetz-theme-dark .playground-theme-toggle {
+  border-color: #2a4356;
+  background: #10202c;
+  color: #dbe8f2;
+}
+
+html.jetz-theme-dark .playground-theme-toggle:hover {
+  border-color: #6cc2f2;
+  background: #16293a;
+  color: #93d4f8;
+}
+
+html.jetz-theme-dark .run-button {
+  background: #2f9fd8;
+}
+
+html.jetz-theme-dark .run-button:hover {
+  background: #5cb6e6;
+}
+
+html.jetz-theme-dark .home-link,
+html.jetz-theme-dark .preview-heading,
+html.jetz-theme-dark .playground-footer a,
+html.jetz-theme-dark .file-tab {
+  color: #b6cede;
+}
+
+html.jetz-theme-dark .home-link:hover,
+html.jetz-theme-dark .playground-footer a:hover {
+  color: #6cc2f2;
+}
+
+html.jetz-theme-dark .editor-pane,
+html.jetz-theme-dark .preview-pane {
+  border-color: #1e3644;
+  background: #10202c;
+  box-shadow: 0 8px 28px #00000040;
+}
+
+html.jetz-theme-dark .pane-toolbar,
+html.jetz-theme-dark .editor-footer,
+html.jetz-theme-dark .preview-note,
+html.jetz-theme-dark .playground-footer {
+  border-color: #1e3644;
+}
+
+html.jetz-theme-dark .file-type {
+  background: #12293a;
+  color: #6cc2f2;
+}
+
+html.jetz-theme-dark .preview-frame,
+html.jetz-theme-dark .preview-loading {
+  background: #0a1620;
 }

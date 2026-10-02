@@ -1,4 +1,4 @@
-import { onDestroy, onMount } from "../../lib/jetz.js";
+import { ifElse, onDestroy, onMount } from "../../lib/jetz.js";
 import { a, button, css, div, footer, header, h1, iframe, img, label, option, p, section, select, span } from "../../lib/jetz-ui.js";
 import logoUrl from "../../../public/img/logo/small.png";
 // The preview runs these files directly, so it executes this working tree instead
@@ -13,6 +13,10 @@ import Prism from "prismjs/components/prism-core.js";
 import "prismjs/components/prism-clike.js";
 import "prismjs/components/prism-javascript.js";
 import "./playground.css";
+// One theme preference for the whole app: the home page and the playground read
+// and write the same remembered signal, so neither can drift out of step.
+import { storedTheme, THEME_DARK, THEME_LIGHT } from "../../theme.js";
+
 import { asBackLink, link } from "../../lib/jetz-router.js";
 
 const examples = {
@@ -218,8 +222,11 @@ const importMap = JSON.stringify({
 
 function createPreviewDocument(source) {
   const safeSource = JSON.stringify(source).replace(/</g, "\\u003c");
+  // read at build time, so a preview started after the switch is dark too
+  const isDark = storedTheme.getValue() === THEME_DARK;
+
   return `<!doctype html>
-<html lang="en">
+<html lang="en" class="${isDark ? "jetz-theme-dark" : ""}" data-theme="${isDark ? THEME_DARK : THEME_LIGHT}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -244,6 +251,20 @@ function createPreviewDocument(source) {
     .online { color: #135f76; background: #e0f4fa; }
     .offline { color: #526d80; background: #edf2f5; }
     #preview-error { color: #9c2f42; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+    /* The frame is sandboxed, so the parent cannot restyle what is inside it:
+       the theme travels in with the document, and these are the dark halves of
+       the rules above. A later switch rebuilds the frame (see the Run button). */
+    html.jetz-theme-dark body { color: #e6f0f7; background: #0a1620; }
+    html.jetz-theme-dark .preview-card { background: #10202c; border-color: #1e3644; box-shadow: 0 14px 36px #00000059; }
+    html.jetz-theme-dark .preview-eyebrow { color: #6cc2f2; }
+    html.jetz-theme-dark .preview-count, html.jetz-theme-dark .preview-result { color: #93d4f8; }
+    html.jetz-theme-dark input { background: #0c1a25; border-color: #2a4356; color: #e6f0f7; }
+    html.jetz-theme-dark .preview-list, html.jetz-theme-dark .task-number { color: #b6cede; }
+    html.jetz-theme-dark .task-number.completed { color: #6d8899; }
+    html.jetz-theme-dark .online { color: #7fe0c0; background: #0e2a1f; }
+    html.jetz-theme-dark .offline { color: #8fa8b9; background: #16222d; }
+    html.jetz-theme-dark #preview-error { color: #ff9aa9; }
+
   </style>
   <script type="importmap">${importMap}</script>
 </head>
@@ -578,6 +599,28 @@ export const Playground = () => {
       button(css`run-button`, { onclick: () => preview(editor?.getValue() ?? examples[selectedExample].source) },
         span(css`run-icon`, "▶"), "Run preview",
       ),
+      // the same signal the home page writes to, so the two pages can never
+      // disagree about which theme was picked
+      button(css`playground-theme-toggle`, {
+        "aria-label": () => storedTheme.value === THEME_DARK ? "Switch to the light theme" : "Switch to the dark theme",
+        title: () => storedTheme.value === THEME_DARK ? "Light theme" : "Dark theme",
+        onclick() {
+          // an event handler is not a tracked context, so the cheap untracked
+          // read is the right one here
+          storedTheme.setState(storedTheme.getValue() === THEME_DARK ? THEME_LIGHT : THEME_DARK);
+          // the preview frame is sandboxed, so the parent cannot restyle it:
+          // rebuilding replays the same source under the new theme
+          preview(editor?.getValue() ?? examples[selectedExample].source);
+        }
+      },
+        // one branch renders at a time, so ifElse() swaps the glyph
+        ifElse(
+          () => storedTheme.getValue() === THEME_DARK,
+          () => span("☀"),
+          () => span("☾")
+        )
+      ),
+
       link('/', a(css`home-link`, { href: '#' }, "Back to home")),
     ),
     div(css`playground-intro`,
