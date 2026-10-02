@@ -1,5 +1,6 @@
 import { asBackLink, link } from '../../lib/jetz-router.js';
-import { computed, Jetz, listOf, loop, rememberOf, stateOf } from '../../lib/jetz.js';
+import { computed, ifElse, Jetz, listOf, loop, rememberOf, stateOf } from '../../lib/jetz.js';
+import { storedTheme, THEME_DARK, THEME_LIGHT } from '../../theme.js';
 import { a, article, button, css, div, footer, h1, h2, header, img, inputCheckbox, inputText, main, p, section, small, span, strong, style } from '../../lib/jetz-ui.js';
 import logoUrl from '../../../public/img/logo/small.png';
 import '../../../public/css/style.css';
@@ -206,6 +207,24 @@ export function ToDo() {
             a(css`todo-brand`, { href: '/', 'aria-label': 'Back to Jetz home' },
                 img({ src: logoUrl, alt: 'Jetz', class: 'todo-logo' }),
                 span('Todo')
+            ),
+            // the same shared switch the welcome page and the playground use, so
+            // the choice follows the visitor across every page
+            button(css`jetz-theme-toggle todo-theme-toggle`, {
+                'aria-label': () => storedTheme.value === THEME_DARK ? 'Switch to the light theme' : 'Switch to the dark theme',
+                title: () => storedTheme.value === THEME_DARK ? 'Light theme' : 'Dark theme',
+                onclick() {
+                    // an event handler is not a tracked context, so the cheap
+                    // untracked read is the right one here
+                    storedTheme.setState(storedTheme.getValue() === THEME_DARK ? THEME_LIGHT : THEME_DARK);
+                }
+            },
+                // one branch renders at a time, so ifElse() swaps the glyph
+                ifElse(
+                    () => storedTheme.getValue() === THEME_DARK,
+                    () => span('☀'),
+                    () => span('☾')
+                )
             ),
             link('/', a(css`todo-back-link`, { href: '#' }, 'Back to home'))
         ),

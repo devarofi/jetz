@@ -3044,3 +3044,58 @@ html.jetz-theme-dark .jetz-theme-toggle:hover {
         text-align: center;
     }
 }
+
+/* ----------------------------------------------------------------------------
+   SHARED THEME SWITCH FALLBACKS
+
+   The switch in the header is shared by every page, but the full `--jetz-*`
+   palette is only declared for the welcome page. These two are all the control
+   itself reads, and each page's own block (welcome, todo, demo shell below)
+   still wins where it declares them.
+   ---------------------------------------------------------------------------- */
+
+body {
+    --jetz-line: #d7e3eb;
+    --jetz-blue: #3498db;
+}
+
+/* ----------------------------------------------------------------------------
+   DARK THEME: LEGACY DEMO PAGES
+
+   counter, play and the remembered-todo demo carry no stylesheet of their own,
+   so they wear the demo shell above. Those rules name their colours directly,
+   which is what these twins replace. The pages that style their own tree are
+   excluded exactly like the light rules exclude them.
+   ---------------------------------------------------------------------------- */
+
+html.jetz-theme-dark body:has(div#app):not(:has(#welcome-page, #landing-page, #calculator-page, #todo-page, .playground-shell)) {
+    --jetz-line: #2a4356;
+    --jetz-blue: #6cc2f2;
+
+    background: #0a1620;
+    color: #e6f0f7;
+}
+
+html.jetz-theme-dark footer:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+    color: #8fa8b9;
+}
+
+html.jetz-theme-dark button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+    background: #10202c;
+    border-color: #2a4356;
+    color: #e6f0f7;
+}
+
+html.jetz-theme-dark button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *):hover {
+    background: #16293a;
+}
+
+html.jetz-theme-dark input[type="text"]:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+    background: #0c1a25;
+    border-color: #2a4356;
+    color: #e6f0f7;
+}
+
+html.jetz-theme-dark a:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *):hover {
+    color: #6cc2f2;
+}

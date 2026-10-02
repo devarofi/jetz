@@ -899,6 +899,69 @@ await new Promise(resolve => setTimeout(resolve, 300));
 assert('/ the playground can be switched back to light', (await playgroundTheme()).isDark, false);
 
 
+// --- the saved theme reaches every other page -------------------------------
+// counter, play and the remembered todo share one switch in the shell footer;
+// the todo bar carries its own. Flipping the theme once has to be enough for
+// every one of them to come up dark.
+section('/theme: the saved theme reaches every page');
+const pageTheme = () => page.evaluate(() => ({
+  isDark: document.documentElement.classList.contains('jetz-theme-dark'),
+  attr: document.documentElement.getAttribute('data-theme'),
+  stored: localStorage.getItem('jetz-theme'),
+  body: getComputedStyle(document.body).backgroundColor,
+  ink: getComputedStyle(document.body).color,
+  toggle: (() => {
+    const el = document.querySelector('.jetz-theme-toggle');
+    if (!el) return null;
+    return { label: el.getAttribute('aria-label'), glyph: el.textContent.trim() };
+  })(),
+}));
+
+await open('/counter');
+let tour = await pageTheme();
+assert('/counter renders the shared switch', tour.toggle?.label, 'Switch to the dark theme');
+assert('/counter starts on the theme the visitor left off with', tour.isDark, false);
+
+await page.click('.jetz-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 250));
+tour = await pageTheme();
+assert('/ the shell switch turns the document dark', tour.isDark, true);
+assert('/ the shell switch mirrors the theme', tour.attr, 'dark');
+assert('/ the shell switch writes the shared key', tour.stored, 'dark');
+assert('/ the shell switch swaps its glyph', tour.toggle?.glyph, '☀');
+assert('/ the demo shell repaints in dark', tour.body, 'rgb(10, 22, 32)');
+assert('/ the demo shell inverts its text', tour.ink, 'rgb(230, 240, 247)');
+
+await open('/play');
+assertTrue('/play inherits the saved dark theme', (await pageTheme()).isDark);
+
+await open('/remember-todo');
+assertTrue('/remember-todo inherits the saved dark theme', (await pageTheme()).isDark);
+
+await open('/open-todo');
+const todoTour = await pageTheme();
+assertTrue('/open-todo inherits the saved dark theme', todoTour.isDark);
+assert('/ the todo bar carries the shared switch', todoTour.toggle?.label, 'Switch to the light theme');
+assert('/ the dark theme repaints the todo bar', await page.$eval('.todo-topbar', el => getComputedStyle(el).backgroundColor), 'rgb(12, 26, 37)');
+assert('/ the dark theme repaints the todo search field', await page.$eval('.todo-search', el => getComputedStyle(el).backgroundColor), 'rgb(16, 32, 44)');
+
+// the calculator is a dark gradient by design in both themes, so it only has to
+// agree about the preference
+await open('/calculator');
+assertTrue('/calculator agrees with the saved theme', (await pageTheme()).isDark);
+
+// the landing page is a Tailwind template with no dark layer of its own: the
+// preference is recorded, but the page keeps its own light styling
+await open('/landing');
+assert('/landing records the preference without restyling itself', (await pageTheme()).attr, 'dark');
+
+// leave the suite on light, the way every theme block above finished
+await open('/counter');
+await page.click('.jetz-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 250));
+assert('/ the shared switch can be turned back to light', (await pageTheme()).isDark, false);
+
+
 section('runtime hygiene: no dropped lifecycle hooks');
 assert('no lifecycle hook was registered outside a render', lifecycleWarnings.length, 0);
 

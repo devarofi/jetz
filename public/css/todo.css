@@ -637,3 +637,92 @@ div#app:has(#todo-page) {
     #todo-page .todo-add-button { width: 100%; }
     #todo-page .todo-list-footer { align-items: flex-start; flex-direction: column; }
 }
+
+/* ============================================================================
+   DARK THEME
+
+   The page above is styled from the `--todo-*` tokens, so the switch is the
+   same one class on <html> the welcome page uses. Only the surfaces that name a
+   colour directly need a rule of their own.
+   ============================================================================ */
+
+html.jetz-theme-dark body:has(#todo-page) {
+    /* the shared header switch reads these two */
+    --jetz-line: #2a4356;
+    --jetz-blue: #6cc2f2;
+
+    --todo-ink: #e6f0f7;
+    --todo-ink-soft: #c0d4e1;
+    --todo-muted: #8fa8b9;
+
+    --todo-blue: #6cc2f2;
+    --todo-blue-dark: #93d4f8;
+    --todo-blue-soft: #10293c;
+
+    --todo-green: #4fd18b;
+    --todo-green-dark: #7fe0c0;
+    --todo-green-soft: #0e2a1f;
+
+    --todo-paper: #10202c;
+    --todo-surface: #0c1a25;
+    --todo-surface-2: #142734;
+    --todo-line: #1e3644;
+
+    --todo-shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.30);
+    --todo-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+
+    background:
+        radial-gradient(circle at 82% 6%, rgba(52, 152, 219, 0.16), transparent 34%),
+        radial-gradient(circle at 12% 0%, rgba(46, 204, 113, 0.11), transparent 28%),
+        linear-gradient(180deg, #0a1620 0%, #0c1a25 100%);
+}
+
+html.jetz-theme-dark #todo-page .todo-topbar {
+    border-bottom-color: #1e3644;
+    background: #0c1a25;
+}
+
+html.jetz-theme-dark #todo-page .todo-brand {
+    color: #e6f0f7;
+}
+
+html.jetz-theme-dark #todo-page .todo-back-link {
+    color: #8fa8b9;
+}
+
+html.jetz-theme-dark #todo-page .todo-back-link:hover {
+    color: #6cc2f2;
+}
+
+html.jetz-theme-dark #todo-page .todo-create-panel,
+html.jetz-theme-dark #todo-page .todo-task,
+html.jetz-theme-dark #todo-page .todo-search,
+html.jetz-theme-dark #todo-page .todo-icon-button {
+    background: #10202c;
+    border-color: #1e3644;
+}
+
+html.jetz-theme-dark #todo-page .todo-task:hover {
+    border-color: #2a4356;
+}
+
+html.jetz-theme-dark #todo-page .todo-task__editor {
+    background: #0c1a25;
+    border-color: #1e3644;
+    color: #e6f0f7;
+}
+
+html.jetz-theme-dark #todo-page .todo-task__editor:focus {
+    background: #0f2233;
+}
+
+html.jetz-theme-dark #todo-page .todo-icon-button--delete:hover {
+    background: #2a1512;
+    border-color: #6b2f24;
+    color: #ff9f8a;
+}
+/* the shared switch sits between the brand and the back link */
+#todo-page .todo-theme-toggle {
+    margin-left: auto;
+}
+
