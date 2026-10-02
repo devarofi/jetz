@@ -775,6 +775,42 @@ describe('reactive css classes', () => {
 		expect(item.textContent).toBe('Review the API');
 	});
 
+	it('updates a reactive class inside loop() when bound input changes', () => {
+		const tasks = listOf(
+			stateOf({ id: 201, done: true, title: 'Task 1' }),
+			stateOf({ id: 202, done: false, title: 'Task 2' })
+		);
+		const target = mount(div(
+			ul(loop(
+				tasks,
+				task => task.id.value,
+				task => li(
+					div(
+						ui.input(ui.type`checkbox`, { bind: task.done }),
+						p(css`task-number ${() => task.done.value ? 'complete' : ''}`, 'TASK ', task.id)
+					)
+				)
+			))
+		));
+		const paragraphs = target.querySelectorAll('p');
+		const checkboxes = target.querySelectorAll('input[type="checkbox"]');
+
+		expect(paragraphs[0].className).toBe('task-number complete');
+		expect(paragraphs[1].className).toBe('task-number');
+
+		checkboxes[1].checked = true;
+		checkboxes[1].dispatchEvent(new Event('change', { bubbles: true }));
+
+		expect(tasks.values[1].done.value).toBe(true);
+		expect(paragraphs[1].className).toBe('task-number complete');
+
+		checkboxes[1].checked = false;
+		checkboxes[1].dispatchEvent(new Event('change', { bubbles: true }));
+
+		expect(tasks.values[1].done.value).toBe(false);
+		expect(paragraphs[1].className).toBe('task-number');
+	});
+
 	it('swaps a whole class from a plain function argument', () => {
 		const count = stateOf(0);
 		const target = mount(div(css(() => count.value % 2 === 0 ? 'text-red-200' : 'text-green-200')));

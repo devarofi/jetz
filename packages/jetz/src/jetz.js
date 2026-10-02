@@ -1410,7 +1410,7 @@ class JetzElement {
 			}
 			// Find matching old part by identity
 			const oldPart = oldParts[i];
-			if (oldPart === part) {
+			if (oldPart === part && oldUnsubs[i]) {
 				// Same subscription, keep it
 				newUnsubs.push(oldUnsubs[i]);
 				return;
@@ -1443,6 +1443,7 @@ class JetzElement {
 	#unbindClassParts() {
 		this.#classUnsubs.forEach(off => off?.());
 		this.#classUnsubs = [];
+		this.#classParts = [];
 	}
 	#setClassAttribute(value) {
 		// `value` is already flat (produced by `#classParts.map(...)`), but each
