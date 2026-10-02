@@ -8,7 +8,7 @@ function middlewareList(middlewares) {
 
 function joinRoutePath(prefix, path) {
 	const segments = [prefix, path]
-		.flatMap(value => typeof value === 'string' ? value.split('/') : [])
+		.flatMap(value => typeof value === 'string' ? value.replace(/^#+/, '').split('/') : [])
 		.filter(Boolean);
 	return segments.length > 0 ? `/${segments.join('/')}` : '/';
 }
