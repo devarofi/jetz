@@ -12,7 +12,8 @@ import {
 	a, aria_, button, css, data_, div, find, findAll, href, id, img, inputText,
 	label, li, main, nav, p, placeholder, span, src, style, strong, text, ul
 } from '../../src/lib/jetz-ui.js';
-import { route, Router, link } from '../../src/lib/jetz-router.js';
+import { route, Router, link, group } from '../../src/lib/jetz-router.js';
+import { Middleware } from '../../src/lib/middleware.js';
 import { Landing } from '../../src/components/landing/landing.js';
 import { counter as counterPage } from '../../src/components/counter/counter.js';
 
@@ -755,12 +756,31 @@ function runMainSuite() {
 	searchInput.dispatchEvent(new Event('input', { bubbles: true }));
 	assert('clearing the search restores every card', findAll('#section-landing-direct-slot #product-grid > div').length, 6);
 
+	// nested route groups with inherited middleware, exercised end-to-end below
+	const guardCalls = [];
+	let guardAllow = true;
+	class OuterGuard extends Middleware {
+		next(params) { guardCalls.push(`outer:${params?.id}`); return guardAllow ? true : this.deny('smoke block'); }
+	}
+	class InnerGuard extends Middleware {
+		next(params) { guardCalls.push(`inner:${params?.id}`); return true; }
+	}
+
 	// wire the full router + nav into a mount target so link() clicks navigate
 	const router = new Router(
 		route('/', Landing),
 		route('landing', Landing),
 		route('counter', counterPage),
-		route('open-todo', counterPage) // reuse the counter page as a stand-in for the todo component
+		route('open-todo', counterPage), // reuse the counter page as a stand-in for the todo component
+		group('/guarded', {
+			middlewares: OuterGuard,
+			routes: [
+				group('/deep', {
+					middlewares: InnerGuard,
+					routes: [route('/:id', params => div({ id: 'guarded-page' }, `Guarded ${params.id}`))]
+				})
+			]
+		})
 	);
 	Jetz.use(router);
 	mountInto('router-slot', main(Jetz.$route.browser()));
@@ -784,6 +804,20 @@ function runMainSuite() {
 	router.to('/landing');
 	assert('router navigates back to landing', !!find('#section-router-slot #landing-page'), true);
 	// leave the URL at "/" so the rememberOf reload phase runs on the same pathname it persisted under
+	router.to('/');
+
+	// nested route groups + inherited middleware, end to end through the real router
+	guardAllow = true;
+	router.to('/guarded/deep/9');
+	assert('nested group route renders through inherited middleware', textOf('#section-router-slot #guarded-page'), 'Guarded 9');
+	assert('outer group middleware runs before the inner one', guardCalls.join(' '), 'outer:9 inner:9');
+	guardCalls.length = 0;
+	guardAllow = false;
+	router.to('/guarded/deep/10');
+	assert('a denying group middleware keeps the previous view', textOf('#section-router-slot #guarded-page'), 'Guarded 9');
+	assert('the chain stops before the inner middleware when denied', guardCalls.join(' '), 'outer:10');
+	guardAllow = true;
+	guardCalls.length = 0;
 	router.to('/');
 
 	// addScript

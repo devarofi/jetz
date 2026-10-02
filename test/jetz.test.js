@@ -8,7 +8,7 @@ import {
 import { aria_, base, body, css, data_, div, head, htmlElement, link, meta, search, slot, span, p, ul, li, a, button, href, style, styleElement, title } from '../src/lib/jetz-ui.js';
 import * as ui from '../src/lib/jetz-ui.js';
 import { Router, group, route } from '../src/lib/jetz-router.js';
-import { Middleware } from '../src/lib/middleware.js';
+import { Middleware, middleware } from '../src/lib/middleware.js';
 
 const mount = (element) => {
 	const target = document.createElement('div');
@@ -267,6 +267,245 @@ describe('nested route groups', () => {
 		router.to('/admin/users');
 		expect(receivedParams).toBe('users');
 		expect(calls).toEqual([['auth', undefined], ['admin', undefined], ['role', undefined]]);
+	});
+
+	it('inherits middleware across three nesting levels and merges path params', () => {
+		window.history.replaceState({}, '', '/');
+		const order = [];
+		let seenParams;
+		class Outer extends Middleware {
+			next(params) { order.push(['outer', params?.memberId]); return true; }
+		}
+		class Middle extends Middleware {
+			next(params) { order.push(['middle', params?.memberId]); return true; }
+		}
+		class Inner extends Middleware {
+			next(params) { order.push(['inner', params?.memberId]); return true; }
+		}
+		const router = new Router(
+			group('/org', {
+				middlewares: Outer,
+				routes: [
+					group('/team', {
+						middlewares: Middle,
+						routes: [
+							group('/member', {
+								middlewares: Inner,
+								routes: [
+									route('/:memberId', params => {
+										seenParams = params;
+										return div(`Member ${params.memberId}`);
+									})
+								]
+							})
+						]
+					})
+				]
+			})
+		);
+		router.install(Jetz);
+		router.to('/org/team/member/7');
+		expect(order).toEqual([['outer', '7'], ['middle', '7'], ['inner', '7']]);
+		expect(seenParams).toEqual({ memberId: '7' });
+	});
+
+	it('carries params declared in a group prefix into the route params', () => {
+		window.history.replaceState({}, '', '/');
+		let seenParams;
+		const router = new Router(
+			group('/org/:orgId', {
+				routes: [
+					group('/repo/:repoId', {
+						routes: [
+							route('/issues/:issueId', params => {
+								seenParams = params;
+								return div('Issue');
+							})
+						]
+					})
+				]
+			})
+		);
+		router.install(Jetz);
+		router.to('/org/acme/repo/site/issues/12');
+		expect(seenParams).toEqual({ orgId: 'acme', repoId: 'site', issueId: '12' });
+	});
+
+	it('flattens single and nested-array middleware declarations', () => {
+		window.history.replaceState({}, '', '/');
+		const order = [];
+		class One extends Middleware { next() { order.push('one'); return true; } }
+		class Two extends Middleware { next() { order.push('two'); return true; } }
+		class Three extends Middleware { next() { order.push('three'); return true; } }
+		const router = new Router(
+			group('/nested', {
+				middlewares: [[One], [Two, [Three]]],
+				routes: [route('/', () => div('Nested'))]
+			})
+		);
+		router.install(Jetz);
+		router.to('/nested');
+		expect(order).toEqual(['one', 'two', 'three']);
+	});
+
+	it('runs route-level middleware after the inherited group middleware', () => {
+		window.history.replaceState({}, '', '/');
+		const order = [];
+		class GroupGuard extends Middleware { next() { order.push('group'); return true; } }
+		class OwnGuard extends Middleware { next() { order.push('route'); return true; } }
+		const router = new Router(
+			group('/area', {
+				middlewares: GroupGuard,
+				routes: [route('/page', () => div('Page'), [OwnGuard])]
+			})
+		);
+		router.install(Jetz);
+		router.to('/area/page');
+		expect(order).toEqual(['group', 'route']);
+	});
+
+	it('blocks navigation and skips the component when a nested middleware denies', () => {
+		window.history.replaceState({}, '', '/');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		let rendered = 0;
+		class Gate extends Middleware {
+			next(params) { return params?.id === 'ok' ? true : this.deny('not allowed'); }
+		}
+		const router = new Router(
+			group('/admin', {
+				middlewares: Gate,
+				routes: [route('/:id', () => { rendered++; return div('Panel'); })]
+			})
+		);
+		router.install(Jetz);
+
+		// allowed: proves the route itself resolves and the guard runs
+		router.to('/admin/ok');
+		expect(rendered).toBe(1);
+
+		// denied: the guard stops it, the component never runs again
+		router.to('/admin/nope');
+		expect(rendered).toBe(1);
+		expect(warn).toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
+	it('stops the inherited chain at the first denial', () => {
+		window.history.replaceState({}, '', '/');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const order = [];
+		class Pass extends Middleware { next() { order.push('pass'); return true; } }
+		class Stop extends Middleware { next() { order.push('stop'); return this.deny(); } }
+		class Never extends Middleware { next() { order.push('never'); return true; } }
+		const router = new Router(
+			group('/guard', {
+				middlewares: Pass,
+				routes: [
+					group('/inner', {
+						middlewares: [Stop, Never],
+						routes: [route('/', () => div('Guarded'))]
+					})
+				]
+			})
+		);
+		router.install(Jetz);
+		router.to('/guard/inner');
+		expect(order).toEqual(['pass', 'stop']);
+		warn.mockRestore();
+	});
+
+	it('accepts a middleware instance and exposes its denial reason', () => {
+		window.history.replaceState({}, '', '/');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		let seenParams;
+		class RequireNumericId extends Middleware {
+			next(params) {
+				if (!/^\d+$/.test(String(params?.id))) return this.deny('id must be numeric');
+				return true;
+			}
+		}
+		const guard = new RequireNumericId();
+		const router = new Router(
+			group('/accounts', {
+				middlewares: guard,
+				routes: [route('/:id', params => {
+					seenParams = params;
+					return div(`Account ${params.id}`);
+				})]
+			})
+		);
+		router.install(Jetz);
+
+		router.to('/accounts/abc');
+		expect(guard.error).toBe('id must be numeric');
+		expect(seenParams).toBeUndefined();
+
+		router.to('/accounts/42');
+		expect(seenParams).toEqual({ id: '42' });
+		warn.mockRestore();
+	});
+});
+
+describe('middleware() helper', () => {
+	it('appends middleware to a route definition without overwriting or duplicating', () => {
+		class A extends Middleware { }
+		class B extends Middleware { }
+		const definition = route('/thing', () => div('Thing'));
+		expect(definition.middlewares).toEqual([]);
+
+		middleware(A, definition);
+		expect(definition.middlewares).toEqual([A]);
+
+		middleware(B, definition);
+		expect(definition.middlewares).toEqual([A, B]);
+
+		// re-applying the same middleware is a no-op
+		middleware(A, definition);
+		expect(definition.middlewares).toEqual([A, B]);
+	});
+
+	it('flattens nested middleware arrays and skips null entries', () => {
+		class A extends Middleware { }
+		class B extends Middleware { }
+		const definition = route('/thing', () => div('Thing'));
+		middleware([[A], [null, [B]]], definition);
+		expect(definition.middlewares).toEqual([A, B]);
+	});
+
+	it('returns the routes so calls can be chained', () => {
+		class A extends Middleware { }
+		const first = route('/one', () => div('One'));
+		const second = route('/two', () => div('Two'));
+		const returned = middleware(A, first, second);
+		expect(returned).toEqual([first, second]);
+		expect(first.middlewares).toEqual([A]);
+		expect(second.middlewares).toEqual([A]);
+	});
+
+	it('protects a route nested inside a group during navigation', () => {
+		window.history.replaceState({}, '', '/');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		let rendered = 0;
+		let allowed = true;
+		class Guard extends Middleware {
+			next() { return allowed ? true : this.deny('blocked'); }
+		}
+		const protectedRoute = route('/secret/:id', () => { rendered++; return div('Secret'); });
+		middleware(Guard, protectedRoute);
+		const router = new Router(
+			group('/vault', { routes: [protectedRoute] })
+		);
+		router.install(Jetz);
+
+		// allowed: the nested route resolves and runs
+		router.to('/vault/secret/1');
+		expect(rendered).toBe(1);
+
+		// denied: the attached middleware blocks it
+		allowed = false;
+		router.to('/vault/secret/2');
+		expect(rendered).toBe(1);
+		warn.mockRestore();
 	});
 });
 
