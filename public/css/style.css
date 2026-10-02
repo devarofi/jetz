@@ -302,6 +302,11 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
+.jetz-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+
 .jetz-split-grid {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
@@ -717,6 +722,12 @@ div#app:has(#welcome-page)>main>footer {
         0 30px 70px rgba(15, 42, 61, 0.18),
         0 8px 20px rgba(15, 42, 61, 0.08);
 }
+
+
+.jetz-snippet-window {
+    margin-top: 30px;
+}
+
 
 
 .jetz-window-bar {
@@ -2821,6 +2832,7 @@ html.jetz-theme-dark .jetz-theme-toggle:hover {
     }
 
 
+    .jetz-metric-grid,
     .jetz-card-grid,
     .jetz-step-grid,
     .jetz-example-grid,

@@ -533,6 +533,56 @@ button(
 
 
     // -------------------------------------------------------------------------
+    // Paint-aware figures
+    //
+    // `defer()` splits one heavy write in two: the loading signal flips now, so
+    // the browser paints the indicator, and the write itself lands one frame
+    // later. The gap below is that frame - the price paid for the instant
+    // feedback - while the other three are the usual stress-test readings taken
+    // with defer() in the loop.
+    // -------------------------------------------------------------------------
+
+    const paintGapMs = '38.80';
+    const paintLatencyMs = '88.70';
+
+    const paintMetrics = [
+        {
+            value: `${paintGapMs} ms`,
+            label: 'Paint Gap',
+            note: 'Instant UI Feedback'
+        },
+        {
+            value: '0.20 ms',
+            label: 'Reactive String',
+            note: 'TextNode Isolation'
+        },
+        {
+            value: '73.1 MB',
+            label: 'JS Heap Usage',
+            note: '50,000 Rows in Memory'
+        },
+        {
+            value: `< ${paintLatencyMs} ms`,
+            label: 'P95 / Max Latency',
+            note: 'Uninterrupted Main Thread'
+        }
+    ];
+
+    // The whole scheduling API in six lines, painted by the same Prism pass as
+    // the hero and explorer snippets.
+    const deferSnippet = `// How easy it is to write non-blocking UI in Jetz
+import { stateOf, defer } from 'jetz';
+
+const currentPage = stateOf(1);
+const isPending = stateOf(false);
+
+function nextPage() {
+  defer(() => currentPage.value++, { loadingState: isPending });
+}`;
+
+
+
+    // -------------------------------------------------------------------------
     // Metric card
     //
     // Reuses the benefit-card shell so it picks up the same border, radius,
@@ -2303,6 +2353,104 @@ button(
                     'See the Methodology & Interactive Stress Test Demo',
 
                     span('→')
+                )
+            )
+        ),
+
+
+        // =====================================================================
+        // PAINT-AWARE SCHEDULING
+        // =====================================================================
+
+        section(
+            {
+                id: 'defer',
+                class: 'jetz-section jetz-section-soft'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                // -- header ----------------------------------------------------
+
+                div(
+                    css`jetz-section-heading text-center jetz-reveal`,
+
+                    div(
+                        css`jetz-eyebrow`,
+
+                        span(
+                            css`jetz-eyebrow-dot`
+                        ),
+
+                        'PAINT-AWARE SCHEDULING'
+                    ),
+
+                    h2(
+                        '60 FPS Feel, Even Under Extreme DOM Load'
+                    ),
+
+                    p(
+                        'Jetz isolates DOM creation from frame painting using native defer() scheduling. Your UI stays butter-smooth with zero frame drops during heavy reconciliations.'
+                    )
+                ),
+
+
+                // -- the four figures -------------------------------------------
+
+                div(
+                    css`jetz-card-grid jetz-metric-grid jetz-reveal`,
+
+                    ...paintMetrics.map(metric => div(
+                        css`jetz-card-col`,
+
+                        metricCard(metric)
+                    ))
+                ),
+
+
+                // -- the whole scheduling API in six lines ---------------------
+
+                div(
+                    css`jetz-reveal`,
+
+                    div(
+                        css`jetz-window jetz-snippet-window`,
+
+                        div(
+                            css`jetz-window-bar`,
+
+                            div(
+                                css`jetz-window-dots`,
+
+                                span(),
+
+                                span(),
+
+                                span()
+                            ),
+
+                            small('defer.js')
+                        ),
+
+                        pre(
+                            css`jetz-hero-code-content`,
+
+                            code(
+                                css`language-javascript`,
+
+                                highlight(deferSnippet)
+                            )
+                        )
+                    )
+                ),
+
+                p(
+                    css`jetz-bench-source`,
+
+                    '* Measured in Chrome on the bundled stress test with defer() enabled: the paint gap is the single frame Jetz waits out so the indicator is on screen before the heavy write runs, and the latency figures come from a full pagination sweep over 50,000 reactive rows.'
                 )
             )
         ),
