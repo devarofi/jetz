@@ -65,6 +65,17 @@ function cssValue(value) {
     return value == null || value === false ? '' : value;
 }
 
+/**
+ * Coerces one interpolated value inside a `style` template into declaration text.
+ * null/undefined/false contribute nothing (the `cond ? 'color:red' : false`
+ * idiom), everything else is stringified as-is.
+ */
+function styleValue(value) {
+    if (typeof value === 'function') value = value();
+    if (value instanceof State) value = value.value;
+    return value == null || value === false ? '' : value;
+}
+
 /** Creates a class attribute, supporting reactive tagged-template interpolations. */
 export function css(value, ...values) {
     if (Array.isArray(value) && Object.hasOwn(value, 'raw')) {
@@ -76,6 +87,7 @@ export function css(value, ...values) {
         return { class: isReactive ? computed(render) : render() };
     }
     if (typeof value === 'function') return { class: computed(value) };
+    if (value instanceof State) return { class: value };
     return { class: value };
 }
 
@@ -116,7 +128,33 @@ export const type = attrOf('type');
 export const role = attrOf('role');
 export const tabindex = attrOf('tabindex');
 export const value = attrOf('value');
-export const style = styles => ({ style: styles });
+/**
+ * Style attribute helper. Call it with an object of CSS properties, or use it as
+ * a tagged template for a css block:
+ *
+ *   div(style({ color: 'red' }))
+ *   div(style`
+ *     max-width: 400px;
+ *     margin: 30px auto;
+ *   `)
+ *
+ * Interpolated functions/states stay reactive: the whole declaration block is
+ * recomposed whenever a value they read changes.
+ */
+export const style = (value, ...values) => {
+    if (Array.isArray(value) && Object.hasOwn(value, 'raw')) {
+        const strings = value;
+        const render = () => strings.reduce((cssText, part, index) => {
+            return cssText + part + (index < values.length ? styleValue(values[index]) : '');
+        }, '');
+        const isReactive = values.some(item => typeof item === 'function' || item instanceof State);
+        return { style: isReactive ? computed(render) : render() };
+    }
+    if (typeof value === 'function' || value instanceof State) {
+        return { style: value instanceof State ? value : computed(value) };
+    }
+    return { style: value };
+};
 export const data_ = objData => prefixedAttrs('data-', objData);
 export const aria_ = objAria => prefixedAttrs('aria-', objAria);
 export const wrap = {

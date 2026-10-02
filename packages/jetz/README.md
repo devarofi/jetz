@@ -445,7 +445,7 @@ Element functions accept arguments in any natural order:
 * **Strings & Numbers:** Rendered as child text nodes.
 * **Child Elements:** Appended directly into the parent.
 * **Objects:** Configured as attributes, properties, or event handlers.
-* **CSS Helpers:** Tagged template `css\`class-name\`` or style objects.
+* **CSS Helpers:** Tagged template ``css`class-name` ``, a reactive function `css(() => …)`, style objects, or a css block via ``style`…` ``.
 * **Reactive States:** Automatically bind their text content.
 
 ```javascript
@@ -694,6 +694,56 @@ const ComputedTaskList = ul(loop(tasks, task => li(
 ```
 
 Create the computed value inside the `loop()` renderer when it depends on that row's `task`. Each row gets a computation that closes over its own task, and `css` updates that row's class whenever `task.done` changes.
+
+#### Reactive Styles
+
+The `style` helper accepts the same three forms as `css`: an object of properties, a **tagged template** holding a css declaration block, or a callback/`State` producing either.
+
+```javascript
+import { stateOf } from "jetz";
+import { div, style } from "jetz/ui";
+
+// 1. object form
+div(style({ color: "crimson", "max-width": "400px" }))
+
+// 2. tagged template - a css block, straight in the markup
+div(
+  style`
+    max-width: 400px;
+    margin: 30px auto;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: sans-serif;
+  `,
+  "Card content"
+)
+```
+
+Interpolations inside the template stay **reactive**, exactly like `css`…`` and `div`…``:
+
+```javascript
+const accent = stateOf("#334155");
+
+const Panel = div(
+  style`
+    color: ${() => accent.value};
+    padding: 20px;
+  `,
+  "Panel"
+);
+
+accent.value = "#dc2626";   // only the color declaration updates
+```
+
+A `State` (or callback) holding the whole block works too:
+
+```javascript
+const theme = stateOf("background: #fff; color: #111;");
+div(style(theme));
+```
+
+The declaration block is parsed into individual properties, so each one keeps its own binding - a reactive interpolation re-renders just that property rather than rewriting the whole `style` attribute. Blank entries and malformed declarations are skipped, and `null`/`false` interpolations contribute nothing.
 
 #### Reactive Attributes
 

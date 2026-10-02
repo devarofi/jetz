@@ -39,7 +39,11 @@ export declare const name: AttrFactory;
 export declare const placeholder: AttrFactory;
 export declare const role: AttrFactory;
 export declare const src: AttrFactory;
-export declare const style: (styles: Record<string, any>) => { style: Record<string, any> };
+/** Style attribute: object of properties, a css block via tagged template, or a State/callback producing either. */
+export declare const style: {
+	(styles: Record<string, any> | string): { style: Record<string, any> | string };
+	(strings: TemplateStringsArray, ...values: any[]): { style: any };
+};
 export declare const tabindex: AttrFactory;
 export declare const type: AttrFactory;
 export declare const value: AttrFactory;

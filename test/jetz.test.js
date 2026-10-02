@@ -1205,3 +1205,57 @@ describe('dependency teardown without per-dependency closures', () => {
 	});
 });
 
+
+describe('style tagged template', () => {
+	it('applies a css declaration block from a tagged template', () => {
+		const target = mount(div(
+			style`
+				max-width: 400px;
+				margin: 30px auto;
+				padding: 20px;
+				border: 1px solid #e2e8f0;
+				border-radius: 8px;
+				font-family: sans-serif;
+			`,
+			'card'
+		));
+		const box = target.querySelector('div');
+		expect(box.style.maxWidth).toBe('400px');
+		expect(box.style.margin).toBe('30px auto');
+		expect(box.style.padding).toBe('20px');
+		expect(box.style.border).toBe('1px solid rgb(226, 232, 240)');
+		expect(box.style.borderRadius).toBe('8px');
+		expect(box.style.fontFamily).toBe('sans-serif');
+		expect(box.textContent).toBe('card');
+	});
+
+	it('keeps interpolated state values reactive', () => {
+		const color = stateOf('red');
+		const target = mount(div(style`color: ${() => color.value}; padding: 4px;`));
+		const box = target.querySelector('div');
+		expect(box.style.color).toBe('red');
+		expect(box.style.padding).toBe('4px');
+
+		color.value = 'blue';
+		expect(box.style.color).toBe('blue');
+	});
+
+	it('supports a State holding the whole css block', () => {
+		const styles = stateOf('color: green;');
+		const target = mount(div(style(styles)));
+		const box = target.querySelector('div');
+		expect(box.style.color).toBe('green');
+
+		styles.value = 'color: purple; margin: 2px;';
+		expect(box.style.color).toBe('purple');
+		expect(box.style.margin).toBe('2px');
+	});
+
+	it('still accepts a plain object of properties', () => {
+		const target = mount(div(style({ color: 'red', 'max-width': '10px' })));
+		const box = target.querySelector('div');
+		expect(box.style.color).toBe('red');
+		expect(box.style.maxWidth).toBe('10px');
+	});
+});
+

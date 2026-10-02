@@ -762,7 +762,14 @@ class JetzElement {
 				} else if (attr === 'bind') {
 					this.#bindInputValue(attrValue);
 				} else if (attr === "style") {
-					this.#addStyle(attrValue);
+					// object form: { color: 'red', … }
+					// string form: a css declaration block, e.g. from `style`…``
+					if (attrValue != null && typeof attrValue === 'object' &&
+						!(attrValue instanceof State) && !(attrValue instanceof JetzElement)) {
+						this.#addStyle(attrValue);
+					} else {
+						this.#addStyleText(attrValue);
+					}
 					continue;
 				} else if (attr === 'if' || attr === 'else' || attr === 'elseif') {
 					this.#assignConditionalAttr(attr, attrValue);
@@ -827,19 +834,50 @@ class JetzElement {
 	#addStyle(styles) {
 		for (const key in styles) {
 			if (Object.hasOwnProperty.call(styles, key)) {
-				let value = styles[key];
-				if (typeof value === 'function') value = computed(value);
-				if (value instanceof State) {
-					const styleState = new StyleState(this.o.style, key, value);
-					value.addContainer(styleState);
-					// the container holds this element's CSSStyleDeclaration, so it
-					// must be dropped when the element (row) leaves the tree
-					this.#bindTeardown(() => value.removeContainer(styleState));
-					this.o.style[key] = value.value;
-				} else {
-					this.o.style[key] = value;
-				}
+				this.#applyStyleValue(key, styles[key]);
 			}
+		}
+	}
+	/**
+	 * Applies a css declaration block given as text (the `style`…`` tagged form).
+	 * Every declaration is routed through #applyStyleValue, so a reactive value
+	 * (State / callback) inside the block keeps updating on its own.
+	 */
+	#addStyleText(value) {
+		if (value instanceof State) {
+			this.#parseStyleText(value.value);
+			const apply = next => this.#parseStyleText(next);
+			value.subscribe(apply);
+			this.#bindTeardown(() => value.unsubscribe(apply));
+			return;
+		}
+		this.#parseStyleText(value);
+	}
+	#parseStyleText(text) {
+		if (text == null) return;
+		const declarations = String(text).split(';');
+		for (const declaration of declarations) {
+			const separator = declaration.indexOf(':');
+			// skip blanks, malformed entries and custom properties (--var)
+			if (separator <= 0 || String(declaration).slice(0, separator).trimStart().startsWith('--')) continue;
+			this.#applyStyleValue(
+				declaration.slice(0, separator).trim(),
+				declaration.slice(separator + 1).trim()
+			);
+		}
+	}
+	/** Binds one css declaration, reacting to its value when it is a State. */
+	#applyStyleValue(key, value) {
+		if (typeof value === 'function') value = computed(value);
+		if (value instanceof State) {
+			const styleState = new StyleState(this.o.style, key, value);
+			value.addContainer(styleState);
+			// the container holds this element's CSSStyleDeclaration, so it
+			// must be dropped when the element (row) leaves the tree
+			this.#bindTeardown(() => value.removeContainer(styleState));
+			this.o.style[key] = value.value;
+		} else {
+			this.o.style[key] = value;
 		}
 	}
 	assignChildren() {

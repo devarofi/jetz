@@ -447,7 +447,7 @@ Element functions accept arguments in any natural order:
 * **Strings & Numbers:** Rendered as child text nodes.
 * **Child Elements:** Appended directly into the parent.
 * **Objects:** Configured as attributes, properties, or event handlers. Keys written `data_*` / `aria_*` render hyphenated, so `{ data_counter: n }` writes `data-counter`.
-* **CSS Helpers:** Tagged template `css\`class-name\``, a reactive function `css(() => …)`, or style objects.
+* **CSS Helpers:** Tagged template `css\`class-name\``, a reactive function `css(() => …)`, style objects, or a css block via `style\`…\``.
 * **Reactive States:** Automatically bind their text content.
 
 ```javascript
@@ -726,6 +726,56 @@ Two rules cover every form above:
 
 * **Read `.value` inside the callback.** A callback tracks the states it reads, so `() => count.value % 2` updates while `${count.value % 2 ? "a" : "b"}` is evaluated before `css` ever sees it and freezes at its first value.
 * **Return `null` or `false` to contribute nothing.** Those values are filtered out instead of being stringified, so no stray `class="false"` is left behind.
+
+#### Reactive Styles
+
+The `style` helper accepts the same three forms as `css`: an object of properties, a **tagged template** holding a css declaration block, or a callback/`State` producing either.
+
+```javascript
+import { stateOf } from "jetz";
+import { div, style } from "jetz/ui";
+
+// 1. object form
+div(style({ color: "crimson", "max-width": "400px" }))
+
+// 2. tagged template - a css block, straight in the markup
+div(
+  style`
+    max-width: 400px;
+    margin: 30px auto;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: sans-serif;
+  `,
+  "Card content"
+)
+```
+
+Interpolations inside the template stay **reactive**, exactly like `css`…`` and `div`…``:
+
+```javascript
+const accent = stateOf("#334155");
+
+const Panel = div(
+  style`
+    color: ${() => accent.value};
+    padding: 20px;
+  `,
+  "Panel"
+);
+
+accent.value = "#dc2626";   // only the color declaration updates
+```
+
+A `State` (or callback) holding the whole block works too:
+
+```javascript
+const theme = stateOf("background: #fff; color: #111;");
+div(style(theme));
+```
+
+The declaration block is parsed into individual properties, so each one keeps its own binding - a reactive interpolation re-renders just that property rather than rewriting the whole `style` attribute. Blank entries and malformed declarations are skipped, and `null`/`false` interpolations contribute nothing.
 
 #### Reactive Attributes
 
@@ -1827,6 +1877,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`).
 * [`listen(callback)`](#11-reactive-listeners-listen): Reactive inline listener attached to element.
 * [`css(...)`](#reactive-classes): Class attribute; the function form `css(() => …)` re-evaluates on state change.
+* [`style(...)`](#reactive-styles): Style attribute from an object or a `style\`…\`` css block; interpolations stay reactive.
 * [`shallowStateOf(object)`](#shallow-row-state-shallowstateof-rowof): Row-level record with one shared version signal.
 * [`rowOf(object)`](#shallow-row-state-shallowstateof-rowof): Alias of `shallowStateOf()` tuned for table records.
 * [`rawOf(row)`](#untracked-pipeline-reads-rawof): Untracked read of a shallow row's plain data.
