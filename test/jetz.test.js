@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
 	Component, Dispatcher, Jetz, JetzElement, Raw, State,
-	_else, _elseif, _if, _show, addScript, batch, computed, createElement, createList, effect, flatMap,
+	_else, _elseif, _if, _show, addScript, batch, computed, createElement, createList, defer, effect, flatMap,
 	html, ifElse, listen, listOf, loop, onCreate, onDestroy, onMount, onUpdate,
 	range, rememberOf, sequenceOf, stateOf
 } from '../src/lib/jetz.js';
@@ -644,6 +644,117 @@ describe('batch', () => {
 		})).toThrow('batch failed');
 		expect(value.value).toBe(1);
 		expect(seen).toEqual([[1, 0]]);
+	});
+});
+
+describe('defer', () => {
+	let frameQueue;
+
+	// Deterministic frame queue: defer() must interleave with paints exactly,
+	// so rAF is stubbed and each flushFrame() simulates one painted frame.
+	const flushFrame = () => {
+		const queue = frameQueue;
+		frameQueue = [];
+		queue.forEach(callback => callback(0));
+	};
+	const nextMacrotask = () => new Promise(resolve => setTimeout(resolve, 0));
+
+	beforeEach(() => {
+		frameQueue = [];
+		vi.stubGlobal('requestAnimationFrame', callback => {
+			frameQueue.push(callback);
+			return frameQueue.length;
+		});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('runs the task after a frame and a macrotask, never synchronously', async () => {
+		const order = [];
+
+		defer(() => order.push('task'));
+		order.push('sync');
+		expect(order).toEqual(['sync']);
+
+		flushFrame();
+		expect(order).toEqual(['sync']); // frame passed, waiting for the macrotask
+
+		await nextMacrotask();
+		expect(order).toEqual(['sync', 'task']);
+	});
+
+	it('toggles loadingState around the task across frames', async () => {
+		const loading = stateOf(false);
+		const order = [];
+
+		defer(() => order.push('task'), { loadingState: loading });
+		// set synchronously so the indicator paints before the task runs
+		expect(loading.value).toBe(true);
+		expect(order).toEqual([]);
+
+		flushFrame(); // frame 1: the loading state was painted
+		expect(loading.value).toBe(true);
+
+		await nextMacrotask();
+		expect(order).toEqual(['task']);
+		// still true: the reset waits for its own frame
+		expect(loading.value).toBe(true);
+
+		flushFrame(); // frame 2: the task result was painted
+		expect(loading.value).toBe(false);
+	});
+
+	it('clears loadingState even when the task throws', () => {
+		const timeouts = [];
+		vi.stubGlobal('setTimeout', callback => {
+			timeouts.push(callback);
+			return timeouts.length;
+		});
+		const loading = stateOf(false);
+
+		defer(() => {
+			throw new Error('boom');
+		}, { loadingState: loading });
+		expect(loading.value).toBe(true);
+
+		flushFrame();
+		expect(timeouts).toHaveLength(1);
+		expect(() => timeouts.shift()()).toThrow('boom');
+		expect(loading.value).toBe(true); // reset queued for the next frame
+
+		flushFrame();
+		expect(loading.value).toBe(false);
+	});
+
+	it('drives button and indicator UI through its frames', async () => {
+		const isNavigating = stateOf(false);
+		const page = stateOf(1);
+		const target = mount(div(
+			page,
+			ifElse(() => isNavigating.value, () => span({ class: 'spinner' }, 'Loading'), () => null),
+			button({ id: 'next', disabled: () => isNavigating.value, onclick: () => defer(() => page.value++, { loadingState: isNavigating }) }, 'Next')
+		));
+		const nextPage = target.querySelector('#next');
+		expect(target.querySelector('.spinner')).toBeNull();
+		expect(nextPage.disabled).toBe(false);
+
+		nextPage.click();
+		expect(isNavigating.value).toBe(true);
+		expect(nextPage.disabled).toBe(true); // disabled + spinner paint first
+		expect(target.querySelector('.spinner')).toBeTruthy();
+		expect(target.textContent).toContain('1');
+
+		flushFrame();
+		await nextMacrotask();
+		expect(target.textContent).toContain('2'); // deferred mutation applied
+		expect(nextPage.disabled).toBe(true); // still loading until its frame
+
+		flushFrame();
+		expect(isNavigating.value).toBe(false);
+		expect(nextPage.disabled).toBe(false);
+		expect(target.querySelector('.spinner')).toBeNull();
 	});
 });
 

@@ -478,6 +478,49 @@ function batch(callback) {
 	}
 }
 /**
+ * Deferred execution with an optional loading indicator.
+ *
+ * `loadingState` flips to `true` synchronously so the browser paints the
+ * loading UI first, `taskFn` runs one animation frame plus one macrotask
+ * later (i.e. after that paint), and the flag returns to `false` on the frame
+ * after the task finished — a heavy DOM swap cannot visually cancel the
+ * indicator while the UI is still busy. The flag is cleared even when
+ * `taskFn` throws.
+ *
+ * @param {Function} taskFn - reactive mutation to run deferred
+ * @param {Object} [options] - configuration object
+ * @param {State} [options.loadingState] - signal toggled around the task
+ */
+function defer(taskFn, options = {}) {
+	const { loadingState = null } = options;
+	// no visual context (SSR, workers): fall back to a ~one-frame timeout so
+	// the deferral contract still holds without requestAnimationFrame
+	const nextFrame = typeof requestAnimationFrame === 'function'
+		? requestAnimationFrame
+		: callback => setTimeout(callback, 16);
+
+	if (loadingState) {
+		loadingState.value = true;
+	}
+
+	nextFrame(() => {
+		// one frame lets the browser paint the loading state first
+		setTimeout(() => {
+			try {
+				taskFn();
+			} finally {
+				if (loadingState) {
+					// clear only after the post-render frame: the task's own
+					// DOM changes may still be painting at this point
+					nextFrame(() => {
+						loadingState.value = false;
+					});
+				}
+			}
+		}, 0);
+	});
+}
+/**
  * Registers a hook on the currently rendering component. Intended for
  * function components:
  *
@@ -3262,4 +3305,4 @@ function effect(effectFn) {
 	return dispose;
 }
 
-export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, lazy, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };
+export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, defer, lazy, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };

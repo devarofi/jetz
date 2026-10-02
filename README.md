@@ -75,6 +75,7 @@ npm install @daevsoft/jetz
   - [10. Two-Way Data Binding (`bind`)](#10-two-way-data-binding-bind)
   - [11. Reactive Listeners (`listen`)](#11-reactive-listeners-listen)
   - [12. DOM Utilities & Helper Methods](#12-dom-utilities--helper-methods)
+  - [13. Deferred Tasks (`defer`)](#13-deferred-tasks-defer)
 - [Scaling Large Data Sets](#scaling-large-data-sets)
   - [Shallow Row State (`shallowStateOf`, `rowOf`)](#shallow-row-state-shallowstateof-rowof)
   - [Untracked Pipeline Reads (`rawOf`)](#untracked-pipeline-reads-rawof)
@@ -167,6 +168,7 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Keyed Reconciliation** | `loop(list, keyFn, renderFn)` | O(1) DOM element recycling and minimal mutations on array changes. |
 | **Shallow Row State** | `shallowStateOf()`, `rowOf()` | Row-level reactivity for tables: one signal per record instead of one per cell. |
 | **Lazy Signals** | `lazy(fn)` | Deferred initialization: initializer runs only on first `.value` read (like SolidJS). |
+| **Deferred Tasks** | `defer(taskFn, { loadingState })` | Run heavy mutations after the browser paints, with an optional loading indicator. |
 | **Auto Cleanup Lifecycle** | `loop()` + `disposeBindings()` | Drops subscriptions, computed values and listeners when a row leaves the DOM. |
 | **Conditional UI** | `_if`, `_elseif`, `_else`, `ifElse` | Declarative, reactive conditional rendering without wrapper divs. |
 | **Component Lifecycle** | `onCreate`, `onMount`, `onUpdate`, `onDestroy` | Deterministic setup and teardown for function and class components. |
@@ -1181,6 +1183,59 @@ const items = findAll(".list-item");      // Returns Array<HTMLElement>
 
 ---
 
+### 13. Deferred Tasks (`defer`)
+
+`defer(taskFn, options?)` runs a reactive mutation *after* the browser has had
+a chance to paint. Without options it is a plain paint-aware deferral; with
+`{ loadingState }` it also wraps the task in a loading indicator:
+
+1. **Frame setup (sync)** — `loadingState.value = true` runs immediately, so
+   spinners and disabled buttons are drawn on the very next frame.
+2. **One frame + one macrotask later** — `taskFn` starts only *after* that
+   loading frame was painted, so a heavy DOM rebuild can no longer freeze the
+   UI before the indicator ever appears.
+3. **Frame after the task** — the signal returns to `false` only once the
+   task's own DOM changes finished painting, so the indicator cannot
+   visually disappear while the UI is still busy.
+
+```javascript
+import { stateOf, defer, ifElse } from "jetz";
+import { button, div, span } from "jetz/ui";
+
+const currentPage = stateOf(1);
+const isNavigating = stateOf(false);
+
+function handleNextPage() {
+  // one line: flips the signal, paints it, then advances the page
+  defer(() => currentPage.value++, { loadingState: isNavigating });
+}
+
+const page = div(
+  button({ onclick: handleNextPage, disabled: () => isNavigating.value }, "Next Page"),
+  // reactive indicator: visible only while defer() is working
+  ifElse(() => isNavigating.value,
+    () => span({ class: "spinner" }, " Loading..."),
+    () => null)
+);
+```
+
+**Why `requestAnimationFrame` + `setTimeout`?**
+
+| Step | Timing | Purpose |
+|---|---|---|
+| `loadingState.value = true` | Immediate (sync) | Subscribers/DOM update right away; the browser paints them on the next frame. |
+| `rAF` → `setTimeout(0)` | After frame 1's paint | The heavy `taskFn` starts only after the loading UI was actually drawn. |
+| `rAF(() => loadingState.value = false)` | Frame after the task | Clears the flag only after the task's result painted — the indicator can't vanish while the UI is still frozen. |
+
+**Notes:**
+- Works without options too: `defer(taskFn)` is a plain paint-aware deferral.
+- If `taskFn` throws, the indicator is still cleared (the `finally` path) and
+  the error propagates.
+- Wrap `taskFn` in `batch(() => …)` when it performs many signal writes and
+  you want a single flush at the end.
+
+---
+
 ## Scaling Large Data Sets
 
 A grid holding tens of thousands of rows puts two separate pressures on the
@@ -1898,6 +1953,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`rawOf(row)`](#untracked-pipeline-reads-rawof): Untracked read of a shallow row's plain data.
 * [`touchRow(row)`](#untracked-pipeline-reads-rawof): Manually bump a shallow row's version.
 * [`lazy(fn)`](#lazy-signals-lazy): Deferred signal — initializer runs only on first `.value` read.
+* [`defer(taskFn, options)`](#13-deferred-tasks-defer): Run a mutation after the next paint, with an optional loading indicator.
 
 ### Collections & Reconciliation
 * [`listOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive array with helper mutation methods.

@@ -4,7 +4,7 @@
  */
 import {
 	Component, Dispatcher, Jetz, JetzElement, Raw, State,
-	_else, _elseif, _if, _show, addScript, createElement, createList, flatMap,
+	_else, _elseif, _if, _show, addScript, createElement, createList, defer, flatMap,
 	html, ifElse, listen, listOf, loop, onCreate, onDestroy, onMount, onUpdate,
 	range, rememberOf, sequenceOf, stateOf
 } from '../../src/lib/jetz.js';
@@ -73,6 +73,8 @@ function finish() {
 
 const textOf = selector => find(selector).textContent;
 const itemsOf = selector => Array.from(findAll(selector)).map(element => element.textContent);
+/** Resolves after the next animation frame plus one macrotask — i.e. after a paint. */
+const afterPaint = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
 
 /** Renders a tree into its own container so the sections stay independent. */
 function mountInto(name, tree, event) {
@@ -119,6 +121,7 @@ function runMainSuite() {
 
 	assert('jetz core entry exposes Jetz', typeof Jetz, 'function');
 	assert('jetz core entry exposes stateOf', typeof stateOf, 'function');
+	assert('jetz core entry exposes defer', typeof defer, 'function');
 	assert('jetz ui entry exposes div', typeof div, 'function');
 	assert('jetz ui entry exposes find', typeof find, 'function');
 	assert('published package root resolves', typeof Jetz.version, 'string');
@@ -833,12 +836,27 @@ function runMainSuite() {
 		});
 	});
 
-	loadExternal.then(status => {
+	loadExternal.then(async status => {
 		const scriptTag = document.querySelector('script[src="external.js"]');
 		assert('addScript() loads the script file', status, 'loaded');
 		assert('addScript() runs the loaded script', window.__JETZ_SMOKE_SCRIPT__, 'loaded');
 		assert('addScript() forwards element attributes', scriptTag.getAttribute('async'), 'true');
 		assert('addScript() appends the script to the body', scriptTag.parentElement.tagName, 'BODY');
+
+		// real-browser check: defer() interleaves with actual rAF paints
+		section('defer: task after paint with loading indicator');
+		const navigating = stateOf(false);
+		const deferredPage = stateOf(1);
+		const deferredSteps = [];
+		defer(() => { deferredPage.value++; deferredSteps.push('task'); }, { loadingState: navigating });
+		assert('defer flips the loading signal synchronously', navigating.getValue(), true);
+		assert('defer keeps the task pending before the frame', deferredSteps.length, 0);
+		await afterPaint();
+		assert('defer runs the task after the frame', deferredSteps.length, 1);
+		assert('defer keeps loading while the task result paints', navigating.getValue(), true);
+		await afterPaint();
+		assert('defer clears loading after the task frame', navigating.getValue(), false);
+		assert('defer applied the deferred mutation', deferredPage.getValue(), 2);
 
 		// phase 1 done: persist the results and ask the runner for one reload,
 		// the reload phase verifies rememberOf

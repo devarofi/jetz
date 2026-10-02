@@ -461,6 +461,21 @@ export declare function batch<T>(callback: () => T): T;
 export declare function lazy<T>(initializer: () => T): State<T>;
 
 /**
+ * Runs `taskFn` after the browser has had a chance to paint pending UI
+ * changes, optionally wrapping it in a loading indicator.
+ *
+ * `options.loadingState` flips to `true` synchronously (the loading UI paints
+ * on the next frame), `taskFn` runs one animation frame plus one macrotask
+ * later, and the signal returns to `false` on the frame after the task
+ * finished. The flag is cleared even when `taskFn` throws.
+ *
+ * @example
+ * const isNavigating = stateOf(false);
+ * defer(() => currentPage.value++, { loadingState: isNavigating });
+ */
+export declare function defer(taskFn: () => void, options?: { loadingState?: State<boolean> }): void;
+
+/**
  * Creates a reactive collection (ListState).
  *
  * @example
