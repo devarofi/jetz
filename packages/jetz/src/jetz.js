@@ -432,9 +432,12 @@ function describeBindingFailure(stateTarget, element) {
 }
 let _batchDepth = 0;
 let _isFlushingBatch = false;
-const _pendingBatchStates = new Map();
-const _pendingBatchComputations = new Set();
-const _pendingBatchEffects = new Set();
+// The pending queues are swapped for fresh instances on every drain instead of
+// being copied into an array and cleared: same "snapshot then reset" semantics,
+// without materialising a new Array on each pass of the flush loop.
+let _pendingBatchStates = new Map();
+let _pendingBatchComputations = new Set();
+let _pendingBatchEffects = new Set();
 
 function flushBatch() {
 	if (_batchDepth > 0 || _isFlushingBatch) return;
@@ -443,18 +446,20 @@ function flushBatch() {
 	try {
 		while (_pendingBatchStates.size || _pendingBatchComputations.size || _pendingBatchEffects.size) {
 			while (_pendingBatchStates.size || _pendingBatchComputations.size) {
-				const stateChanges = [..._pendingBatchStates.values()];
-				_pendingBatchStates.clear();
+				// Swap, don't copy: work runs on the detached queue while writes
+				// triggered by it land in the fresh one and are picked up next pass.
+				const stateChanges = _pendingBatchStates;
+				_pendingBatchStates = new Map();
 				stateChanges.forEach(notify => {
 					hasStateChanges = true;
 					notify();
 				});
-				const computations = [..._pendingBatchComputations];
-				_pendingBatchComputations.clear();
+				const computations = _pendingBatchComputations;
+				_pendingBatchComputations = new Set();
 				computations.forEach(recompute => recompute());
 			}
-			const effects = [..._pendingBatchEffects];
-			_pendingBatchEffects.clear();
+			const effects = _pendingBatchEffects;
+			_pendingBatchEffects = new Set();
 			effects.forEach(run => run());
 		}
 	} finally {
@@ -1217,13 +1222,29 @@ class JetzElement {
 		this.#classUnsubs = [];
 	}
 	#setClassAttribute(value) {
-		// value is already flat from .map() - no need for recursive flatMap
+		// `value` is already flat (produced by `#classParts.map(...)`), but each
+		// entry can still be a multi-class string like 'a-1 b-2', so it has to be
+		// split on whitespace the way `addClass` does. Done with an index loop +
+		// charCode scanning: no regex engine, no intermediate filter/flatMap
+		// arrays, and consecutive separators collapse for free (space only).
 		const values = Array.isArray(value) ? value : [value];
-		const className = values
-			.filter(item => item != null && item !== false)
-			.flatMap(item => String(item).split(/\s+/))
-			.filter(Boolean)
-			.join(' ');
+		let className = '';
+		for (let i = 0; i < values.length; i++) {
+			const item = values[i];
+			if (item == null || item === false || item === '') continue;
+			const text = typeof item === 'string' ? item : String(item);
+			let pending = '';
+			for (let j = 0; j < text.length; j++) {
+				const code = text.charCodeAt(j);
+				// space, tab, LF, CR, FF, VT, NBSP
+				if (code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || code === 11 || code === 160) {
+					if (pending) { className = className ? className + ' ' + pending : pending; pending = ''; }
+				} else {
+					pending += text[j];
+				}
+			}
+			if (pending) className = className ? className + ' ' + pending : pending;
+		}
 		if (className) this.o.setAttribute('class', className);
 		else this.o.removeAttribute('class');
 	}
@@ -2927,7 +2948,10 @@ const _show = _if;
 function computed(computeFn) {
 	let _computing = false;
 	let _deps = new Set();
-	let _unsubs = [];
+	// `_deps` is the only registry of dependencies: it holds the State instances
+	// themselves, so teardown can call `unsubscribe` directly on each one. Keeping
+	// a parallel `_unsubs` array of per-dependency closures doubled the allocation
+	// (and the GC pressure) of every recompute for no extra reach.
 	function scheduleTrack() {
 		if (_isFlushingBatch) _pendingBatchComputations.add(track);
 		else track();
@@ -2938,9 +2962,8 @@ function computed(computeFn) {
 		if (_computing) return;
 		_computing = true;
 
-		// Unsubscribe from old dependencies
-		_unsubs.forEach(fn => fn());
-		_unsubs = [];
+		// Unsubscribe from the previous dependency set
+		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
 		_deps = new Set();
 
 		// Collect dependencies by tracking State.value reads
@@ -2955,10 +2978,7 @@ function computed(computeFn) {
 		}
 
 		// Subscribe to all discovered dependencies
-		_deps.forEach(dep => {
-			dep.subscribe(scheduleTrack);
-			_unsubs.push(() => dep.unsubscribe(scheduleTrack));
-		});
+		_deps.forEach(dep => dep.subscribe(scheduleTrack));
 
 		return result;
 	}
@@ -2971,8 +2991,7 @@ function computed(computeFn) {
 	track = function () {
 		_computing = true;
 
-		_unsubs.forEach(fn => fn());
-		_unsubs = [];
+		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
 		_deps = new Set();
 
 		const prevTracking = _trackingEffect;
@@ -2985,10 +3004,7 @@ function computed(computeFn) {
 			_computing = false;
 		}
 
-		_deps.forEach(dep => {
-			dep.subscribe(scheduleTrack);
-			_unsubs.push(() => dep.unsubscribe(scheduleTrack));
-		});
+		_deps.forEach(dep => dep.subscribe(scheduleTrack));
 
 		derivedState.value = result;
 		return result;
@@ -2998,8 +3014,7 @@ function computed(computeFn) {
 	// Only registered while a `loop()` item is being rendered, so a computed
 	// created outside a loop keeps living until it is garbage collected.
 	registerDisposable(() => {
-		_unsubs.forEach(fn => fn());
-		_unsubs = [];
+		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
 		_deps = new Set();
 	});
 
@@ -3023,7 +3038,6 @@ function computed(computeFn) {
  */
 function effect(effectFn) {
 	let _deps = new Set();
-	let _unsubs = [];
 	let _running = false;
 	let _disposed = false;
 	function scheduleRun() {
@@ -3035,9 +3049,9 @@ function effect(effectFn) {
 		if (_disposed || _running) return;
 		_running = true;
 
-		// Unsubscribe from old dependencies
-		_unsubs.forEach(fn => fn());
-		_unsubs = [];
+		// Unsubscribe from the previous dependency set (`_deps` holds the State
+		// instances, so no per-dependency teardown closures are needed).
+		_deps.forEach(dep => dep.unsubscribe(scheduleRun));
 		_deps = new Set();
 
 		// Collect dependencies by tracking State.value reads
@@ -3051,10 +3065,7 @@ function effect(effectFn) {
 		}
 
 		// Subscribe to all discovered dependencies
-		_deps.forEach(dep => {
-			dep.subscribe(scheduleRun);
-			_unsubs.push(() => dep.unsubscribe(scheduleRun));
-		});
+		_deps.forEach(dep => dep.subscribe(scheduleRun));
 	}
 
 	// Run immediately to collect initial dependencies and execute effect
@@ -3063,8 +3074,7 @@ function effect(effectFn) {
 	// Return dispose function
 	function dispose() {
 		_disposed = true;
-		_unsubs.forEach(fn => fn());
-		_unsubs = [];
+		_deps.forEach(dep => dep.unsubscribe(scheduleRun));
 		_deps.clear();
 	}
 	// scope teardown for effects created inside a `loop()` item

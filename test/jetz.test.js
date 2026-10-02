@@ -1097,3 +1097,111 @@ describe('Jetz helpers', () => {
 		expect(script.defer).toBe(true);
 	});
 });
+
+describe('dependency teardown without per-dependency closures', () => {
+	it('computed drops a dependency that disappears from its last recompute', () => {
+		const useA = stateOf(true);
+		const a = stateOf('a');
+		const b = stateOf('b');
+		// Reads `a` only while useA is true, so `a` is dropped when it flips.
+		const derived = computed(() => (useA.value ? a.value : b.value));
+		expect(derived.value).toBe('a');
+
+		useA.value = false;
+		expect(derived.value).toBe('b');
+
+		// `a` is no longer a dependency: writing it must not recompute.
+		a.value = 'a2';
+		expect(derived.value).toBe('b');
+
+		// `b` is still a dependency and keeps driving the computed.
+		b.value = 'b2';
+		expect(derived.value).toBe('b2');
+	});
+
+	it('computed re-subscribes to a dependency that returns to the graph', () => {
+		const useA = stateOf(false);
+		const a = stateOf(1);
+		const b = stateOf(10);
+		const derived = computed(() => (useA.value ? a.value : b.value));
+		expect(derived.value).toBe(10);
+		expect(derived.value).toBe(10);
+
+		useA.value = true;
+		expect(derived.value).toBe(1);
+
+		a.value = 2;
+		expect(derived.value).toBe(2);
+
+		// Back to the other branch, then returning must restore the subscription.
+		useA.value = false;
+		expect(derived.value).toBe(10);
+		useA.value = true;
+		a.value = 3;
+		expect(derived.value).toBe(3);
+	});
+
+	it('effect stops firing for a dependency it stopped reading', () => {
+		const gate = stateOf(true);
+		const tracked = stateOf(0);
+		const ignored = stateOf(0);
+		let runs = 0;
+		const dispose = effect(() => {
+			tracked.value;
+			if (gate.value) ignored.value;
+			runs++;
+		});
+		expect(runs).toBe(1);
+
+		// Both states are dependencies while the gate is open.
+		tracked.value = 1;
+		ignored.value = 1;
+		expect(runs).toBe(3);
+
+		// Closing the gate drops the `ignored` subscription (no per-dep closure).
+		gate.value = false;
+		expect(runs).toBe(4);
+		ignored.value = 2;
+		expect(runs).toBe(4);
+		tracked.value = 2;
+		expect(runs).toBe(5);
+
+		dispose();
+		tracked.value = 3;
+		expect(runs).toBe(5);
+	});
+
+	it('computed works in both subscription orders under batch()', () => {
+		// The batch queues are swapped (not copied) on each drain: effects and
+		// computeds registered in either order must still converge.
+		const first = stateOf(1);
+		const second = stateOf(2);
+		const sum = computed(() => first.value + second.value);
+		let seen = 0;
+		const dispose = effect(() => { seen = sum.value; });
+		expect(seen).toBe(3);
+
+		batch(() => {
+			second.value = 20;
+			first.value = 10;
+		});
+		expect(sum.value).toBe(30);
+		expect(seen).toBe(30);
+
+		// Values written by an effect during a flush land in the fresh queue and
+		// are drained on the next pass of the same flush.
+		const source = stateOf(0);
+		const mirror = stateOf(0);
+		const disposeMirror = effect(() => {
+			source.value;
+			mirror.value = source.value * 2;
+		});
+		expect(mirror.value).toBe(0);
+		batch(() => { source.value = 5; });
+		expect(mirror.value).toBe(10);
+
+		dispose();
+		disposeMirror();
+	});
+});
+
