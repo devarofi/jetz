@@ -90,17 +90,25 @@ function mulberry32(seed) {
 function createRow(id, rnd) {
     const first = FIRST_NAMES[(rnd() * FIRST_NAMES.length) | 0];
     const last = LAST_NAMES[(rnd() * LAST_NAMES.length) | 0];
+    const name = `${first} ${last}`;
+    const email = `${first}.${last}${id}@jetz.dev`.toLowerCase();
+    const department = DEPARTMENTS[(rnd() * DEPARTMENTS.length) | 0];
+    const region = REGIONS[(rnd() * REGIONS.length) | 0];
     return rowOf({
         id,
         idLabel: id.toLocaleString("en-US"),
-        name: `${first} ${last}`,
-        email: `${first}.${last}${id}@jetz.dev`.toLowerCase(),
-        department: DEPARTMENTS[(rnd() * DEPARTMENTS.length) | 0],
-        region: REGIONS[(rnd() * REGIONS.length) | 0],
+        name,
+        email,
+        department,
+        region,
         score: (rnd() * 100000) | 0,
         visits: 1 + ((rnd() * 999) | 0),
         status: STATUSES[(rnd() * STATUSES.length) | 0],
-        selected: false
+        selected: false,
+        // Precomputed lowercase search key: the filter pipeline scans up to
+        // 50k rows per keystroke, so pay the 4x toLowerCase once at build
+        // instead of on every pipeline run.
+        _search: `${name} ${email} ${department} ${region}`.toLowerCase()
     });
 }
 
@@ -310,12 +318,9 @@ effect(() => {
         const r = rawOf(row);  // untracked read
         if (onlySelected && !r.selected) continue;
         if (status !== "all" && r.status !== status) continue;
-        if (needle && !(
-            r.name.toLowerCase().includes(needle) ||
-            r.email.includes(needle) ||
-            r.department.toLowerCase().includes(needle) ||
-            r.region.toLowerCase().includes(needle)
-        )) continue;
+        // One haystack probe against the precomputed key built in createRow(),
+        // instead of four toLowerCase() allocations per row on every keystroke.
+        if (needle && !r._search.includes(needle)) continue;
         filtered.push(row);  // push the shallow row (not rawOf) so loop() gets rowOf instances
     }
     const compare = COMPARATORS[key] ?? COMPARATORS.id;
@@ -574,6 +579,18 @@ function statCard(label, value, hint) {
     return div(css`rounded-lg bg-slate-950/50 px-3 py-2 ring-1 ring-inset ring-white/10`, ...children);
 }
 
+/**
+ * A titled category of stat cards, so results are arranged by what produced
+ * them (dataset context, button-driven tests, sweep benchmark) instead of one
+ * flat grid mixing all three.
+ */
+function cardGroup(title, cards, grid = "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5") {
+    return section(css`mt-3`,
+        div(css`${LABEL} mb-2`, title),
+        div(css`grid gap-2 ${grid}`, ...cards)
+    );
+}
+
 function Header() {
     return header(css`flex flex-wrap items-end justify-between gap-3`,
         div(
@@ -754,26 +771,31 @@ function PaginationBar() {
 function StatsPanel() {
     return section(css`${PANEL}`,
         div(css`flex flex-wrap items-center justify-between gap-2`,
-            div(css`${LABEL}`, "Render metrics"),
+            div(css`${LABEL}`, "Metrics by category"),
             div(css`flex flex-wrap items-center gap-2`,
                 button(css`${BTN}`, { onclick: bumpAllScores }, "Bump every score (+1)"),
                 button(css`${BTN}`, { onclick: pulseStrings }, "Pulse strings"),
                 button(css`${BTN}`, { onclick: resetMetrics }, "Reset metrics")
             )
         ),
-        div(css`mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5`,
+        // Context: what is loaded and rendered right now.
+        cardGroup("Dataset & DOM", [
             statCard("Rows loaded", totalLabel, computed(() => `build ${msLabel(stats.buildMs.value)}`)),
             statCard("Rows after filter", filteredLabel, computed(() => `${numberFormat(pageCount.value)} pages · ${numberFormat(pageSize.value)}/page`)),
             statCard("Rows in DOM", computed(() => numberFormat(stats.domRows.value)), computed(() => `first render ${msLabel(stats.loadMs.value)}`)),
+            statCard("Selection", selectionLabel, "click a row to toggle"),
+            statCard("JS heap", heapLabel, "Chrome only")
+        ]),
+        // Results of the manual, button-triggered tests in this panel and in
+        // the grid's pagination bar — each card is written by its button.
+        cardGroup("Button test results", [
             statCard("Last page change", lastMsLabel, computed(() => `${numberFormat(stats.changes.value)} samples`)),
             statCard("Average page change", avgMsLabel, computed(() => `min ${msLabel(stats.minMs.value)}`)),
             statCard("p95 / max", computed(() => `${msLabel(stats.p95Ms.value)} / ${msLabel(stats.maxMs.value)}`), computed(() => `mount ${msLabel(stats.mountMs.value)}`)),
             statCard("Single row update", updateMsLabel, "row state write → DOM"),
             statCard("Batch all rows", bulkMsLabel, "one state write per row"),
-            statCard("Reactive string", stringMsLabel, computed(() => `one write → ${numberFormat(stats.domRows.value)} row strings`)),
-            statCard("Selection", selectionLabel, "click a row to toggle"),
-            statCard("JS heap", heapLabel, "Chrome only")
-        )
+            statCard("Reactive string", stringMsLabel, computed(() => `one write → ${numberFormat(stats.domRows.value)} row strings`))
+        ])
     );
 }
 
@@ -795,13 +817,15 @@ function SweepPanel() {
         div(css`mt-3 h-2 overflow-hidden rounded-full bg-slate-800`,
             div(css`h-2 rounded-full bg-emerald-400`, { style: { width: () => `${sweep.progress.value}%` } },)
         ),
-        div(css`mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5`,
+        // Results of the automated sweep benchmark — kept apart from the
+        // button-driven cards above so each category reads on its own.
+        cardGroup("Sweep results", [
             statCard("Progress", computed(() => `${sweep.progress.value}%`), computed(() => `${numberFormat(sweep.pages.value)} page changes`)),
             statCard("Wall time", computed(() => `${Math.round(sweep.totalMs.value)} ms`), computed(() => `${sweep.rounds.value} round(s)`)),
             statCard("Average", computed(() => msLabel(sweep.avgMs.value))),
             statCard("p95 / max", computed(() => `${msLabel(sweep.p95Ms.value)} / ${msLabel(sweep.maxMs.value)}`)),
             statCard("Pages / second", computed(() => sweep.pps.value ? numberFormat(sweep.pps.value) : "—"))
-        )
+        ], "sm:grid-cols-2 lg:grid-cols-5")
     );
 }
 
