@@ -1386,12 +1386,246 @@ describe('Dispatcher', () => {
 		expect(d.dispatch('250')).toBe(250);
 	});
 
-	// Documents current behaviour: there is a single handler and no isolation,
-	// so a throwing handler surfaces to the dispatch() caller. This test exists
-	// so a deliberate change (isolation / multi-store) cannot land unnoticed.
-	it('propagates a throwing handler to the caller', () => {
+	it('contains a throwing handler and reports it instead of aborting the dispatch', () => {
+		const seen = [];
+		const errors = [];
 		const d = new Dispatcher(() => { throw new Error('store blew up'); });
-		expect(() => d.dispatch('X')).toThrow('store blew up');
+		d.subscribe(action => seen.push(action), 'healthy');
+		d.onError = (error, action, token) => errors.push([error.message, action, token]);
+
+		expect(() => d.dispatch('LOAD')).not.toThrow();
+		expect(seen).toEqual(['LOAD']);
+		expect(errors.map(([message, action]) => [message, action])).toEqual([['store blew up', 'LOAD']]);
+		expect(typeof errors[0][2]).toBe('function');
+	});
+
+	it('reports a throwing handler through console.error by default', () => {
+		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		new Dispatcher(() => { throw new Error('boom'); }).dispatch('X');
+		expect(spy).toHaveBeenCalled();
+		expect(String(spy.mock.calls[0][0])).toContain('Dispatcher');
+		spy.mockRestore();
+	});
+
+	it('fans one action out to every subscribed store', () => {
+		const users = [];
+		const orders = [];
+		const d = new Dispatcher();
+		d.subscribe((action, payload) => users.push(`${action}:${payload.id}`), 'users');
+		d.subscribe((action, payload) => orders.push(`${action}:${payload.id}`), 'orders');
+		d.dispatch('LOAD', { id: 7 });
+		expect(users).toEqual(['LOAD:7']);
+		expect(orders).toEqual(['LOAD:7']);
+		expect(d.size).toBe(2);
+	});
+
+	it('stops notifying an unsubscribed store and hands back a disposer', () => {
+		const seen = [];
+		const other = [];
+		const d = new Dispatcher();
+		const off = d.subscribe(() => seen.push('a'), 'a');
+		d.subscribe(() => other.push('b'), 'b');
+
+		d.dispatch('X');
+		expect(seen).toEqual(['a']);
+		off();
+		d.dispatch('Y');
+		expect(seen).toEqual(['a']);
+		expect(other).toEqual(['b', 'b']);
+		expect(d.size).toBe(1);
+	});
+
+	it('registers the constructor callback as the first handler', () => {
+		let primary = 0;
+		const later = [];
+		const d = new Dispatcher(() => { primary++; return 'primary'; });
+		d.subscribe(() => later.push(1));
+		expect(d.size).toBe(2);
+		expect(d.dispatch('X')).toBe('primary');
+		expect(primary).toBe(1);
+		expect(later).toEqual([1]);
+	});
+
+	it('waitFor() runs a dependency to completion before the caller continues', () => {
+		const order = [];
+		const users = stateOf(0);
+		const total = stateOf(0);
+		const d = new Dispatcher();
+		// 'summary' subscribes FIRST, so without waitFor it would read stale state
+		d.subscribe(() => {
+			order.push('summary:start');
+			d.waitFor('users');
+			total.value = users.value * 2;
+			order.push('summary:end');
+		}, 'summary');
+		d.subscribe(() => {
+			order.push('users');
+			users.value += 5;
+		}, 'users');
+
+		d.dispatch('ADD');
+		expect(order).toEqual(['summary:start', 'users', 'summary:end']);
+		expect(order.filter(step => step === 'users')).toHaveLength(1);
+		expect(total.value).toBe(10);
+	});
+
+	it('waitFor() accepts several tokens and honours their order', () => {
+		const order = [];
+		const d = new Dispatcher();
+		// registered first, so it must force its dependencies rather than coast on order
+		d.subscribe(() => { d.waitFor(['b', 'a']); order.push('dependent'); }, 'dependent');
+		d.subscribe(() => { order.push('c'); }, 'c');
+		d.subscribe(() => { order.push('a'); }, 'a');
+		d.subscribe(() => { order.push('b'); }, 'b');
+
+		d.dispatch('X');
+		// dependent approves b then a (token order), finishes, then c runs by registration order
+		expect(order).toEqual(['b', 'a', 'dependent', 'c']);
+	});
+
+	it('waitFor() outside a dispatch is a no-op', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const d = new Dispatcher();
+		expect(() => d.waitFor('missing')).not.toThrow();
+		expect(warn).toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
+	it('a handler that waitFor()s itself does not recurse forever', () => {
+		let runs = 0;
+		const d = new Dispatcher();
+		d.subscribe(() => { runs++; d.waitFor('self'); }, 'self');
+		d.dispatch('X');
+		expect(runs).toBe(1);
+	});
+
+	it('does not run a handler removed earlier in the same dispatch', () => {
+		const seen = [];
+		const d = new Dispatcher();
+		const victim = () => seen.push('victim');
+		d.subscribe(() => { seen.push('first'); d.unsubscribe(victim); });
+		d.subscribe(victim);
+		d.dispatch('X');
+		expect(seen).toEqual(['first']);
+	});
+
+	it('rejects a non-function handler', () => {
+		expect(() => new Dispatcher().subscribe(42)).toThrow(TypeError);
+	});
+
+	it('survives a throwing onError reporter and still notifies the rest', () => {
+		const seen = [];
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const d = new Dispatcher();
+		d.subscribe(() => { throw new Error('store boom'); }, 'bad');
+		d.subscribe(() => seen.push('good'), 'good');
+		d.onError = () => { throw new Error('reporter boom'); };
+		expect(() => d.dispatch('X')).not.toThrow();
+		expect(seen).toEqual(['good']);
+		expect(logged).toHaveBeenCalled();
+		logged.mockRestore();
+	});
+
+	it('a handler subscribed mid-dispatch waits for the next dispatch', () => {
+		const seen = [];
+		const d = new Dispatcher();
+		d.subscribe(() => {
+			seen.push('first');
+			d.subscribe(() => seen.push('late'), 'late');
+		}, 'first');
+		d.subscribe(() => seen.push('second'), 'second');
+		d.dispatch('X');
+		// the running fan-out was fixed at dispatch time: 'late' sits this one out
+		expect(seen).toEqual(['first', 'second']);
+		d.dispatch('Y');
+		expect(seen).toEqual(['first', 'second', 'first', 'second', 'late']);
+	});
+
+	it('waitFor() on an unknown token is a silent no-op inside a dispatch', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const d = new Dispatcher();
+		d.subscribe(() => { d.waitFor('ghost'); }, 'a');
+		expect(() => d.dispatch('X')).not.toThrow();
+		// no warning: an unregistered optional store must not spam the console
+		expect(warn).not.toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
+	it('waitFor() runs the sync prefix of an async dependency without awaiting it', async () => {
+		const order = [];
+		const d = new Dispatcher();
+		d.subscribe(() => {
+			order.push('reader:start');
+			d.waitFor('asyncStore');
+			order.push('reader:end');
+		}, 'reader');
+		d.subscribe(async () => {
+			order.push('async:sync-prefix');
+			await new Promise(resolve => setTimeout(resolve, 5));
+			order.push('async:resolved');
+		}, 'asyncStore');
+		d.dispatch('X');
+		// waitFor ran the dependency now but did not await its promise
+		expect(order).toEqual(['reader:start', 'async:sync-prefix', 'reader:end']);
+		await new Promise(resolve => setTimeout(resolve, 20));
+		expect(order).toEqual(['reader:start', 'async:sync-prefix', 'reader:end', 'async:resolved']);
+	});
+
+	it('circular waitFor() terminates: each store runs once', () => {
+		const order = [];
+		const d = new Dispatcher();
+		d.subscribe(() => { order.push('A:start'); d.waitFor('B'); order.push('A:end'); }, 'A');
+		d.subscribe(() => { order.push('B:start'); d.waitFor('A'); order.push('B:end'); }, 'B');
+		expect(() => d.dispatch('X')).not.toThrow();
+		expect(order).toEqual(['A:start', 'B:start', 'B:end', 'A:end']);
+	});
+
+	it('waitFor() honours each matching entry when a token is shared', () => {
+		const order = [];
+		const d = new Dispatcher();
+		d.subscribe(() => { d.waitFor('shared'); order.push('reader'); }, 'reader');
+		d.subscribe(() => { order.push('one'); }, 'shared');
+		d.subscribe(() => { order.push('two'); }, 'shared');
+		d.dispatch('X');
+		expect(order).toEqual(['one', 'two', 'reader']);
+	});
+
+	it('drives a multi-store app: fan-out, derived store via waitFor, isolated failure', () => {
+		const userCount = stateOf(0);
+		const orderCount = stateOf(0);
+		const dashboard = stateOf('');
+		const errors = [];
+
+		const d = new Dispatcher();
+		d.onError = (error, action, token) => errors.push([token, error.message]);
+
+		// a derived store registered BEFORE the stores it reads, so it has to
+		// force them through waitFor instead of relying on subscription order
+		d.subscribe(action => {
+			if (action !== 'ANALYTICS') return;
+			d.waitFor(['orders', 'users']);
+			dashboard.value = `${userCount.value}u/${orderCount.value}o`;
+		}, 'dashboard');
+
+		d.subscribe(action => {
+			if (action === 'USER_ADDED') userCount.value = userCount.value + 1;
+		}, 'users');
+
+		d.subscribe(action => {
+			if (action === 'ORDER_ADDED') orderCount.value = orderCount.value + 1;
+		}, 'orders');
+
+		// a deliberately broken store: must never take the others down
+		d.subscribe(() => { throw new Error('telemetry down'); }, 'telemetry');
+
+		d.dispatch('USER_ADDED');
+		d.dispatch('ORDER_ADDED');
+		d.dispatch('ANALYTICS');
+
+		expect(dashboard.value).toBe('1u/1o');
+		expect(d.size).toBe(4);
+		expect(errors.map(([token]) => token)).toEqual(['telemetry', 'telemetry', 'telemetry']);
+		expect(errors.every(([, message]) => message === 'telemetry down')).toBe(true);
 	});
 });
 

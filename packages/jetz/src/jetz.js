@@ -497,13 +497,155 @@ const onCreate = callback => useLifecycle('onCreate', callback);
 const onMount = callback => useLifecycle('onMount', callback);
 const onUpdate = callback => useLifecycle('onUpdate', callback);
 const onDestroy = callback => useLifecycle('onDestroy', callback);
+/**
+ * Lightweight Flux-style action dispatcher for unidirectional data flow.
+ *
+ * One action fans out to every registered handler, so domain logic can live in
+ * independent stores instead of a single switch:
+ *
+ *   const dispatcher = new Dispatcher();
+ *   dispatcher.subscribe((action, payload) => { ... }, 'users');
+ *   dispatcher.subscribe((action, payload) => { ... }, 'orders');
+ *   dispatcher.dispatch('LOAD', { id: 1 });
+ *
+ * Backward compatible: `new Dispatcher(fn)` registers `fn` as the first
+ * handler and `dispatch()` returns the first handler's result, so the original
+ * single-callback usage behaves exactly as before.
+ *
+ * Handlers run in registration order. A throwing handler is contained and
+ * reported (`onError`, default `console.error`), so one broken store cannot
+ * abort the dispatch or take unrelated stores down with it. Even `onError`
+ * itself is guarded: a throwing reporter is logged and the dispatch continues.
+ *
+ * A handler subscribed mid-dispatch takes effect on the *next* dispatch, never
+ * the running one. `waitFor` is synchronous and does not await `async`
+ * handlers: it runs the dependency's synchronous prefix and returns.
+ */
 class Dispatcher {
-	#actionDispatch;
-	constructor(callback = action => { }) {
-		this.#actionDispatch = callback;
+	/** Optional reporter: `(error, action, token) => void`. Defaults to `console.error`. */
+	onError = null;
+	/** Registered handlers, in invocation order. */
+	#handlers = [];
+	/** The dispatch cycle currently on the stack, read by `waitFor()`. */
+	#cycle = null;
+
+	constructor(callback) {
+		if (typeof callback === 'function') this.subscribe(callback);
 	}
+
+	/** Number of registered handlers. */
+	get size() {
+		return this.#handlers.length;
+	}
+
+	/**
+	 * Registers a handler invoked as `handler(action, ...args)`.
+	 *
+	 * A handler subscribed *during* a dispatch joins the roster for the *next*
+	 * cycle, never the running one: dispatch iterates a snapshot, so the current
+	 * fan-out is fixed the moment it starts.
+	 *
+	 * @param {(action: any, ...args: any[]) => any} handler
+	 * @param {any} [token] identifier usable with `waitFor()`; defaults to `handler`
+	 * @returns {() => void} unsubscribe function
+	 */
+	subscribe(handler, token) {
+		if (typeof handler !== 'function') {
+			throw new TypeError('Jetz Dispatcher: subscribe(handler) expects a function');
+		}
+		const entry = { handler, token: token === undefined ? handler : token };
+		this.#handlers.push(entry);
+		return () => { this.unsubscribe(handler); };
+	}
+
+	/** Removes a handler previously passed to the constructor or `subscribe()`. */
+	unsubscribe(handler) {
+		this.#handlers = this.#handlers.filter(entry => entry.handler !== handler);
+		return this;
+	}
+
+	/**
+	 * Runs a prerequisite handler *now*, before the caller continues, so a store
+	 * that derives from others can force its dependencies to settle first:
+	 *
+	 *   dispatcher.subscribe(() => {
+	 *     dispatcher.waitFor('users');            // 'users' runs to completion
+	 *     total.value = users.count.value + orders.count.value;
+	 *   }, 'summary');
+	 *
+	 * A handler already invoked in the current cycle is not run twice, so
+	 * `waitFor` also doubles as a re-entrancy guard. Calling it outside a
+	 * dispatch warns and is a no-op. Waiting on an unknown token is a silent
+	 * no-op by design, so optional stores can stay unregistered.
+	 *
+	 * `waitFor` is synchronous: it runs the dependency's *synchronous* prefix
+	 * now and returns. An `async` handler's promise resolves later, so `waitFor`
+	 * does not await it — order async flows with explicit awaits instead.
+	 */
+	waitFor(tokens) {
+		const cycle = this.#cycle;
+		if (cycle == null) {
+			console.warn('Jetz Dispatcher: waitFor() called outside dispatch() - ignored.');
+			return this;
+		}
+		const wanted = Array.isArray(tokens) ? tokens : [tokens];
+		for (const token of wanted) {
+			for (const entry of [...this.#handlers]) {
+				if (entry.token !== token) continue;
+				this.#run(entry, cycle);
+			}
+		}
+		return this;
+	}
+
+	/** Fans `action` out to every registered handler; returns the first result. */
 	dispatch(action, ...args) {
-		return this.#actionDispatch(action, ...args);
+		const cycle = { action, args, invoked: new Set() };
+		const previous = this.#cycle;
+		this.#cycle = cycle;
+		let result;
+		let captured = false;
+		try {
+			for (const entry of [...this.#handlers]) {
+				// a handler removed by an earlier handler this cycle must not run
+				if (cycle.invoked.has(entry) || !this.#handlers.includes(entry)) continue;
+				const value = this.#run(entry, cycle);
+				if (!captured) {
+					captured = true;
+					result = value;
+				}
+			}
+		} finally {
+			this.#cycle = previous;
+		}
+		return result;
+	}
+
+	#run(entry, cycle) {
+		// marked before the call, so a handler that waitFor()s itself or is
+		// reached twice in one cycle cannot recurse forever
+		if (cycle.invoked.has(entry)) return undefined;
+		cycle.invoked.add(entry);
+		try {
+			return entry.handler(cycle.action, ...cycle.args);
+		} catch (error) {
+			this.#report(error, cycle.action, entry);
+			return undefined;
+		}
+	}
+
+	#report(error, action, entry) {
+		if (typeof this.onError === 'function') {
+			try {
+				this.onError(error, action, entry.token);
+			} catch (reporterError) {
+				// a broken reporter must not take the dispatch down with it
+				console.error('Jetz Dispatcher: onError threw while reporting', reporterError);
+			}
+			return;
+		}
+		const label = typeof entry.token === 'string' ? ` "${entry.token}"` : '';
+		console.error(`Jetz Dispatcher: handler${label} threw while handling "${String(action)}"`, error);
 	}
 }
 

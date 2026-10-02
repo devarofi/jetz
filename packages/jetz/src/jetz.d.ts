@@ -340,11 +340,23 @@ export declare class Component {
 }
 
 /**
- * Lightweight action dispatcher for unidirectional data flow.
+ * Lightweight Flux-style action dispatcher for unidirectional data flow.
+ * One action fans out to every registered handler (registration order).
  */
 export declare class Dispatcher {
-    constructor(callback?: (action: string, ...args: any[]) => any);
-    dispatch(action: string, ...args: any[]): any;
+    /** Optional reporter: `(error, action, token) => void`. Defaults to `console.error`. */
+    onError: ((error: unknown, action: any, token: any) => void) | null;
+    constructor(callback?: (action: any, ...args: any[]) => any);
+    /** Number of registered handlers. */
+    readonly size: number;
+    /** Registers a handler; returns an unsubscribe function. */
+    subscribe(handler: (action: any, ...args: any[]) => any, token?: any): () => void;
+    /** Removes a handler passed to the constructor or `subscribe()`. */
+    unsubscribe(handler: (action: any, ...args: any[]) => any): this;
+    /** Runs a prerequisite handler to completion before the caller continues. */
+    waitFor(tokens: any | any[]): this;
+    /** Fans `action` out to every registered handler; returns the first result. */
+    dispatch(action: any, ...args: any[]): any;
 }
 
 /**
