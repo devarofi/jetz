@@ -1945,6 +1945,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`rememberOf(key, initialValue)`](#3-reactive-state-stateof-rememberof): Reactive value persisted in `localStorage`.
 * [`computed(fn)`](#4-computed-state-computed): Auto-tracked derived state.
 * [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`).
+* [`batch(fn)`](#13-deferred-tasks-defer): Coalesce state notifications and reactive updates until the callback finishes.
 * [`listen(callback)`](#11-reactive-listeners-listen): Reactive inline listener attached to element.
 * [`css(...)`](#reactive-classes): Class attribute; the function form `css(() => …)` re-evaluates on state change.
 * [`style(...)`](#reactive-styles): Style attribute from an object or a `style\`…\`` css block; interpolations stay reactive.
@@ -1979,6 +1980,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`link`, `asLink`, `asBackLink`](#router--link-navigation): Route navigation helpers.
 * [`Middleware`, `middleware`](#route-middlewares): Navigation guards.
 * [`JetzSession`, `sessionOf`](#session-storage-jetzsession-sessionof): Reactive session store.
+* [`Dispatcher`](#dispatcher-pattern): Action dispatcher with subscriptions, ordered fan-out, and `waitFor()` dependencies.
 
 ### Application & Utilities
 * [`Jetz.mount(App, container)`](#quick-start): Mount application to DOM.
@@ -1986,6 +1988,10 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`Jetz.style(cssString)`](#quick-start): Inject dynamic `<style>` rules.
 * [`Jetz.use(plugin)`](#router--link-navigation): Install plugin (e.g. Router, Session).
 * [`find(selector)`, `findAll(selector)`](#12-dom-utilities--helper-methods): DOM query helpers.
+* [`JetzBindingError`](#when-a-binding-fails): Diagnostic error for invalid `bind` targets.
+* [`html(content)`, `addScript(src, options)`](#script--raw-html-injection): Wrap raw HTML or load an external script.
+* [`range`, `flatMap`, `createList`](#prototype-extensions--array-helpers): Array construction and flattening helpers.
+* [`Array.last()`, `Array.take()`, `Number.range()`, `NodeList.last()`](#prototype-extensions--array-helpers): Convenience prototype helpers.
 
 ---
 
