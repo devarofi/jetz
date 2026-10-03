@@ -306,7 +306,7 @@ let _filterSortSignature = "";
  * sortKey, sortDir or pageSize change. Caches the result in _filteredSorted
  * so the pagination stage can slice without redoing this work.
  */
-effect(() => {
+function runFilterPipeline() {
     dataVersion.value;
     const needle = query.value.trim().toLowerCase();
     const status = statusFilter.value;
@@ -337,18 +337,23 @@ effect(() => {
 
     // Publish scalars and slice
     _paginateFromCache(1, size);
-});
+}
 
 /**
  * Stage 2: pagination only. Runs when page changes (and on initial mount).
  * Reads the cached _filteredSorted instead of re-filtering the full dataset.
  */
-effect(() => {
+function runPaginationPipeline() {
     const requestedPage = page.value;      // tracked
     const size = pageSize.value;           // tracked
     dataVersion.value;                     // tracked: dataset swap invalidates
     _paginateFromCache(requestedPage, size);
-});
+}
+
+function startPipeline() {
+    effect(runFilterPipeline);
+    effect(runPaginationPipeline);
+}
 
 /** Shared pagination logic: slices the cached sorted array and pushes to rows. */
 function _paginateFromCache(requestedPage, size) {
@@ -927,10 +932,10 @@ const mountStart = performance.now();
 Jetz.mount(App, "#app");
 stats.mountMs.value = +(performance.now() - mountStart).toFixed(2);
 
-// `loadDataset()` ran before the table existed, so re-run the pipeline once
-// against the mounted DOM to measure a real first render.
+// Run the pipeline after the table is attached so its first list update renders
+// directly into the mounted grid.
 const initialRenderStart = performance.now();
-dataVersion.value++;
+startPipeline();
 stats.loadMs.value = +(performance.now() - initialRenderStart).toFixed(2);
 refreshDomStats();
 

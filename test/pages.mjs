@@ -146,6 +146,9 @@ const probe = () => page.evaluate(() => {
 		stressTitle: document.title,
 		stressTable: document.querySelector('#app table') !== null,
 		stressRows: document.querySelectorAll('#app table tbody tr').length,
+		stressFirstRowId: document.querySelector('#grid-body tr td')?.textContent.trim() ?? '',
+		stressUndefinedCells: [...document.querySelectorAll('#grid-body td')]
+			.filter(cell => cell.textContent.trim() === 'undefined').length,
 		// the tagged-template ticker: one reactive string per rendered row
 		stressTicker: document.querySelector('#app table tbody tr .stress-ticker')?.textContent ?? '',
 		stressTickerCells: document.querySelectorAll('#app table tbody tr .stress-ticker').length,
@@ -516,9 +519,19 @@ const stress = await open('/stress.html');
 assert('/stress.html serves its own title', stress.stressTitle, 'Jetz Stress Test - 50.000 Reactive Rows');
 assertTrue('/stress.html mounts the reactive grid', stress.stressTable);
 assertTrue('/stress.html renders a page of rows', stress.stressRows > 0);
+assert('/stress.html renders the first row on initial load', stress.stressFirstRowId, '1');
+assert('/stress.html has no undefined cells on initial load', stress.stressUndefinedCells, 0);
 assertContains('/stress.html renders a tagged-template ticker per row', stress.stressTicker, ' pts · t');
 assert('/stress.html one ticker cell per rendered row', stress.stressTickerCells, stress.stressRows);
 assertContains('/stress.html reports the reactive-string metric', stress.stressStringCard, 'row strings');
+
+await page.evaluate(() => {
+	[...document.querySelectorAll('#app button')]
+		.find(button => button.textContent.trim() === '50')
+		?.click();
+});
+await page.waitForFunction(() => document.querySelectorAll('#grid-body tr').length === 50, { timeout: 5000 });
+assert('/stress.html changes rows per page after initial render', await page.$$eval('#grid-body tr', rows => rows.length), 50);
 
 // one shared state write has to re-render every row's tagged string
 const tickOf = value => Number(/· t(\d+)\s*$/.exec(String(value ?? '').trim())?.[1] ?? -1);

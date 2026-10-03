@@ -143,7 +143,7 @@ export function range(start, to) {
 export function flatMap(arr) {
     const result = [];
     for (const item of arr) {
-        if (Array.isArray(item) && item.constructor.name !== 'ListState') {
+        if (Array.isArray(item) && !(item instanceof ListState)) {
             result.push(...flatMap(item));
         } else {
             result.push(item);
