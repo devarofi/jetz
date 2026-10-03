@@ -145,10 +145,15 @@ const probe = () => page.evaluate(() => {
 		// page is the one being loaded
 		stressTitle: document.title,
 		stressTable: document.querySelector('#app table') !== null,
+		stressDevtools: document.querySelector('[data-jetz-devtools]') !== null,
 		stressRows: document.querySelectorAll('#app table tbody tr').length,
 		stressFirstRowId: document.querySelector('#grid-body tr td')?.textContent.trim() ?? '',
 		stressUndefinedCells: [...document.querySelectorAll('#grid-body td')]
 			.filter(cell => cell.textContent.trim() === 'undefined').length,
+		stressSelection: (() => {
+			const label = [...document.querySelectorAll('#app div')].find(el => el.textContent === 'Selection');
+			return label?.parentElement?.querySelector('div:nth-child(2)')?.textContent.trim() ?? '';
+		})(),
 		// the tagged-template ticker: one reactive string per rendered row
 		stressTicker: document.querySelector('#app table tbody tr .stress-ticker')?.textContent ?? '',
 		stressTickerCells: document.querySelectorAll('#app table tbody tr .stress-ticker').length,
@@ -517,6 +522,7 @@ assert('/ the light theme is byte-for-byte the documented colour', keyboarded.th
 section('/stress.html: benchmark page');
 const stress = await open('/stress.html');
 assert('/stress.html serves its own title', stress.stressTitle, 'Jetz Stress Test - 50.000 Reactive Rows');
+assert('/stress.html keeps DevTools opt-in by default', stress.stressDevtools, false);
 assertTrue('/stress.html mounts the reactive grid', stress.stressTable);
 assertTrue('/stress.html renders a page of rows', stress.stressRows > 0);
 assert('/stress.html renders the first row on initial load', stress.stressFirstRowId, '1');
@@ -532,6 +538,15 @@ await page.evaluate(() => {
 });
 await page.waitForFunction(() => document.querySelectorAll('#grid-body tr').length === 50, { timeout: 5000 });
 assert('/stress.html changes rows per page after initial render', await page.$$eval('#grid-body tr', rows => rows.length), 50);
+
+await page.evaluate(() => document.querySelector('#grid-body tr')?.click());
+assert('/stress.html increments selection count for a selected row', (await probe()).stressSelection, '1 selected');
+await page.evaluate(() => document.querySelectorAll('#grid-body tr')[1]?.click());
+assert('/stress.html counts multiple selected rows', (await probe()).stressSelection, '2 selected');
+await page.evaluate(() => document.querySelector('#grid-body tr')?.click());
+assert('/stress.html decrements selection count when deselecting a row', (await probe()).stressSelection, '1 selected');
+await page.evaluate(() => document.querySelectorAll('#grid-body tr')[1]?.click());
+assert('/stress.html returns selection count to zero when all rows are deselected', (await probe()).stressSelection, '0 selected');
 
 // one shared state write has to re-render every row's tagged string
 const tickOf = value => Number(/· t(\d+)\s*$/.exec(String(value ?? '').trim())?.[1] ?? -1);
@@ -567,6 +582,22 @@ assertContains('/stress.html defer() reports the task it ran', settled.stressDef
 // the recorded gap is the frame defer() waited out before running the task
 const gapMs = Number(/([\d.]+)\s*ms/.exec(settled.stressGapCard)?.[1] ?? 0);
 assertTrue('/stress.html defer() runs the task after a painted frame', gapMs > 0);
+
+section('/stress.html: opt-in Jetz DevTools plugin');
+await page.goto(`http://127.0.0.1:${port}/stress.html?jetz-devtools`, { waitUntil: 'load' });
+await page.waitForFunction(() => !!document.querySelector('[data-jetz-devtools]'), { timeout: 5000 });
+await page.evaluate(() => document.querySelector('[data-jetz-devtools]').shadowRoot.querySelector('.toggle').click());
+const devtoolsTree = await page.evaluate(() => {
+	const shadow = document.querySelector('[data-jetz-devtools]').shadowRoot;
+	return {
+		title: shadow.querySelector('h2')?.textContent ?? '',
+		tree: shadow.querySelector('.tree')?.textContent ?? '',
+		count: shadow.querySelector('.count')?.textContent ?? ''
+	};
+});
+assert('/stress.html enables DevTools only when requested', devtoolsTree.title, 'Jetz DevTools');
+assertTrue('/stress.html DevTools shows the root sample component', devtoolsTree.tree.includes('StressTestApp'));
+assertTrue('/stress.html DevTools observes a populated element tree', Number.parseInt(devtoolsTree.count, 10) > 50);
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load', timeout: 20000 });
 await new Promise(resolve => setTimeout(resolve, 600));
@@ -974,6 +1005,14 @@ await page.click('.jetz-theme-toggle');
 await new Promise(resolve => setTimeout(resolve, 250));
 assert('/ the shared switch can be turned back to light', (await pageTheme()).isDark, false);
 
+section('/: opt-in Jetz DevTools plugin');
+await page.goto(`http://127.0.0.1:${port}/?jetz-devtools`, { waitUntil: 'load' });
+await page.waitForFunction(() => !!document.querySelector('[data-jetz-devtools]'), { timeout: 5000 });
+await page.evaluate(() => document.querySelector('[data-jetz-devtools]').shadowRoot.querySelector('.toggle').click());
+const homeDevtoolsTree = await page.evaluate(() =>
+	document.querySelector('[data-jetz-devtools]').shadowRoot.querySelector('.tree').textContent
+);
+assertTrue('/ enables the inspector through the lazy plugin chunk', homeDevtoolsTree.includes('App'));
 
 section('runtime hygiene: no dropped lifecycle hooks');
 assert('no lifecycle hook was registered outside a render', lifecycleWarnings.length, 0);

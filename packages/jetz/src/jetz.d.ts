@@ -6,6 +6,14 @@ export interface StateHandler<T> {
     set(state: State<T>, value: T): boolean | void;
 }
 
+export type JetzDevtoolsEvent =
+    | { type: 'create'; element: JetzElement; tag: string; key?: unknown; index?: number }
+    | { type: 'attach'; element: JetzElement; parent: JetzElement | null }
+    | { type: 'render'; element: JetzElement }
+    | { type: 'component'; element: JetzElement; name: string }
+    | { type: 'lifecycle'; stage: 'create' | 'mount' | 'update' | 'destroy'; element: JetzElement | null }
+    | { type: 'dispose'; element: JetzElement };
+
 /** The recursively reactive shape produced by stateOf() and ListState.toState(). */
 export type Reactive<T> = T extends State<infer V>
     ? State<V>
@@ -594,6 +602,8 @@ export declare const Jetz: {
 
     /** Installs a plugin (e.g. Router, JetzSession). */
     use(plugin: any): void;
+    /** Subscribe to opt-in element and component events for development tools. */
+    observeDevtools(listener: (event: JetzDevtoolsEvent) => void): () => boolean;
 
     /** Runs before mounted elements are rendered. */
     onStart(callback?: () => void): void;

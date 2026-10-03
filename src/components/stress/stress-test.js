@@ -27,6 +27,7 @@ import {
     button, css, div, footer, h1, header, inputCheckbox, inputNumber, inputText,
     label, main, p, section, small, span, strong, table, tbody, td, text, th, thead, tr
 } from "../../lib/jetz-ui.js";
+import { JetzDevtools } from "../../lib/jetz-devtools.js";
 
 /* -------------------------------------------------------------------------- */
 /* 1. Fixtures & helpers                                                       */
@@ -141,6 +142,8 @@ const dataset = lazy(() => {
 const query = stateOf("");
 const statusFilter = stateOf("all");
 const selectedOnly = stateOf(false);
+const selectedCount = stateOf(0);
+const selectionVersion = stateOf(0);
 const sortKey = stateOf("id");
 const sortDir = stateOf("asc");
 const page = stateOf(1);
@@ -244,6 +247,7 @@ function loadDataset(size) {
 
     // Replace the lazy dataset's value
     dataset.value = rows;
+    selectedCount.value = 0;
     timings.length = 0;
     stats.buildMs.value = +buildMs.toFixed(2);
     stats.lastMs.value = 0;
@@ -311,11 +315,12 @@ function runFilterPipeline() {
     const needle = query.value.trim().toLowerCase();
     const status = statusFilter.value;
     const onlySelected = selectedOnly.value;
+    const selectionRevision = onlySelected ? selectionVersion.value : 0;
     const key = sortKey.value;
     const descending = sortDir.value === "desc";
     const size = pageSize.value;
 
-    const signature = [dataVersion.getValue(), needle, status, onlySelected, key, descending, size].join("|");
+    const signature = [dataVersion.getValue(), needle, status, onlySelected, selectionRevision, key, descending, size].join("|");
     if (signature === _filterSortSignature) return;
     _filterSortSignature = signature;
 
@@ -374,14 +379,6 @@ function _paginateFromCache(requestedPage, size) {
     rows.set(slice);
     refreshDomStats();
 }
-
-const selectedCount = computed(() => {
-    dataVersion.value;
-    let count = 0;
-    const data = dataset.value;
-    for (const row of data) if (rawOf(row).selected) count++;
-    return count;
-});
 
 // Formatted views used by the UI (created once, so no per-render cost).
 const totalLabel = computed(() => numberFormat(datasetSize.value));
@@ -488,6 +485,8 @@ function toggleRow(row) {
     const startedAt = performance.now();
     const r = rawOf(row);
     r.selected = !r.selected;
+    selectedCount.value += r.selected ? 1 : -1;
+    selectionVersion.value += 1;
     touchRow(row);
     stats.updateMs.value = +(performance.now() - startedAt).toFixed(2);
 }
@@ -524,9 +523,12 @@ function clearSelection() {
         const data = dataset.value;
         for (const row of data) {
             const r = rawOf(row);
-            if (r.selected) r.selected = false;
+            if (!r.selected) continue;
+            r.selected = false;
+            touchRow(row);
         }
-        for (const row of data) touchRow(row);
+        selectedCount.value = 0;
+        selectionVersion.value += 1;
     });
     stats.bulkMs.value = +(performance.now() - startedAt).toFixed(2);
 }
@@ -915,6 +917,7 @@ function App() {
         Footer()
     );
 }
+App.displayName = "StressTestApp";
 
 /* -------------------------------------------------------------------------- */
 /* 7. Styles & mount                                                           */
@@ -929,6 +932,7 @@ Jetz.style(`
 `);
 
 const mountStart = performance.now();
+Jetz.use(new JetzDevtools());
 Jetz.mount(App, "#app");
 stats.mountMs.value = +(performance.now() - mountStart).toFixed(2);
 

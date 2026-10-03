@@ -40,6 +40,11 @@
       "types": "./packages/jetz/src/jetz-test.d.ts",
       "import": "./src/lib/jetz-test.js",
       "require": "./src/lib/jetz-test.js"
+    },
+    "./devtools": {
+      "types": "./packages/jetz/src/jetz-devtools.d.ts",
+      "import": "./src/lib/jetz-devtools.js",
+      "require": "./src/lib/jetz-devtools.js"
     }
   },
   "private": true,

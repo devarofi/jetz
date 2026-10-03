@@ -89,6 +89,7 @@ npm install @daevsoft/jetz
   - [Dispatcher Pattern](#dispatcher-pattern)
   - [Script & Raw HTML Injection](#script--raw-html-injection)
   - [Prototype Extensions & Array Helpers](#prototype-extensions--array-helpers)
+- [Jetz DevTools](#jetz-devtools)
 - [Real-World Example: Calculator](#real-world-example-calculator)
 - [Architecture Overview](#architecture-overview)
 - [API Quick Reference](#api-quick-reference)
@@ -1833,6 +1834,45 @@ document.querySelectorAll("li").last(); // Last matched DOM node
 
 ---
 
+## Jetz DevTools
+
+`JetzDevtools` is an opt-in development plugin. It renders a small toggle and
+Shadow DOM panel with the observed Jetz element/component tree, keyed list
+items, element highlighting, and uncaught error/unhandled rejection details.
+Captured errors are also written to the console without suppressing the
+browser's normal error reporting.
+
+Install it before mounting the app:
+
+```javascript
+import { Jetz } from "@daevsoft/jetz";
+import { JetzDevtools } from "@daevsoft/jetz/devtools";
+
+Jetz.use(new JetzDevtools());
+Jetz.mount(App, "#app");
+```
+
+The project registers the plugin in its normal bootstrap, but it activates only
+when `?jetz-devtools` is present: open `/?jetz-devtools` or
+`/stress.html?jetz-devtools`. Remove the query parameter to run without
+instrumentation. In your own app, you can also register it unconditionally and
+let it check the URL:
+
+```javascript
+Jetz.use(new JetzDevtools());
+Jetz.mount(App, "#app");
+```
+
+Install the plugin only in development builds. Developer-source locations in
+error stacks depend on source maps being enabled by the consuming build. Set
+`Component.displayName` when a stable component label is needed in a minified
+build.
+
+The inspector observes Jetz elements and component lifecycle events; it is not
+a browser-DOM inspector. It does not evaluate or edit application state.
+
+---
+
 ## Real-World Example: Calculator
 
 Here is how real Jetz applications compose state, collections, UI elements, and styling together.
@@ -1981,6 +2021,7 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`Middleware`, `middleware`](#route-middlewares): Navigation guards.
 * [`JetzSession`, `sessionOf`](#session-storage-jetzsession-sessionof): Reactive session store.
 * [`Dispatcher`](#dispatcher-pattern): Action dispatcher with subscriptions, ordered fan-out, and `waitFor()` dependencies.
+* [`JetzDevtools`](#jetz-devtools): Opt-in Shadow DOM inspector for the element/component tree and runtime errors.
 
 ### Application & Utilities
 * [`Jetz.mount(App, container)`](#quick-start): Mount application to DOM.

@@ -713,11 +713,13 @@ class LifecycleContext {
 	runCreate() {
 		if (this.#created) return;
 		this.#created = true;
+		Jetz.emitDevtoolsEvent({ type: 'lifecycle', stage: 'create', element: this.entry });
 		this.hooks.onCreate.forEach(cb => cb());
 	}
 	runMount() {
 		if (this.mounted || this.destroyed) return;
 		this.mounted = true;
+		Jetz.emitDevtoolsEvent({ type: 'lifecycle', stage: 'mount', element: this.entry });
 		this.hooks.onMount.forEach(cb => cb());
 		const component = this.component;
 		if (component && component.constructor.prototype.hasOwnProperty('onMount')) {
@@ -726,6 +728,7 @@ class LifecycleContext {
 	}
 	runUpdate() {
 		if (!this.mounted || this.destroyed) return;
+		Jetz.emitDevtoolsEvent({ type: 'lifecycle', stage: 'update', element: this.entry });
 		this.hooks.onUpdate.forEach(cb => cb());
 		const component = this.component;
 		if (component && component.constructor.prototype.hasOwnProperty('onUpdate')) {
@@ -735,6 +738,7 @@ class LifecycleContext {
 	runDestroy() {
 		if (this.destroyed) return;
 		this.destroyed = true;
+		Jetz.emitDevtoolsEvent({ type: 'lifecycle', stage: 'destroy', element: this.entry });
 		this.hooks.onDestroy.forEach(cb => cb());
 		const component = this.component;
 		if (component && component.constructor.prototype.hasOwnProperty('onDestroy')) {
@@ -773,6 +777,14 @@ class JetzElement {
 	attachLifecycle(context) {
 		this.lifecycle = context;
 		context.entry = this;
+		const component = context.component;
+		if (component) {
+			const name = typeof component === 'function'
+				? component.displayName || component.name || 'Anonymous component'
+				: component.displayName || component.constructor?.displayName ||
+					component.constructor?.name || 'Anonymous component';
+			Jetz.emitDevtoolsEvent({ type: 'component', element: this, name });
+		}
 		Jetz.registerLifecycle(context);
 		context.runCreate();
 	}
@@ -784,6 +796,13 @@ class JetzElement {
 		this.tagName = tag;
 		this.attributes = attributes;
 		this.children = children;
+		Jetz.emitDevtoolsEvent({
+			type: 'create',
+			element: this,
+			tag,
+			key: _renderContext?.key,
+			index: _renderContext?.index
+		});
 		// Opt-in only: capturing a stack per element is measurable on large lists,
 		// so it happens only when the developer asked for binding diagnostics.
 		if (Jetz.devtools) _elementOrigins.set(this, new Error().stack);
@@ -819,6 +838,7 @@ class JetzElement {
 	}
 	/** Releases only this element's own bindings (not its subtree). */
 	#releaseBindings() {
+		Jetz.emitDevtoolsEvent({ type: 'dispose', element: this });
 		[...this.#disposers].forEach(entry => entry());
 		this.#unbindClassParts();
 		disposeViewScope(this);
@@ -854,6 +874,11 @@ class JetzElement {
 	render(parent = null, renderPosition = 0) {
 		this.renderPosition = renderPosition;
 		this.parent = parent; // Parent JetzElement
+		Jetz.emitDevtoolsEvent({
+			type: 'attach',
+			element: this,
+			parent: parent instanceof JetzElement ? parent : null
+		});
 		// re-rendering replaces `this.o` with a brand new node, so the bindings
 		// made for the previous node are stale: drop them instead of piling up.
 		// The item scope is untouched: it belongs to the render call that created
@@ -869,6 +894,7 @@ class JetzElement {
 			this.initStyle();
 			this.initListener();
 			this.o.$ = this;
+			Jetz.emitDevtoolsEvent({ type: 'render', element: this });
 			// class components fire their own onMount/onRendered once their
 			// element exists; function components registered through context
 			if (this.lifecycle) {
@@ -1141,6 +1167,14 @@ class JetzElement {
 				childFunction = child.call();
 			} finally {
 				_activeLifecycle = previous;
+			}
+			const componentElement = Array.isArray(childFunction) ? childFunction[0] : childFunction;
+			if (componentElement instanceof JetzElement) {
+				Jetz.emitDevtoolsEvent({
+					type: 'component',
+					element: componentElement,
+					name: child.displayName || child.name || 'Anonymous component'
+				});
 			}
 			if (context.hooks.onCreate.length + context.hooks.onMount.length +
 				context.hooks.onUpdate.length + context.hooks.onDestroy.length > 0) {
@@ -1617,11 +1651,29 @@ class Jetz {
 	static remountByAttr = [];
 	static #onRenderedCollections = [];
 	static #isMounting = false;
+	static #devtoolsListeners = new Set();
 	// live component lifecycle contexts
 	static #lifecycles = new Set();
 	/** True while Jetz.mount() renders and triggers the element tree. */
 	static get isMounting() {
 		return Jetz.#isMounting;
+	}
+	/** Subscribes to opt-in element and component lifecycle events. */
+	static observeDevtools(listener) {
+		if (typeof listener !== 'function') throw new TypeError('Jetz.observeDevtools expects a function');
+		Jetz.#devtoolsListeners.add(listener);
+		return () => Jetz.#devtoolsListeners.delete(listener);
+	}
+	/** @internal Emits instrumentation only when a devtools subscriber is installed. */
+	static emitDevtoolsEvent(event) {
+		if (Jetz.#devtoolsListeners.size === 0) return;
+		for (const listener of Jetz.#devtoolsListeners) {
+			try {
+				listener(event);
+			} catch (error) {
+				console.error('Jetz devtools observer failed:', error);
+			}
+		}
 	}
 	/** Registers a component lifecycle context for update/destroy tracking. */
 	static registerLifecycle(context) {
@@ -1678,7 +1730,15 @@ class Jetz {
 				components.forEach(element => {
 					if (element != null) {
 						if (typeof element === 'function') {
-							element = element();
+							const component = element;
+							element = component();
+							if (element instanceof JetzElement) {
+								Jetz.emitDevtoolsEvent({
+									type: 'component',
+									element,
+									name: component.displayName || component.name || 'Anonymous component'
+								});
+							}
 						}
 
 						element.render();
