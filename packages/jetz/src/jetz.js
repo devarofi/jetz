@@ -141,19 +141,15 @@ export function range(start, to) {
 	return arr;
 }
 export function flatMap(arr) {
-	let newArr = [];
-	arr.forEach(item => {
-		if (Array.isArray(item)) {
-			if (item instanceof ListState) {
-				newArr.push(item);
-			} else {
-				newArr = [...newArr, ...flatMap(item)];
-			}
-		} else {
-			newArr.push(item);
-		}
-	});
-	return newArr;
+    const result = [];
+    for (const item of arr) {
+        if (Array.isArray(item) && item.constructor.name !== 'ListState') {
+            result.push(...flatMap(item));
+        } else {
+            result.push(item);
+        }
+    }
+    return result;
 }
 /**
  * Injects an external script into the document.
@@ -208,49 +204,35 @@ function warnStringifiedFunction(child) {
 		JSON.stringify(snippet)
 	);
 }
+function isPlainObject(val) {
+    return val !== null && typeof val === 'object' && !Array.isArray(val) && val.constructor.name === 'Object';
+}
+
+// Fast special child detection using constructor.name (avoids instanceof prototype chain walk)
+const specialChildNames = new Set([
+    'JetzElement', 'State', 'ListState', 'Component',
+    'UniqueString', 'UniqueNumber', 'Raw', 'IfElse',
+    'StateListener', 'JetzArgument'
+]);
+function isSpecialChild(val) {
+    return val != null && specialChildNames.has(val.constructor?.name);
+}
+
 function createElement(tag, ...args) {
-	args = flatMap(args);
-	let attr = {};
-	if (args.length > 0) {
-		args = args.filter((arg, position) => {
-			if (typeof arg === "object") {
-				if (arg == null) return false;
-				if (arg instanceof JetzElement) {
-					return true;
-				} else if (arg instanceof State || arg.prototype instanceof State) {
-					return true;
-				} else if (arg instanceof ListState) {
-					return true;
-				} else if (arg instanceof Component) {
-					return true;
-				} else if (
-					arg instanceof UniqueString ||
-					arg instanceof UniqueNumber
-				) {
-					return true;
-				} else if (arg instanceof Raw) {
-					return true;
-				} else if (arg instanceof IfElse || arg instanceof StateListener) {
-					return true;
-				} else if (arg.constructor.prototype instanceof JetzArgument) {
-					attr = mergeObject(attr, { arg });
-					return false;
-				} else {
-					// skipped
-					attr = mergeObject(arg, attr);
-					return false;
-				}
-			}
-			return true;
-		});
-		if (typeof args[0] === "object") {
-			if (args[0].constructor.name === 'Object') {
-				attr = args[0];
-				args = args.slice(1);
-			}
-		}
-	}
-	return new JetzElement(tag, attr, ...args);
+    let children = flatMap(args);
+    let attr = {};
+
+    for (let i = 0; i < children.length; i++) {
+        const arg = children[i];
+        if (arg == null) continue;
+        if (isPlainObject(arg) && !isSpecialChild(arg)) {
+            attr = mergeObject(attr, arg);
+            children.splice(i, 1);
+            i--;
+        }
+    }
+
+    return new JetzElement(tag, attr, ...children);
 }
 /**
  * Active component lifecycle context while a component's render() executes.
@@ -2216,16 +2198,50 @@ export class ListState extends Array {
 				if (!parent || !parent.o) return;
 				const newKeys = this.values.map(item => this._keyFn(item));
 				const newKeySet = new Set(newKeys);
-				// 1. Remove items no longer in the list
+
+				// 1. Detect how many old keys survive into the new set
+				let retainedCount = 0;
+				for (const [key] of keyMap) {
+					if (newKeySet.has(key)) retainedCount++;
+				}
+
+				// 2. Full-swap fast path: every old key is gone, every new key is
+				//    fresh. Remove all old views, render into a DocumentFragment,
+				//    then append once — 1 DOM operation instead of N.
+				if (retainedCount === 0) {
+					// Remove old views
+					for (const [key, entry] of keyMap) {
+						this.#removeView(entry.view);
+					}
+					keyMap.clear();
+					// Render all new items and collect DOM nodes
+					const frag = document.createDocumentFragment();
+					const newViews = [];
+					for (let j = 0; j < newKeys.length; j++) {
+						const item = this.values[j];
+						const rendered = this.createItemView(parent, item, j);
+						keyMap.set(newKeys[j], { item, view: rendered });
+						newViews.push(rendered);
+						const domNodes = this.#viewNodes(rendered);
+						for (let d = 0; d < domNodes.length; d++) frag.appendChild(domNodes[d]);
+					}
+					parent.o.appendChild(frag);
+					this.views[parentIdx] = newViews;
+					return;
+				}
+
+				// 3. Incremental path: some keys survive, reconcile individually
+				// Remove items no longer in the list
 				for (const [key, entry] of keyMap) {
 					if (!newKeySet.has(key)) {
 						this.#removeView(entry.view);
 						keyMap.delete(key);
 					}
 				}
-				// 2. Add/reorder items
+				// Add/reorder items
 				let prevNode = null;
-				newKeys.forEach((key, j) => {
+				for (let j = 0; j < newKeys.length; j++) {
+					const key = newKeys[j];
 					let entry = keyMap.get(key);
 					if (entry && entry.item !== this.values[j]) {
 						this.#removeView(entry.view);
@@ -2261,7 +2277,7 @@ export class ListState extends Array {
 					}
 					const entryNodes = this.#viewNodes(entry.view);
 					prevNode = entryNodes[entryNodes.length - 1] ?? prevNode;
-				});
+				}
 				// Rebuild views array from keyMap order
 				this.views[parentIdx] = newKeys.map(k => keyMap.get(k).view);
 			});
@@ -2621,6 +2637,15 @@ function lazy(initializer) {
 			return true;
 		}
 	});
+	// Override getValue to return the lazy value
+	const originalGetValue = state.getValue.bind(state);
+	state.getValue = () => {
+		if (!initialized) {
+			initialized = true;
+			value = initializer();
+		}
+		return value;
+	};
 	// Override setState to track initialization
 	const originalSetState = state.setState.bind(state);
 	state.setState = (next) => {
@@ -3207,8 +3232,17 @@ function computed(computeFn) {
 		return result;
 	}
 
-	const initialValue = track();
-	const derivedState = stateOf(initialValue);
+const initialValue = track();
+// Create a proper State wrapper that always has .value getter
+const derivedState = new State(initialValue, {
+	get(obj) {
+		return obj.getValue();
+	},
+	set(obj, val) {
+		obj.setState(val);
+		return true;
+	}
+});
 
 	// Override the recompute to update the state
 	const originalTrack = track;

@@ -1,4 +1,4 @@
-import { computed, createElement, State } from './jetz.js'
+import { computed, createElement, Jetz, State } from './jetz.js'
 
 // ---------- factories (deduplicate the repetitive helpers below) ----------
 
@@ -7,34 +7,42 @@ import { computed, createElement, State } from './jetz.js'
  * An interpolated function is probed once to see what it produces:
  * - primitives (string/number/boolean/null/undefined) become a computed()
  *   text state, so `div`Is online : ${() => online.value ? 'Yes' : 'No'}``
- *   re-renders whenever a state read inside the getter changes. A plain
- *   (untagged) template literal would flatten `${fn}` to its source text and
- *   lose the closure, which is exactly why the tag form exists;
+ *   re-renders whenever a state read inside the getter changes.
  * - objects (elements, components, states, arrays) keep the previous
  *   one-shot function-child behaviour and are passed through untouched.
+ * In devtools mode, the probe is wrapped in try/catch for better DX.
+ * In production, the probe runs without try/catch overhead.
  */
 function templateChildren(strings, values) {
     const children = [];
     strings.forEach((chunk, index) => {
-        // templates that start/end with an interpolation produce empty static
-        // chunks; skipping them avoids creating empty Text nodes that would
-        // only add DOM nodes without rendering anything
         if (chunk !== '') children.push(chunk);
         if (index >= values.length) return;
+        
         const value = values[index];
         if (value === '') return;
         if (typeof value !== 'function') {
             children.push(value);
             return;
         }
+
         let probe;
-        try { probe = value(); } catch { probe = undefined; }
-        const isTextGetter = probe == null ||
-            (typeof probe !== 'object' && typeof probe !== 'function');
+        if (Jetz.devtools) {
+            try { 
+                probe = value(); 
+            } catch (error) {
+                console.error("Jetz: Error executing interpolated function.", value);
+                throw error;
+            }
+        } else {
+            probe = value();
+        }
+
+        const isTextGetter = probe == null || (typeof probe !== 'object' && typeof probe !== 'function');
+        
         children.push(isTextGetter
             ? computed(() => {
                 const result = value();
-                // null/undefined/false contribute no text (same rule as cssValue)
                 return result == null || result === false ? '' : result;
             })
             : value);
@@ -58,10 +66,6 @@ const attrOf = key => value => ({
 function cssValue(value) {
     if (typeof value === 'function') value = value();
     if (value instanceof State) value = value.value;
-    // `?? ''` only drops null/undefined, so a falsy branch such as
-    // `cond ? 'on' : false` used to be concatenated into the literal text
-    // "false" and end up as a real class. false and null mean "contribute
-    // nothing", matching what the function form of css() already did.
     return value == null || value === false ? '' : value;
 }
 

@@ -294,14 +294,17 @@ const rangeEnd = stateOf(0);
 // Dataset is lazy - will be generated on first access (loadDataset triggers it).
 loadDataset(DEFAULT_DATASET_SIZE);
 
-/** Signature of the filter/sort inputs: changing it sends the grid back to page 1. */
-let lastFilterSignature = "";
+/**
+ * Cached filtered+sorted array. Re-built only when filter/sort/dataset inputs
+ * change. A page-only change skips the filter+sort entirely and slices this.
+ */
+let _filteredSorted = [];
+let _filterSortSignature = "";
 
 /**
- * The single reactive pipeline: filter -> sort -> slice -> `rows.set()`.
- *
- * Uses rawOf() for untracked reads so the reactive graph never gains
- * a dependency per row. Only the rendered page (via rows.set) stays reactive.
+ * Stage 1: filter + sort. Runs only when data, query, status, selectedOnly,
+ * sortKey, sortDir or pageSize change. Caches the result in _filteredSorted
+ * so the pagination stage can slice without redoing this work.
  */
 effect(() => {
     dataVersion.value;
@@ -313,35 +316,47 @@ effect(() => {
     const size = pageSize.value;
 
     const signature = [dataVersion.getValue(), needle, status, onlySelected, key, descending, size].join("|");
-    const requestedPage = page.value;                        // tracked: page changes re-run the pipeline
-    let wantedPage = requestedPage;
-    if (signature !== lastFilterSignature) {
-        lastFilterSignature = signature;
-        wantedPage = 1;
-        if (requestedPage !== 1) page.setState(1);
-    }
+    if (signature === _filterSortSignature) return;
+    _filterSortSignature = signature;
 
     const filtered = [];
-    // Access dataset.value to trigger lazy initialization and track dependency
     const data = dataset.value;
     for (const row of data) {
         const r = rawOf(row);  // untracked read
         if (onlySelected && !r.selected) continue;
         if (status !== "all" && r.status !== status) continue;
-        // One haystack probe against the precomputed key built in createRow(),
-        // instead of four toLowerCase() allocations per row on every keystroke.
         if (needle && !r._search.includes(needle)) continue;
-        filtered.push(row);  // push the shallow row (not rawOf) so loop() gets rowOf instances
+        filtered.push(row);
     }
     const compare = COMPARATORS[key] ?? COMPARATORS.id;
     filtered.sort(descending ? (a, b) => compare(b, a) : compare);
+    _filteredSorted = filtered;
 
-    // Publish the scalars, then hand the page slice to the keyed list.
-    const total = filtered.length;
+    // Reset to page 1 when the filter/sort changes
+    if (page.getValue() !== 1) page.setState(1);
+
+    // Publish scalars and slice
+    _paginateFromCache(1, size);
+});
+
+/**
+ * Stage 2: pagination only. Runs when page changes (and on initial mount).
+ * Reads the cached _filteredSorted instead of re-filtering the full dataset.
+ */
+effect(() => {
+    const requestedPage = page.value;      // tracked
+    const size = pageSize.value;           // tracked
+    dataVersion.value;                     // tracked: dataset swap invalidates
+    _paginateFromCache(requestedPage, size);
+});
+
+/** Shared pagination logic: slices the cached sorted array and pushes to rows. */
+function _paginateFromCache(requestedPage, size) {
+    const total = _filteredSorted.length;
     const pages = Math.max(1, Math.ceil(total / size));
-    const current = Math.max(1, Math.min(pages, wantedPage));
+    const current = Math.max(1, Math.min(pages, requestedPage));
     const start = (current - 1) * size;
-    const slice = filtered.slice(start, start + size);
+    const slice = _filteredSorted.slice(start, start + size);
 
     filteredCount.value = total;
     pageCount.value = pages;
@@ -353,7 +368,7 @@ effect(() => {
 
     rows.set(slice);
     refreshDomStats();
-});
+}
 
 const selectedCount = computed(() => {
     dataVersion.value;
