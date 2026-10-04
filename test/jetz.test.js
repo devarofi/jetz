@@ -126,8 +126,51 @@ describe('binding diagnostics', () => {
 });
 
 describe('route head metadata', () => {
+	it('runs function and class component lifecycles when routed', () => {
+		window.history.replaceState({}, '', '/');
+		const steps = [];
+		function FunctionPage(params) {
+			onCreate(() => steps.push('function:create'));
+			onMount(() => steps.push('function:mount'));
+			onUpdate(() => steps.push('function:update'));
+			onDestroy(() => steps.push('function:destroy'));
+			return div(`Function ${params.id}`);
+		}
+		class ClassPage extends Component {
+			render() { return div('Class page'); }
+			onCreate() { steps.push('class:create'); }
+			onMount() { steps.push('class:mount'); }
+			onUpdate() { steps.push('class:update'); }
+			onDestroy() { steps.push('class:destroy'); }
+		}
+		const router = new Router(
+			route('/', () => div('Home')),
+			route('/function/:id', FunctionPage),
+			route('/class', ClassPage)
+		);
+		router.install(Jetz);
+		const target = document.createElement('div');
+		document.body.append(target);
+		Jetz.mount(div(router.browser()), target);
+
+		router.to('/function/42');
+		expect(target.textContent).toContain('Function 42');
+		expect(steps).toEqual(['function:create', 'function:mount']);
+		stateOf(0).setState(1);
+		expect(steps).toContain('function:update');
+
+		router.to('/class');
+		expect(steps).toContain('function:destroy');
+		expect(target.textContent).toContain('Class page');
+		expect(steps.slice(-3)).toEqual(['class:create', 'function:destroy', 'class:mount']);
+
+		router.to('/');
+		expect(steps.at(-1)).toBe('class:destroy');
+	});
+
 	it('sets metadata on navigation and replaces only prior route metadata', () => {
 		window.history.replaceState({}, '', '/');
+		document.title = 'Jetz';
 		const router = new Router(
 			route('/', {
 				component: () => div('Home'),
@@ -144,9 +187,11 @@ describe('route head metadata', () => {
 		router.install(Jetz);
 
 		expect(document.title).toBe('Home');
+		expect(document.head.querySelectorAll('title')).toHaveLength(1);
 		expect(document.head.querySelector('meta[name="description"]').content).toBe('Home page');
 		router.to('/about');
 		expect(document.title).toBe('About Jetz');
+		expect(document.head.querySelectorAll('title')).toHaveLength(1);
 		expect(document.head.querySelectorAll('meta[name="description"]')).toHaveLength(1);
 		expect(document.head.querySelector('meta[name="description"]').content)
 			.toBe('Learn about the Jetz framework.');
@@ -631,6 +676,25 @@ describe('batch', () => {
 		expect(seen).toEqual([[5, 1], 9]);
 		expect(effectRuns).toEqual(['5:4']);
 		expect(target.textContent).toBe('5:4:9');
+		dispose();
+	});
+	it('allows a batched effect to update a counter without subscribing to that counter', () => {
+		const first = stateOf(1);
+		const second = stateOf(2);
+		const runs = stateOf(0);
+		const dispose = effect(() => {
+			first.value;
+			second.value;
+			runs.value = runs.peek() + 1;
+		});
+
+		expect(runs.value).toBe(1);
+		batch(() => {
+			first.value = 3;
+			second.value = 4;
+		});
+
+		expect(runs.value).toBe(2);
 		dispose();
 	});
 	it('flushes changes even when the callback throws', () => {
@@ -2008,4 +2072,3 @@ describe('style tagged template', () => {
 		expect(box.style.maxWidth).toBe('10px');
 	});
 });
-

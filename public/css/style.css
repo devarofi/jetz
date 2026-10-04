@@ -23,7 +23,8 @@ div#app {
 div#app:has(#landing-page),
 div#app:has(#calculator-page),
 div#app:has(#todo-page),
-div#app:has(.playground-shell) {
+div#app:has(.playground-shell),
+div#app:has(#jetz-docs) {
     display: block;
 
     height: auto;
@@ -54,7 +55,8 @@ body {
 
 /* Legacy demo pages only: `body`/`html` and the full-page layouts
    (landing, calculator, todo and the welcome page) style their own tree. */
-*:not(#landing-page, #landing-page *,
+*:not(#jetz-docs, #jetz-docs *,
+    #landing-page, #landing-page *,
     #calculator-page, #calculator-page *,
     #todo-page, #todo-page *,
     #welcome-page, #welcome-page *,
@@ -66,7 +68,7 @@ body {
 }
 
 
-h1:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+h1:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
     margin-bottom: 24px;
 
     font-size: 42px;
@@ -74,7 +76,7 @@ h1:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .play
 }
 
 
-footer:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+footer:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
     position: absolute;
 
     bottom: 20px;
@@ -87,12 +89,12 @@ footer:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .
 }
 
 
-p:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+p:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
     margin-bottom: 50px;
 }
 
 
-button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
     margin: 12px;
     padding: 8px 12px;
 
@@ -105,22 +107,22 @@ button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .
 }
 
 
-button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *):hover {
+button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *):hover {
     background: #e5e5e5;
 }
 
 
-a:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *):hover {
+a:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *):hover {
     color: #166aad;
 }
 
 
-pre:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+pre:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
     text-align: left;
 }
 
 
-input[type="text"]:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
+input[type="text"]:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *) {
     padding: 8px 12px;
 
     border: 1px solid grey;
@@ -230,6 +232,10 @@ div#app:has(.playground-shell) {
     min-height: 100vh;
     height: auto;
     text-align: left;
+}
+
+div#app:has(#jetz-docs)>main>footer {
+    display: none;
 }
 
 div#app:has(#welcome-page)>main>footer {

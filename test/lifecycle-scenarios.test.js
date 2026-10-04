@@ -133,6 +133,30 @@ describe('Lifecycle: Component - Function Component Hooks', () => {
         expect(steps).toContain('parent:mount');
         expect(steps).toContain('child:mount');
     });
+
+    it('runs lifecycle hooks for a function component in an ifElse branch', () => {
+        const steps = [];
+        const visible = stateOf(true);
+
+        function ClockPreview() {
+            onCreate(() => steps.push('create'));
+            onMount(() => steps.push('mount'));
+            onDestroy(() => steps.push('destroy'));
+            return div('clock');
+        }
+
+        mount(div(ifElse(
+            () => visible.value,
+            () => div(ClockPreview),
+            () => p('hidden')
+        )));
+
+        expect(steps).toEqual(['create', 'mount']);
+        visible.value = false;
+        expect(steps).toEqual(['create', 'mount', 'destroy']);
+        visible.value = true;
+        expect(steps).toEqual(['create', 'mount', 'destroy', 'create', 'mount']);
+    });
 });
 
 describe('Lifecycle: Component - Nested Components', () => {

@@ -1,4 +1,4 @@
-import { Component, Jetz, JetzArgument, JetzElement, stateOf } from "./jetz.js";
+import { Component, Jetz, JetzArgument, JetzElement, renderComponent, stateOf } from "./jetz.js";
 import { Middleware } from "./middleware.js";
 
 function middlewareList(middlewares) {
@@ -32,8 +32,10 @@ export class Router {
 	#navigationObserver;
 	#routeHeadNodes = [];
 	#lastListenerUrl = null;
+	#defaultTitle;
 
 	constructor(...route) {
+		this.#defaultTitle = document.title;
 		if ('navigation' in window) {
 			this.#navigationObserver = window.navigation;
 		}
@@ -199,6 +201,7 @@ export class Router {
 	#applyRouteHead(route, params) {
 		this.#routeHeadNodes.forEach(node => node.remove());
 		this.#routeHeadNodes = [];
+		document.title = this.#defaultTitle;
 		if (typeof route.head !== 'function') return;
 
 		const headContent = route.head(params);
@@ -209,6 +212,10 @@ export class Router {
 			if (entry instanceof JetzElement) {
 				entry.render();
 				node = entry.getElement();
+			}
+			if (node?.tagName?.toLowerCase() === 'title') {
+				document.title = node.textContent ?? '';
+				return;
 			}
 			document.head.append(node);
 			this.#routeHeadNodes.push(node);
@@ -247,33 +254,11 @@ export class Router {
 	}
 }
 function toElement(component, params = null) {
-	if (component instanceof JetzElement) {
-		return component
-	} else if (component.prototype instanceof Component) {
-		let _component = new component();
-		_component.$params = params;
-		let element = _component.render();
-		// if Component was implement onRender, call onRender
-		if (element != null) {
-			if (_component.constructor.prototype.hasOwnProperty('onRendered')) {
-				element.onRendered(_component.onRendered.bind(_component));
-			} else {
-			}
-		}
-		return element;
-	} else if (component instanceof Component) {
-		component.$params = params;
-		const element = component.render();
-		if (element != null && component.constructor.prototype.hasOwnProperty('onRendered')) {
-			element.onRendered(component.onRendered.bind(component));
-		}
-		return element;
-	} else if (typeof component === 'function') {
-		if (params == null)
-			return component();
-		else
-			return component(params);
+	if (component instanceof JetzElement) return component;
+	if (component instanceof Component || typeof component === 'function') {
+		return renderComponent(component, params);
 	}
+	return component;
 }
 
 

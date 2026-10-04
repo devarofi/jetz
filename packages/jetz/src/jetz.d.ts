@@ -546,6 +546,9 @@ export declare function onUpdate(callback: () => void): void;
 /** Registers an onDestroy hook for function components. */
 export declare function onDestroy(callback: () => void): void;
 
+/** @internal Resolves a routed component with the regular component lifecycle. */
+export declare function renderComponent(component: any, params?: any): any;
+
 /** Creates a JetzElement. */
 export declare function createElement(tag: string, ...args: any[]): JetzElement;
 

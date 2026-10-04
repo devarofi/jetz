@@ -746,6 +746,66 @@ class LifecycleContext {
 		}
 	}
 }
+/**
+ * Resolves a component using the same lifecycle context for nested and routed
+ * components. A function receives route params when supplied; class instances
+ * retain their own lifecycle methods.
+ */
+export function renderComponent(component, params = null) {
+	if (typeof component === 'function' && component.prototype instanceof Component) {
+		component = new component();
+	}
+	if (component instanceof Component) {
+		if (arguments.length > 1) component.$params = params;
+		const context = new LifecycleContext();
+		context.component = component;
+		component.$lifecycle = context;
+		const previous = _activeLifecycle;
+		_activeLifecycle = context;
+		let result;
+		try {
+			if (component.constructor.prototype.hasOwnProperty('onCreate')) {
+				component.onCreate();
+			}
+			context.runCreate();
+			result = component.render();
+		} finally {
+			_activeLifecycle = previous;
+		}
+		if (result instanceof JetzElement && component.constructor.prototype.hasOwnProperty('onRendered')) {
+			result.onRendered(component.onRendered.bind(component));
+		}
+		const entry = Array.isArray(result) ? result[0] : result;
+		if (entry instanceof JetzElement && !entry.lifecycle) {
+			entry.attachLifecycle(context);
+		}
+		return result;
+	}
+	if (typeof component !== 'function') return component;
+	const context = new LifecycleContext();
+	const previous = _activeLifecycle;
+	_activeLifecycle = context;
+	let result;
+	try {
+		result = params == null ? component.call() : component(params);
+	} finally {
+		_activeLifecycle = previous;
+	}
+	const entry = Array.isArray(result) ? result[0] : result;
+	if (entry instanceof JetzElement) {
+		Jetz.emitDevtoolsEvent({
+			type: 'component',
+			element: entry,
+			name: component.displayName || component.name || 'Anonymous component'
+		});
+		if (context.hooks.onCreate.length + context.hooks.onMount.length +
+			context.hooks.onUpdate.length + context.hooks.onDestroy.length > 0) {
+			context.component = component;
+			if (!entry.lifecycle) entry.attachLifecycle(context);
+		}
+	}
+	return result;
+}
 class JetzElement {
 	// element rendered
 	o;
@@ -1156,35 +1216,8 @@ class JetzElement {
 				this.#appendStateListener(child);
 				return this;
 			}
-		} else if (typeof child === 'function') {
-			// function component: run inside a lifecycle context so its
-			// onMount/onUpdate/onDestroy hooks are registered
-			const context = new LifecycleContext();
-			const previous = _activeLifecycle;
-			_activeLifecycle = context;
-			let childFunction;
-			try {
-				childFunction = child.call();
-			} finally {
-				_activeLifecycle = previous;
-			}
-			const componentElement = Array.isArray(childFunction) ? childFunction[0] : childFunction;
-			if (componentElement instanceof JetzElement) {
-				Jetz.emitDevtoolsEvent({
-					type: 'component',
-					element: componentElement,
-					name: child.displayName || child.name || 'Anonymous component'
-				});
-			}
-			if (context.hooks.onCreate.length + context.hooks.onMount.length +
-				context.hooks.onUpdate.length + context.hooks.onDestroy.length > 0) {
-				// it registered hooks -> treat it as a function component
-				context.component = child;
-				const result = Array.isArray(childFunction) ? childFunction[0] : childFunction;
-				if (result instanceof JetzElement && !result.lifecycle) {
-					result.attachLifecycle(context);
-				}
-			}
+		} else if (typeof child === 'function' && !(child.prototype instanceof Component)) {
+			const childFunction = renderComponent(child);
 			if (Array.isArray(childFunction))
 				this.append(...childFunction);
 			else
@@ -1244,36 +1277,7 @@ class JetzElement {
 	}
 	/** Renders a Component (instance or class) and wires its lifecycle hooks. */
 	#appendComponent(component) {
-		// set up the lifecycle context: class hooks + standalone function hooks
-		const context = new LifecycleContext();
-		context.component = component;
-		component.$lifecycle = context;
-		// run render() inside the context so function-component hooks register
-		const previous = _activeLifecycle;
-		_activeLifecycle = context;
-		let childComponent;
-		try {
-			// class hook: onCreate runs before render()
-			if (component.constructor.prototype.hasOwnProperty('onCreate')) {
-				component.onCreate();
-			}
-			context.runCreate();
-			childComponent = component.render();
-		} finally {
-			_activeLifecycle = previous;
-		}
-		if (childComponent instanceof JetzElement && component.constructor.prototype.hasOwnProperty('onRendered')) {
-			// must be wired before the element renders, otherwise the hook is never invoked
-			childComponent.onRendered(component.onRendered.bind(component));
-		}
-		if (childComponent instanceof JetzElement && !childComponent.lifecycle) {
-			childComponent.attachLifecycle(context);
-		} else if (Array.isArray(childComponent)) {
-			context.entry = childComponent[0] instanceof JetzElement ? childComponent[0] : null;
-			if (context.entry) {
-				context.entry.attachLifecycle(context);
-			}
-		}
+		const childComponent = renderComponent(component);
 		if (Array.isArray(childComponent)) {
 			this.#appendChildren(childComponent);
 			return this;
@@ -1854,8 +1858,10 @@ class State {
 			this.#value.render();
 			element = this.#value.getElement();
 		} else {
-			// Reuse existing Text node if available
-			const existingText = this.container.find(c => c instanceof Text);
+			// Reuse an existing Text node only while it is still unparented.
+			// A State may be bound in several trees at once; handing the same
+			// node to a second parent would detach it from the first one.
+			const existingText = this.container.find(c => c instanceof Text && c.parentNode == null);
 			element = existingText ?? new Text(this.#value);
 		}
 		this.container.push(element);

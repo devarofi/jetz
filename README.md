@@ -512,6 +512,27 @@ const Page = div(
 );
 ```
 
+Calling a function like `UserCard(...)` is an ordinary JavaScript call. It works well for simple element-building functions, but does not give that call its own lifecycle. To let Jetz invoke a child component, pass a function reference, such as `div(UserCard)`. That form takes no arguments, so use a small wrapper when the child needs values:
+
+```javascript
+import { stateOf } from "jetz";
+import { div, inputText, p } from "jetz/ui";
+
+function Greeting({ name }) {
+  return p("Hello, ", name);
+}
+
+const name = stateOf("Ada");
+const GreetingForUser = () => Greeting({ name });
+
+const Page = div(
+  inputText({ bind: name }),
+  GreetingForUser
+);
+```
+
+Jetz invokes `GreetingForUser` as the child component. The wrapper passes `name` into `Greeting`; because `name` is a State, the greeting updates when the input changes. Put lifecycle hooks in the function Jetz invokes (here, `GreetingForUser`), or use the function reference directly when it needs no parameters. Do not write `div(Greeting(name.value))` if you need a child lifecycle: that calls `Greeting` immediately, outside Jetz's component invocation. Routed function components are different: the router passes route parameters to the function directly.
+
 #### B. Class Components
 
 For complex stateful components or object-oriented architectures, extend `Component`:
@@ -1003,6 +1024,8 @@ const Nav = div(
 ### 9. Component Lifecycle
 
 Every Jetz component — whether function-based or class-based — supports four lifecycle stages:
+
+Each component instance that Jetz invokes has its own lifecycle context, including nested and routed components. For a nested function component, pass its function reference to an element (for example, `div(LiveClock)`) and use the imported lifecycle hooks inside it. If it needs values, pass them through a wrapper function as shown in the Components section. A route such as `route("/clock", LiveClock)` can pass route parameters directly to the function. Class components keep using their `onCreate()`, `onMount()`, `onUpdate()`, and `onDestroy()` methods. Lifecycle methods are not called on function components; use the hook functions instead.
 
 ```text
 onCreate   ──►   onMount   ──►   onUpdate   ──►   onDestroy
