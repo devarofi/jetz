@@ -69,7 +69,7 @@ function docsLink(path, label, activePath) {
     return link(path, element);
 }
 
-function sidebarGroup(title, items) {
+function sidebarGroup(title, items, activePath) {
     return details({
         // Expanded by default: every section is visible on first paint.
         open: true,
