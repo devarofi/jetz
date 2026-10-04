@@ -69,10 +69,10 @@ function docsLink(path, label, activePath) {
     return link(path, element);
 }
 
-function sidebarGroup(title, items, activePath) {
-    const isActiveGroup = items.some(item => item.path === activePath);
+function sidebarGroup(title, items) {
     return details({
-        open: isActiveGroup,
+        // Expanded by default: every section is visible on first paint.
+        open: true,
         class: "jetz-docs-nav-group mb-2",
     },
         summary(css`mb-1 cursor-pointer list-none rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`,

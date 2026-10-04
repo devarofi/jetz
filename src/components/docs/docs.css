@@ -122,6 +122,7 @@
 }
 
 #jetz-docs .jetz-docs-sidebar a {
+    position: relative;
     display: block;
     min-height: 36px;
     padding: 8px 12px;
@@ -132,11 +133,13 @@
     font-weight: 500;
     line-height: 20px;
     white-space: normal;
+    transition: background-color 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
 }
 
 #jetz-docs .jetz-docs-sidebar a:hover {
     background: #f8fafc !important;
     color: #1e293b !important;
+    padding-left: 16px;
 }
 
 #jetz-docs .jetz-docs-sidebar a[href="/docs"],
@@ -153,7 +156,98 @@
     border-left-color: var(--docs-accent);
     background: var(--docs-accent-soft);
     color: var(--docs-accent) !important;
-    font-weight: 600;
+    font-weight: 700;
+    animation: docs-active-pill 0.3s ease both;
+}
+
+#jetz-docs .jetz-docs-sidebar a[aria-current="page"]:hover {
+    padding-left: 12px;
+}
+
+/* Animated accent bar on the selected menu. */
+#jetz-docs .jetz-docs-sidebar a[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--docs-accent);
+    animation: docs-active-bar 0.28s ease both;
+}
+
+@keyframes docs-active-pill {
+    from {
+        background: #fff !important;
+    }
+    to {
+        background: var(--docs-accent-soft);
+    }
+}
+
+@keyframes docs-active-bar {
+    from {
+        opacity: 0;
+        transform: scaleY(0.4);
+    }
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+/* Smooth expand/collapse where the engine supports it. */
+@supports (interpolate-size: allow-keywords) {
+    #jetz-docs .jetz-docs-nav-group::details-content {
+        overflow: clip;
+        transition: height 0.28s ease, content-visibility 0.28s allow-discrete;
+    }
+}
+
+/* Staggered entrance whenever a group is opened. */
+#jetz-docs .jetz-docs-nav-group[open] li {
+    animation: docs-nav-in 0.32s ease both;
+}
+
+#jetz-docs .jetz-docs-nav-group[open] li:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+#jetz-docs .jetz-docs-nav-group[open] li:nth-child(3) {
+    animation-delay: 0.08s;
+}
+
+#jetz-docs .jetz-docs-nav-group[open] li:nth-child(4) {
+    animation-delay: 0.12s;
+}
+
+#jetz-docs .jetz-docs-nav-group[open] li:nth-child(n+5) {
+    animation-delay: 0.16s;
+}
+
+@keyframes docs-nav-in {
+    from {
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #jetz-docs .jetz-docs-nav-group[open] li,
+    #jetz-docs .jetz-docs-sidebar a[aria-current="page"]::before {
+        animation: none;
+    }
+
+    #jetz-docs .jetz-docs-sidebar a,
+    #jetz-docs .jetz-docs-nav-group > summary,
+    #jetz-docs .jetz-docs-nav-group > summary::after {
+        transition: none;
+    }
 }
 
 #jetz-docs > div > main {
@@ -460,14 +554,20 @@
     display: none;
 }
 
+#jetz-docs .jetz-docs-nav-group > summary {
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 #jetz-docs .jetz-docs-nav-group > summary::after {
     content: "+";
     float: right;
     color: #71717a;
     font-size: 13px;
     line-height: 1;
+    transition: transform 0.25s ease;
 }
 
 #jetz-docs .jetz-docs-nav-group[open] > summary::after {
     content: "−";
+    transform: rotate(180deg);
 }
