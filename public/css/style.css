@@ -2307,6 +2307,12 @@ html.jetz-theme-dark .jetz-code-explorer .jetz-code-pane .jetz-code {
 }
 
 
+.jetz-footer-examples {
+    display: flex;
+    gap: 16px;
+}
+
+
 /* ============================================================================
    COMPARISON
    ============================================================================ */
@@ -2531,6 +2537,20 @@ html.jetz-theme-dark .jetz-code-explorer .jetz-code-pane .jetz-code {
    The chart is the one place on the page that gets to be loud: a floating glass
    segmented control, a gradient highlight bar with a neon glow, and everything
    else pushed into slate so a single row owns the eye. */
+
+/* #benchmark hosts the whole performance story as one mega section: the
+   comparison bands (#special, #chart, #defer) nest inside it as full-width
+   sub-sections. Their band padding is trimmed so two section paddings never
+   stack at a boundary, and the outer section closes flush with the last band. */
+#benchmark {
+    padding-bottom: 0;
+}
+
+#benchmark > .jetz-section {
+    padding-top: 60px;
+    padding-bottom: 60px;
+}
+
 
 /* A soft colour wash sits behind the header and the control. Without something
    coloured underneath, a frosted surface has nothing to refract and the

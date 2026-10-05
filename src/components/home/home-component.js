@@ -305,23 +305,6 @@ const App = () => div(
 
 Jetz.mount(App, "#app");`;
 
-    // Short runnable snippet used only by the playground promo. It excludes the
-    // hero imports and mount call so the page keeps exactly two highlighted
-    // `language-javascript` blocks in the always-active content.
-    const playgroundSnippet =
-        `const count = stateOf(7);
-
-button(
-    "Clicked ",
-    count,
-    " times",
-    {
-        onclick() {
-            count.value++;
-        }
-    }
-);`;
-
 
     // -------------------------------------------------------------------------
     // Syntax highlighting
@@ -569,7 +552,7 @@ button(
                         a(
                             {
                                 class: 'jetz-code-open',
-                                href: '#playground'
+                                href: '/playground'
                             },
 
                             'Open Playground ↗'
@@ -711,7 +694,10 @@ button(
         pageSize: 500,
         // page flips sustained before the heap curve flattens out
         sweepCycles: '2,500+',
-        detachedNodes: 0
+        detachedNodes: 0,
+
+        // P95 frame budget held over a full pagination sweep with defer() on
+        p95LatencyMs: '60'
     };
 
     const metrics = [
@@ -729,47 +715,15 @@ button(
             value: `${benchmark.paintGapMs} ms`,
             label: 'Non-Blocking Paint Gap',
             note: 'Powered by native defer() scheduling for zero visual delay.'
-        }
-    ];
-
-
-    // -------------------------------------------------------------------------
-    // Paint-aware figures
-    //
-    // `defer()` splits one heavy write in two: the loading signal flips now, so
-    // the browser paints the indicator, and the write itself lands one frame
-    // later. The gap below is that frame - the price paid for the instant
-    // feedback - while the other three are the usual stress-test readings taken
-    // with defer() in the loop.
-    // -------------------------------------------------------------------------
-
-    const paintGapMs = '5.20';
-    const paintReactiveMs = '0.10';
-    const paintReactiveRows = 25;
-    const paintLatencyMs = '60';
-
-    const paintMetrics = [
-        {
-            value: `${paintGapMs} ms`,
-            label: 'Paint Gap',
-            note: 'Instant UI Feedback'
         },
         {
-            value: `${paintReactiveMs} ms`,
-            label: 'Reactive String',
-            note: `TextNode Isolation (${paintReactiveRows})`
-        },
-        {
-            value: `${benchmark.heapMb} MB`,
-            label: 'JS Heap Usage',
-            note: `${benchmark.rows} Rows in Memory`
-        },
-        {
-            value: `< ${paintLatencyMs} ms`,
+            value: `< ${benchmark.p95LatencyMs} ms`,
             label: 'P95 Frame Latency',
             note: 'Uninterrupted Main Thread'
         }
     ];
+
+
 
     // The whole scheduling API in six lines, painted by the same Prism pass as
     // the hero and explorer snippets.
@@ -1230,8 +1184,7 @@ function nextPage() {
                             },
 
                             ...[
-                                { href: '#why', label: 'Why Jetz' },
-                                { href: '#features', label: 'Features' },
+                                { href: '#why', label: 'Core primitives' },
                                 { href: '#examples', label: 'Examples' },
                                 { href: '#special', label: 'Compare' },
                                 { href: '#benchmark', label: 'Benchmark' },
@@ -1362,7 +1315,7 @@ function nextPage() {
                                     a(
                                         {
                                             class: 'jetz-btn-primary',
-                                            href: '#playground'
+                                            href: '/playground'
                                         },
 
                                         'Try Jetz',
@@ -1474,132 +1427,12 @@ function nextPage() {
 
 
         // =====================================================================
-        // WHY
+        // CORE PRIMITIVES (WHY JETZ + CORE CONCEPTS merged into one section)
         // =====================================================================
 
         section(
             {
                 id: 'why',
-                class: 'jetz-section jetz-section-white'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
-
-                    span(
-                        css`jetz-label`,
-                        'WHY JETZ'
-                    ),
-
-                    h2(
-                        'A framework that stays out of your way.'
-                    ),
-
-                    p(
-                        'Learn the fundamentals quickly, then keep using the same simple ideas as your application grows.'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-card-grid jetz-reveal`,
-
-                    div(
-                        css`jetz-card-col`,
-
-                        article(
-                            css`jetz-benefit-card`,
-
-                            div(
-                                css`jetz-card-number`,
-                                '01'
-                            ),
-
-                            div(
-                                css`jetz-card-icon`,
-                                '{}'
-                            ),
-
-                            h3(
-                                'Just JavaScript'
-                            ),
-
-                            p(
-                                'Write UI with functions, objects, arrays and events. No JSX or template language required.'
-                            )
-                        )
-                    ),
-
-
-                    div(
-                        css`jetz-card-col`,
-
-                        article(
-                            css`jetz-benefit-card`,
-
-                            div(
-                                css`jetz-card-number`,
-                                '02'
-                            ),
-
-                            div(
-                                css`jetz-card-icon`,
-                                '↻'
-                            ),
-
-                            h3(
-                                'Reactive by default'
-                            ),
-
-                            p(
-                                'State changes flow directly into the UI so your code stays close to the behavior it controls.'
-                            )
-                        )
-                    ),
-
-
-                    div(
-                        css`jetz-card-col`,
-
-                        article(
-                            css`jetz-benefit-card`,
-
-                            div(
-                                css`jetz-card-number`,
-                                '03'
-                            ),
-
-                            div(
-                                css`jetz-card-icon`,
-                                '→'
-                            ),
-
-                            h3(
-                                'Small enough to understand'
-                            ),
-
-                            p(
-                                'Jetz focuses on the core building blocks you actually use when creating frontend applications.'
-                            )
-                        )
-                    )
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // FEATURES
-        // =====================================================================
-
-        section(
-            {
-                id: 'features',
                 class: 'jetz-section jetz-section-soft'
             },
 
@@ -1616,7 +1449,7 @@ function nextPage() {
 
                         span(
                             css`jetz-label`,
-                            'CORE CONCEPTS'
+                            'CORE PRIMITIVES'
                         ),
 
                         h2(
@@ -1782,7 +1615,7 @@ function nextPage() {
                         a(
                             {
                                 class: 'jetz-code-run-link',
-                                href: '#playground'
+                                href: '/playground'
                             },
 
                             'Open Playground →'
@@ -1824,471 +1657,6 @@ function nextPage() {
                         examplePanel('lists'),
 
                         examplePanel('conditional')
-                    )
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // PLAYGROUND PROMO
-        // =====================================================================
-
-        section(
-            {
-                id: 'playground',
-                class: 'jetz-section jetz-section-soft'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                div(
-                    css`jetz-playground-promo`,
-
-                    div(
-                        css`jetz-playground-promo-copy`,
-
-                        span(
-                            css`jetz-label`,
-                            'LIVE PLAYGROUND'
-                        ),
-
-                        h2(
-                            'Stop reading. Start running.'
-                        ),
-
-                        p(
-                            'The playground ships with the framework: pick a working example, change the code, and see the result instantly. No setup, no build step.'
-                        ),
-
-                        div(
-                            css`jetz-playground-steps`,
-
-                            span('Write code → Run → See result → Modify → Try again')
-                        ),
-
-                        div(
-                            css`jetz-hero-actions`,
-
-                            link(
-                                'playground',
-
-                                a(
-                                    {
-                                        class: 'jetz-btn-primary',
-                                        href: '#playground'
-                                    },
-
-                                    'Try Jetz',
-
-                                    span('→')
-                                )
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-playground-promo-visual`,
-
-                        div(
-                            css`jetz-window`,
-
-                            div(
-                                css`jetz-window-bar`,
-
-                                div(
-                                    css`jetz-window-dots`,
-
-                                    span(),
-                                    span(),
-                                    span()
-                                ),
-
-                                small(
-                                    'playground / main.js'
-                                ),
-
-                                span(
-                                    css`jetz-live-badge`,
-                                    'LIVE'
-                                )
-                            ),
-
-                            pre(
-                                css`jetz-hero-code-content`,
-
-                                code(
-                                    css`language-javascript`,
-
-                                    highlight(playgroundSnippet)
-                                )
-                            ),
-
-                            div(
-                                css`jetz-window-status`,
-
-                                span(
-                                    css`jetz-status-dot`
-                                ),
-
-                                'Preview: edit the code, press Run, change inputs live'
-                            )
-                        )
-                    )
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // DEVELOPER JOURNEY
-        // =====================================================================
-
-        section(
-            {
-                id: 'journey',
-                class: 'jetz-section jetz-section-white'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
-
-                    span(
-                        css`jetz-label`,
-                        'FROM FIRST TRY TO REAL APP'
-                    ),
-
-                    h2(
-                        'Start small. Grow naturally.'
-                    ),
-
-                    p(
-                        'The same primitives you use for your first counter can become the foundation of a larger frontend application.'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-step-grid`,
-
-                    div(
-                        css`jetz-step-col`,
-
-                        div(
-                            css`jetz-journey-card`,
-
-                            span('01'),
-
-                            strong('Learn'),
-
-                            p(
-                                'Understand state, components and events in minutes.'
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-step-col`,
-
-                        div(
-                            css`jetz-journey-card`,
-
-                            span('02'),
-
-                            strong('Compose'),
-
-                            p(
-                                'Turn small functions into reusable application components.'
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-step-col`,
-
-                        div(
-                            css`jetz-journey-card`,
-
-                            span('03'),
-
-                            strong('Connect'),
-
-                            p(
-                                'Add routing, API calls and application behavior around your UI.'
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-step-col`,
-
-                        div(
-                            css`jetz-journey-card`,
-
-                            span('04'),
-
-                            strong('Build'),
-
-                            p(
-                                'Use the same concepts to create complete frontend applications.'
-                            )
-                        )
-                    )
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // EXAMPLES
-        // =====================================================================
-
-        section(
-            {
-                class: 'jetz-section jetz-section-soft'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
-
-                    span(
-                        css`jetz-label`,
-                        'TRY SOMETHING REAL'
-                    ),
-
-                    h2(
-                        'Not just a counter.'
-                    ),
-
-                    p(
-                        'Use the same primitives to build practical applications.'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-example-grid`,
-
-                    div(
-                        css`jetz-example-col`,
-
-                        link(
-                            'open-todo',
-
-                            a(
-                                {
-                                    href: '#open-todo',
-                                    class: 'welcome-example-link'
-                                },
-
-                                div(
-                                    css`jetz-example-card`,
-
-                                    div(
-                                        css`jetz-example-icon`,
-                                        '✓'
-                                    ),
-
-                                    div(
-                                        css`jetz-example-content`,
-
-                                        strong(
-                                            'Task List'
-                                        ),
-
-                                        span(
-                                            'Reactive CRUD, filtering and live counters'
-                                        )
-                                    ),
-
-                                    span(
-                                        css`jetz-example-arrow`,
-                                        '→'
-                                    )
-                                )
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-example-col`,
-
-                        link(
-                            'calculator',
-
-                            a(
-                                {
-                                    href: '#calculator',
-                                    class: 'welcome-example-link'
-                                },
-
-                                div(
-                                    css`jetz-example-card`,
-
-                                    div(
-                                        css`jetz-example-icon`,
-                                        '='
-                                    ),
-
-                                    div(
-                                        css`jetz-example-content`,
-
-                                        strong(
-                                            'Calculator'
-                                        ),
-
-                                        span(
-                                            'Reactive expressions and application state'
-                                        )
-                                    ),
-
-                                    span(
-                                        css`jetz-example-arrow`,
-                                        '→'
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // SPECIAL
-        // =====================================================================
-
-        section(
-            {
-                id: 'special',
-                class: 'jetz-section jetz-section-white'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
-
-                    span(
-                        css`jetz-label`,
-                        'SPECIAL BY DESIGN'
-                    ),
-
-                    h2(
-                        'Composable first, instead of composable too.'
-                    ),
-
-                    p(
-                        'Jetz keeps what makes a modern UI framework productive - reactive state, components, routing - and leaves out the parts that move your code into another language or behind a compiler.'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-compare jetz-reveal`,
-
-                    compareHead(SPECIAL_LABELS),
-
-                    compareRow(
-                        'Authoring',
-                        'Plain JavaScript functions: div(), button(), p()',
-                        'JSX, .vue or .svelte files that must be compiled first'
-                    ),
-
-                    compareRow(
-                        'Build step',
-                        'Nothing extra for syntax - standard ES modules',
-                        'Babel, SWC or a TypeScript JSX transform'
-                    ),
-
-                    compareRow(
-                        'Rendering',
-                        'State updates the exact bound text node or attribute',
-                        'Virtual-DOM diffing on every state change'
-                    ),
-
-                    compareRow(
-                        'Reactivity',
-                        'stateOf(), computed() and effect() track dependencies automatically',
-                        'Manual dependency arrays and memoization rules'
-                    ),
-
-                    compareRow(
-                        'Lists',
-                        'loop(list, keyFn, renderFn) recycles keyed elements',
-                        'Framework-specific key props and helper components'
-                    ),
-
-                    compareRow(
-                        'App features',
-                        'Router, route guards, session state and dispatcher included',
-                        'Assembled from separate ecosystem packages'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-fit-grid jetz-reveal`,
-
-                    div(
-                        css`jetz-fit-card`,
-
-                        strong(
-                            'Use Jetz when you want...'
-                        ),
-
-                        ul(
-                            li(
-                                'Interactive web applications and SPAs with routing and lifecycle.'
-                            ),
-
-                            li(
-                                'Dashboards and internal tools without a heavy toolchain.'
-                            ),
-
-                            li(
-                                'JavaScript-first frontends built from small composable functions.'
-                            ),
-
-                            li(
-                                'Small interactive interfaces where direct DOM updates matter.'
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-fit-card jetz-fit-card-alt`,
-
-                        strong(
-                            'Reach for something else when...'
-                        ),
-
-                        ul(
-                            li(
-                                'Your team is required to write JSX or TSX.'
-                            ),
-
-                            li(
-                                'You are shipping a content-heavy static site with no interactivity, where plain HTML or a static site generator is enough.'
-                            )
-                        )
                     )
                 )
             )
@@ -2346,7 +1714,7 @@ function nextPage() {
                 // -- key metric cards ------------------------------------------
 
                 div(
-                    css`jetz-card-grid jetz-reveal`,
+                    css`jetz-card-grid jetz-metric-grid jetz-reveal`,
 
                     metrics.map(metric => div(
                         css`jetz-card-col`,
@@ -2488,6 +1856,124 @@ function nextPage() {
                         span('↗')
                     )
                 )
+            ),
+
+
+        // =====================================================================
+        // SPECIAL BY DESIGN
+        // =====================================================================
+
+        section(
+            {
+                id: 'special',
+                class: 'jetz-section jetz-section-white'
+            },
+
+            div(
+                {
+                    class: 'container'
+                },
+
+                div(
+                    css`jetz-section-heading text-center jetz-reveal`,
+
+                    span(
+                        css`jetz-label`,
+                        'SPECIAL BY DESIGN'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-compare jetz-reveal`,
+
+                    compareHead(SPECIAL_LABELS),
+
+                    compareRow(
+                        'Authoring',
+                        'Plain JavaScript functions: div(), button(), p()',
+                        'JSX, .vue or .svelte files that must be compiled first'
+                    ),
+
+                    compareRow(
+                        'Build step',
+                        'Nothing extra for syntax - standard ES modules',
+                        'Babel, SWC or a TypeScript JSX transform'
+                    ),
+
+                    compareRow(
+                        'Rendering',
+                        'State updates the exact bound text node or attribute',
+                        'Virtual-DOM diffing on every state change'
+                    ),
+
+                    compareRow(
+                        'Reactivity',
+                        'stateOf(), computed() and effect() track dependencies automatically',
+                        'Manual dependency arrays and memoization rules'
+                    ),
+
+                    compareRow(
+                        'Lists',
+                        'loop(list, keyFn, renderFn) recycles keyed elements',
+                        'Framework-specific key props and helper components'
+                    ),
+
+                    compareRow(
+                        'App features',
+                        'Router, route guards, session state and dispatcher included',
+                        'Assembled from separate ecosystem packages'
+                    )
+                ),
+
+
+                div(
+                    css`jetz-fit-grid jetz-reveal`,
+
+                    div(
+                        css`jetz-fit-card`,
+
+                        strong(
+                            'Use Jetz when you want...'
+                        ),
+
+                        ul(
+                            li(
+                                'Interactive web applications and SPAs with routing and lifecycle.'
+                            ),
+
+                            li(
+                                'Dashboards and internal tools without a heavy toolchain.'
+                            ),
+
+                            li(
+                                'JavaScript-first frontends built from small composable functions.'
+                            ),
+
+                            li(
+                                'Small interactive interfaces where direct DOM updates matter.'
+                            )
+                        )
+                    ),
+
+                    div(
+                        css`jetz-fit-card jetz-fit-card-alt`,
+
+                        strong(
+                            'Reach for something else when...'
+                        ),
+
+                        ul(
+                            li(
+                                'Your team is required to write JSX or TSX.'
+                            ),
+
+                            li(
+                                'You are shipping a content-heavy static site with no interactivity, where plain HTML or a static site generator is enough.'
+                            )
+                        )
+                    )
+                )
             )
         ),
 
@@ -2520,12 +2006,6 @@ function nextPage() {
                         ),
 
                         'BENCHMARK & SPEED SPECTRUM'
-                    ),
-
-                    h2('Top-Tier Performance Without Virtual DOM Overhead'),
-
-                    p(
-                        'See how Jetz\'s Fine-Grained Direct DOM architecture outperforms Virtual DOM based frameworks in speed and memory efficiency.'
                     )
                 ),
 
@@ -2610,28 +2090,7 @@ function nextPage() {
                         ),
 
                         'PAINT-AWARE SCHEDULING'
-                    ),
-
-                    h2(
-                        '60 FPS Feel, Even Under Extreme DOM Load'
-                    ),
-
-                    p(
-                        'Jetz isolates DOM creation from frame painting using native defer() scheduling. Your UI stays butter-smooth with zero frame drops during heavy reconciliations.'
                     )
-                ),
-
-
-                // -- the four figures -------------------------------------------
-
-                div(
-                    css`jetz-card-grid jetz-metric-grid jetz-reveal`,
-
-                    ...paintMetrics.map(metric => div(
-                        css`jetz-card-col`,
-
-                        metricCard(metric)
-                    ))
                 ),
 
 
@@ -2677,6 +2136,7 @@ function nextPage() {
                     '* Measured in Chrome on the bundled stress test with defer() enabled: the paint gap is the single frame Jetz waits out so the indicator is on screen before the heavy write runs, and the latency figures come from a full pagination sweep over 50,000 reactive rows.'
                 )
             )
+        ),
         ),
 
 
@@ -2730,7 +2190,7 @@ function nextPage() {
                             a(
                                 {
                                     class: 'jetz-btn-primary jetz-btn-light',
-                                    href: '#playground'
+                                    href: '/playground'
                                 },
 
                                 'Try Jetz',
@@ -2782,6 +2242,36 @@ function nextPage() {
 
                 span(
                     'Javascript, Compose.'
+                ),
+
+                div(
+                    css`jetz-footer-examples`,
+
+                    link(
+                        'open-todo',
+
+                        a(
+                            {
+                                href: '/open-todo',
+                                class: 'welcome-example-link'
+                            },
+
+                            'Task List'
+                        )
+                    ),
+
+                    link(
+                        'calculator',
+
+                        a(
+                            {
+                                href: '/calculator',
+                                class: 'welcome-example-link'
+                            },
+
+                            'Calculator'
+                        )
+                    )
                 ),
 
                 a(
