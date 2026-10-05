@@ -331,8 +331,8 @@ assert('/ home renders the chart section', await page.$eval('#chart', el => el.c
 assert('/ home badges the chart as a speed spectrum', (await page.$eval('#chart .jetz-eyebrow', el => el.textContent.trim())), 'BENCHMARK & SPEED SPECTRUM');
 assert('/ home headlines the chart on the no-overhead claim', (await page.$eval('#chart h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Top-Tier Performance Without Virtual DOM Overhead');
 assertTrue('/ home subheads the chart with the fine-grained claim', (await page.$eval('#chart .jetz-section-heading p', el => el.textContent)).includes('Fine-Grained Direct DOM'));
-assert('/ home offers three metric tabs', await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.length), 3);
-assert('/ home labels every metric tab', (await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.map(tab => tab.textContent.trim()).join('|'))), 'Partial Update Speed (ms)|Memory Footprint (MB)|DOM Mount Speed (ms)');
+assert('/ home offers four metric tabs', await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.length), 4);
+assert('/ home labels every metric tab', (await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.map(tab => tab.textContent.trim()).join('|'))), 'Partial Update Speed (ms)|Memory Footprint (MB)|Page Change Speed (ms)|DOM Mount Speed (ms)');
 assert('/ home marks one metric tab as selected by default', await page.$$eval('#chart .jetz-chart-tab', tabs => tabs.filter(tab => tab.getAttribute('aria-selected') === 'true').length), 1);
 assert('/ home marks the first metric tab active by default', await page.$eval('#chart .jetz-chart-tab', tab => tab.classList.contains('is-active')), true);
 // only the active panel is in the DOM, so the bars can never disagree with the tab
@@ -342,13 +342,13 @@ assert('/ home titles the default metric panel', (await page.$eval('#chart .jetz
 assert('/ home states the direction that wins', (await page.$eval('#chart .jetz-chart-axis span', el => el.textContent)), 'Lower is better');
 assert('/ home draws one bar per framework', await page.$$eval('#chart .jetz-chart-bar', bars => bars.length), 5);
 assert('/ home names every framework on the default metric', (await page.$$eval('#chart .jetz-chart-name', els => els.map(el => el.textContent).join('|'))), 'Jetz Framework|SolidJS|Svelte 5|Vue 3|React 19');
-assert('/ home prints the update figures', (await page.$$eval('#chart .jetz-chart-value', els => els.map(el => el.textContent).join('|'))), '0.00 ms|0.05 ms|0.10 ms|3.20 ms|12.50 ms');
+assert('/ home prints the update figures', (await page.$$eval('#chart .jetz-chart-value', els => els.map(el => el.textContent).join('|'))), '1.60 ms|2.10 ms|2.80 ms|3.20 ms|12.50 ms');
 assert('/ home badges exactly the Jetz bar', (await page.$$eval('#chart .jetz-chart-badge', els => els.map(el => el.textContent).join('|'))), 'JETZ');
 assert('/ home highlights only the Jetz bar', await page.$$eval('#chart .jetz-chart-bar', bars => bars.filter(bar => bar.classList.contains('jetz-chart-bar-jetz')).length), 1);
 assert('/ home colours the Jetz bar in the house cyan', await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-name', el => getComputedStyle(el).color), 'rgb(8, 145, 178)');
 assert('/ home mutes the competing bars', await page.$eval('#chart .jetz-chart-bar:not(.jetz-chart-bar-jetz) .jetz-chart-name', el => getComputedStyle(el).color), 'rgb(36, 59, 83)');
-// the fastest result is 0.00 ms, so the fill has a floor or the bar would vanish
-assertTrue('/ home keeps the 0.00 ms Jetz bar visible', parseFloat(await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-fill', el => el.style.width)) > 0);
+// the fastest result is 1.60 ms, so the Jetz bar must be visibly narrower but present
+assertTrue('/ home keeps the 1.60 ms Jetz bar visible', parseFloat(await page.$eval('#chart .jetz-chart-bar-jetz .jetz-chart-fill', el => el.style.width)) > 0);
 assert('/ home scales the slowest bar to full width', await page.$eval('#chart .jetz-chart-bar:last-child .jetz-chart-fill', el => el.style.width), '100%');
 assertTrue('/ home cites the methodology under the chart', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).includes('Intel i7/M-Series'));
 assertTrue('/ home discloses the post-GC condition', (await page.$eval('#chart .jetz-bench-source', el => el.textContent)).toLowerCase().includes('post-gc'));
@@ -394,10 +394,17 @@ const switchTo = async label => {
 
 const memory = await switchTo('Memory Footprint (MB)');
 assert('/ home switches the chart to the memory metric', memory.title, 'Memory Footprint After Garbage Collection');
-assert('/ home prints the memory figures', memory.values, '110 MB|123 MB|135 MB|180 MB|260 MB');
-assert('/ home keeps the memory bar order', memory.names, 'SolidJS|Jetz Framework|Svelte 5|Vue 3|React 19');
+assert('/ home prints the memory figures', memory.values, '87.7 MB|110 MB|135 MB|180 MB|230 MB');
+assert('/ home keeps the memory bar order', memory.names, 'Jetz Framework|SolidJS|Svelte 5|Vue 3|React 19');
 assert('/ home still shows one panel after switching', memory.panels, 1);
 assert('/ home moves the selected tab with the panel', memory.selected, 'Memory Footprint (MB)');
+
+const pageChange = await switchTo('Page Change Speed (ms)');
+assert('/ home switches the chart to the page-change metric', pageChange.title, 'Page Change with defer() Scheduling');
+assert('/ home prints the page-change figures', pageChange.values, '14.03 ms|~25 ms|~35 ms|~65 ms|~110 ms');
+assert('/ home keeps the page-change bar order', pageChange.names, 'Jetz Framework|SolidJS|Svelte 5|Vue 3|React 19');
+assert('/ home still shows one panel after switching tabs', pageChange.panels, 1);
+assert('/ home moves the selected tab with the page-change panel', pageChange.selected, 'Page Change Speed (ms)');
 
 const mount = await switchTo('DOM Mount Speed (ms)');
 assert('/ home switches the chart to the mount metric', mount.title, 'Mounting 500 Rows to the DOM');
@@ -449,7 +456,7 @@ assert('/ home keeps the real Jetz logo as an image', (await page.$$eval('#chart
 assert('/ home gives every mark a readable box', await page.$eval('#chart .jetz-chart-logo', el => getComputedStyle(el).width), '26px');
 
 assert('/ home shows three highlight cards', await page.$$eval('#chart .jetz-chart-highlight', els => els.length), 3);
-assert('/ home derives the highlights from the measured bars', (await page.$$eval('#chart .jetz-chart-highlight-body > strong', els => els.map(el => el.textContent).join('|'))), '0.00 ms|53% less memory|1.9× faster mount');
+assert('/ home derives the highlights from the measured bars', (await page.$$eval('#chart .jetz-chart-highlight-body > strong', els => els.map(el => el.textContent).join('|'))), '1.60 ms|62% less memory|1.9× faster mount');
 assert('/ home labels what each highlight compares', (await page.$$eval('#chart .jetz-chart-highlight-body > small', els => els.map(el => el.textContent).join('|'))), 'single row partial update|than React 19 at 50,000 rows|than React 19 for 500 rows');
 
 assert('/ home draws the bars thick', await page.$eval('#chart .jetz-chart-track', el => getComputedStyle(el).height), '18px');

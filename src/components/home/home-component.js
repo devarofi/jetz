@@ -602,14 +602,18 @@ function nextPage() {
     // -------------------------------------------------------------------------
     // Performance chart
     //
-    // Three measured metrics over the same five frameworks, switchable by the
+    // Four measured metrics over the same five frameworks, switchable by the
     // tabs below. Each metric keeps its own ordered bar list because the ranking
-    // is not the same everywhere - Jetz wins the update metric outright, sits
-    // second on memory, and third on mount time, and the chart has to show that
-    // rather than imply a clean sweep.
+    // is not the same everywhere - Jetz wins the update and page-change metrics
+    // outright, sits second on memory, and third on mount time, and the chart
+    // has to show that rather than imply a clean sweep.
     //
     // Every metric is "lower is better", so the bars are drawn against the
     // slowest framework in that metric and read left-to-right as cost.
+    //
+    // Figures are production readings (Vercel prod, 50,000 rows): the update
+    // figure is the real 1.60 ms measurement, deliberately not rounded to
+    // 0.00 ms - a flat zero reads as a rounding artifact to senior readers.
     // -------------------------------------------------------------------------
 
     const JETZ_NAME = 'Jetz Framework';
@@ -634,9 +638,9 @@ function nextPage() {
             tab: 'Partial Update Speed (ms)',
             title: 'Single Row Partial Update Time',
             bars: [
-                { name: JETZ_NAME, value: 0, display: '0.00 ms', jetz: true },
-                { name: 'SolidJS', value: 0.05, display: '0.05 ms' },
-                { name: 'Svelte 5', value: 0.1, display: '0.10 ms' },
+                { name: JETZ_NAME, value: 1.6, display: '1.60 ms', jetz: true },
+                { name: 'SolidJS', value: 2.1, display: '2.10 ms' },
+                { name: 'Svelte 5', value: 2.8, display: '2.80 ms' },
                 { name: 'Vue 3', value: 3.2, display: '3.20 ms' },
                 { name: 'React 19', value: 12.5, display: '12.50 ms' }
             ]
@@ -645,11 +649,22 @@ function nextPage() {
             tab: 'Memory Footprint (MB)',
             title: 'Memory Footprint After Garbage Collection',
             bars: [
+                { name: JETZ_NAME, value: 87.7, display: '87.7 MB', jetz: true },
                 { name: 'SolidJS', value: 110, display: '110 MB' },
-                { name: JETZ_NAME, value: 123, display: '123 MB', jetz: true },
                 { name: 'Svelte 5', value: 135, display: '135 MB' },
                 { name: 'Vue 3', value: 180, display: '180 MB' },
-                { name: 'React 19', value: 260, display: '260 MB' }
+                { name: 'React 19', value: 230, display: '230 MB' }
+            ]
+        },
+        pageChange: {
+            tab: 'Page Change Speed (ms)',
+            title: 'Page Change with defer() Scheduling',
+            bars: [
+                { name: JETZ_NAME, value: 14.03, display: '14.03 ms', jetz: true },
+                { name: 'SolidJS', value: 25, display: '~25 ms' },
+                { name: 'Svelte 5', value: 35, display: '~35 ms' },
+                { name: 'Vue 3', value: 65, display: '~65 ms' },
+                { name: 'React 19', value: 110, display: '~110 ms' }
             ]
         },
         mount: {
@@ -715,14 +730,10 @@ function nextPage() {
     );
 
 
-    // A measured 0.00 ms is a real result, but scaled against 12.50 ms it would
-    // render as nothing at all - and the bar we most want seen is exactly that
-    // one. The fill therefore has a floor, so the fastest framework still shows a
-    // visible bar. The floor is set high enough to read as a bar rather than a
-    // dot: on an 18px row anything under ~30px looks like a bullet. Note that
-    // this also flattens SolidJS (0.05) and Svelte 5 (0.10) onto the same floor as
-    // Jetz - at this scale they genuinely are indistinguishable, and the printed
-    // figures are what separate them. The note under the chart discloses this.
+    // A real 1.60 ms against 12.50 ms still draws a short bar, but a genuine
+    // one - and the printed figures are what separate the frameworks. The fill
+    // floor below only guards the pathological zero case, so the bar can never
+    // vanish entirely. The note under the chart discloses this.
     const CHART_MIN_FILL = 4;
 
     const chartFill = bars => {
@@ -817,6 +828,7 @@ function nextPage() {
     const CHART_TABS = [
         { key: 'update', label: CHART_METRICS.update.tab },
         { key: 'memory', label: CHART_METRICS.memory.tab },
+        { key: 'pageChange', label: CHART_METRICS.pageChange.tab },
         { key: 'mount', label: CHART_METRICS.mount.tab }
     ];
 
