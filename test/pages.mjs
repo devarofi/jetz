@@ -229,6 +229,30 @@ assertTrue('/ home turns numbers into Prism tokens', (await page.$$eval('.jetz-c
 assertTrue('/ home keeps the highlighted source unchanged', (await page.$eval('.jetz-code', el => el.textContent)).includes('import { stateOf } from "@daevsoft/jetz";'));
 assert('/ home paints the explorer tokens with the Prism palette', await page.$eval('.jetz-code .token.keyword', el => getComputedStyle(el).color), 'rgb(101, 191, 240)');
 
+// --- the split IDE window: chrome, gutter, copy button, live widget ---------
+section('/: learn-by-doing split window');
+assert('/ home labels the file in the editor window bar', await page.$eval('.jetz-code-window-bar .jetz-code-file', el => el.textContent), 'Counter.js');
+assert('/ home offers the playground from the window bar', await page.$eval('.jetz-code-window-bar .jetz-code-open', el => el.textContent.trim()), 'Open Playground ↗');
+assert('/ home paints the window traffic lights', await page.$$eval('.jetz-code-window-bar .jetz-window-dots span', dots => dots.length), 3);
+assert('/ home splits code and preview side by side', await page.$eval('.jetz-code-split', el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2);
+assertTrue('/ home numbers every source line with a CSS counter', (await page.$eval('.jetz-code-line', el => getComputedStyle(el).counterIncrement)).startsWith('jetz-line'));
+assert('/ home offers a copy button for the snippet', await page.$eval('.jetz-code-pane .jetz-code-copy', el => el.textContent), 'Copy');
+assert('/ home badges the pattern under the snippet', await page.$eval('.jetz-code-pane .jetz-code-badge', el => el.textContent), 'stateOf(0) — one signal, zero boilerplate');
+assert('/ home labels the live pane', await page.$eval('.jetz-live-pane .jetz-live-tag', el => el.textContent.trim().replace(/\s+/g, ' ')), 'LIVE PREVIEW');
+
+// the widget is wired to real state: one click updates the readout in place
+const liveReadout = () => page.$eval('.jetz-live-pane .jetz-live-readout', el => el.textContent.trim());
+assert('/ home live preview starts at zero', await liveReadout(), 'Clicked 0 times');
+await page.click('.jetz-live-pane .jetz-live-btn');
+assert('/ home live preview reacts to a click', await liveReadout(), 'Clicked 1 times');
+
+// demo state lives at the top of Home(): switching tabs keeps what was clicked
+await page.click('.jetz-code-tabs .jetz-code-tab:nth-child(5)'); // Lists
+await page.click('.jetz-live-pane .jetz-live-btn'); // Add a task
+assert('/ home list preview appends an item', await page.$$eval('.jetz-live-list li', items => items.length), 3);
+await page.click('.jetz-code-tabs .jetz-code-tab:nth-child(1)'); // back to State
+assert('/ home keeps the touched demo after a tab switch', await liveReadout(), 'Clicked 1 times');
+
 // --- Prism paints the hero code window too ---------------------------------
 section('/: hero code window syntax highlighting');
 assert('/ home tags the hero code block with the highlighted language', await page.$eval('.jetz-hero-code-content code', el => el.className), 'language-javascript');
@@ -260,6 +284,8 @@ assertTrue('/ home keeps Playground visible on mobile', await page.$eval('.jetz-
 assertTrue('/ home keeps GitHub visible on mobile', await page.$eval('.jetz-nav-github', el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
 assertTrue('/ home keeps the theme toggle visible on mobile', await page.$eval('.jetz-theme-toggle', el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
 assertTrue('/ home keeps the mobile navigation inside the viewport', await page.$eval('.jetz-header-inner', el => el.getBoundingClientRect().right <= document.documentElement.clientWidth));
+// under 900px the split window stacks instead of squeezing both panes
+assert('/ home stacks the split window on mobile', await page.$eval('.jetz-code-split', el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 1);
 await page.setViewport({ width: 1280, height: 900 });
 await page.goto(`http://127.0.0.1:${port}/docs`, { waitUntil: 'load' });
 assert('/docs uses the built PNG favicon', await page.$eval('link[rel="icon"]:last-of-type', el => new URL(el.href).pathname), '/img/logo/small.png');

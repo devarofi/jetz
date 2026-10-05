@@ -1,5 +1,5 @@
 import { link } from "../../lib/jetz-router.js";
-import { html, ifElse, stateOf } from "../../lib/jetz.js";
+import { computed, html, ifElse, listOf, loop, stateOf, _else, _if } from "../../lib/jetz.js";
 import { storedTheme, THEME_DARK, THEME_LIGHT } from "../../theme.js";
 
 import {
@@ -50,6 +50,17 @@ import "prismjs/components/prism-javascript.js";
 export function Home() {
 
     const activeTab = stateOf('state');
+
+    // Live state behind the "Learn by doing" split previews. One signal set
+    // per tab so every panel has a real widget, not a screenshot: the states
+    // live here (not inside the panel builders) so switching tabs never
+    // resets the demo the visitor already touched.
+    const demoCount = stateOf(0);
+    const demoUser = stateOf({ name: 'Daev', email: 'hello@example.com' });
+    const demoMessage = stateOf('Ready');
+    const demoTasks = listOf('Read the docs', 'Build a demo');
+    const demoOnline = stateOf(false);
+    const demoRoute = stateOf('/');
 
     // which benchmark metric the chart is currently showing. The panels read it
     // to decide which one renders, so it is the only state the chart needs.
@@ -356,12 +367,166 @@ button(
 
 
     // -------------------------------------------------------------------------
-    // Example panel
+    // Example panel: split IDE view (editor + live widget)
     //
     // Each tab owns one `ifElse()` panel: the panel renders while its tab is
     // active and renders nothing otherwise. A branch callback must return
     // content, never another `ifElse()`, so every tab gets its own panel.
+    //
+    // The demo states live at the top of Home(), so flipping tabs never
+    // resets a demo the visitor already touched.
     // -------------------------------------------------------------------------
+
+    // Filename shown in the editor chrome, one per tab.
+    const exampleFile = {
+        state: 'Counter.js',
+        components: 'UserCard.js',
+        routing: 'router.js',
+        events: 'Events.js',
+        lists: 'Tasks.js',
+        conditional: 'Status.js'
+    };
+
+    // The call each example pivots on - badged under the code so the
+    // fine-grained-signal shape is unmistakable without reading every line.
+    const exampleBadge = {
+        state: 'stateOf(0) — one signal, zero boilerplate',
+        components: 'plain function — no class, no template',
+        routing: 'route(path, page) — pages are values',
+        events: 'onclick next to the element it handles',
+        lists: 'listOf + loop — views follow the data',
+        conditional: '_if / _else — no wrapper element'
+    };
+
+    // Live widget per tab, each wired to its demo state.
+    const exampleDemo = {
+        state: () => div(
+            css`jetz-live-demo`,
+            p(css`jetz-live-readout`, 'Clicked ', demoCount, ' times'),
+            button(
+                {
+                    class: 'jetz-live-btn',
+                    onclick() { demoCount.value++; }
+                },
+                'Click me'
+            )
+        ),
+        components: () => {
+            // stateOf({…}) keeps one signal per property: demoUser.name is the
+            // reactive value itself, so the card reads and rewrites it directly.
+            const rename = () => {
+                demoUser.name.value = demoUser.name.value === 'Daev' ? 'Ada' : 'Daev';
+            };
+            return div(
+                css`jetz-live-demo`,
+                p(css`jetz-live-readout`, 'Hello, ', demoUser.name, '!'),
+                p(css`jetz-live-sub`, demoUser.email),
+                button({ class: 'jetz-live-btn', onclick: rename }, 'Rename user')
+            );
+        },
+        routing: () => {
+            const pages = {
+                '/': 'Home page — welcome!',
+                '/docs': 'Docs page — read the guides.',
+                '/about': 'About page — hello there.'
+            };
+            return div(
+                css`jetz-live-demo`,
+                p(css`jetz-live-readout`, 'Route: ', demoRoute),
+                p(css`jetz-live-sub`, computed(() => pages[demoRoute.value] ?? 'Unknown route')),
+                div(
+                    css`jetz-live-row`,
+                    ...Object.keys(pages).map(path => button(
+                        {
+                            class: 'jetz-live-chip',
+                            onclick() { demoRoute.value = path; }
+                        },
+                        path
+                    ))
+                )
+            );
+        },
+        events: () => div(
+            css`jetz-live-demo`,
+            p(css`jetz-live-readout`, 'Status: ', demoMessage),
+            button(
+                {
+                    class: 'jetz-live-btn',
+                    onclick() { demoMessage.value = 'Triggered'; }
+                },
+                'Run action'
+            )
+        ),
+        lists: () => div(
+            css`jetz-live-demo`,
+            ul(
+                css`jetz-live-list`,
+                loop(demoTasks, task => li(task))
+            ),
+            button(
+                {
+                    class: 'jetz-live-btn',
+                    onclick() { demoTasks.push('Ship it'); }
+                },
+                'Add a task'
+            )
+        ),
+        conditional: () => div(
+            css`jetz-live-demo`,
+            div(_if(() => demoOnline.value), p(css`jetz-live-readout`, 'You are online')),
+            div(_else, p(css`jetz-live-readout`, 'You are offline')),
+            button(
+                {
+                    class: 'jetz-live-btn',
+                    onclick() { demoOnline.value = !demoOnline.value; }
+                },
+                'Toggle status'
+            )
+        )
+    };
+
+    // Line-numbered code: Prism highlights the source once, then the token
+    // stream is cut at every newline and each visual line is wrapped in a
+    // span whose CSS counter supplies its number - no table layout, no split
+    // markup that could drift from the highlighted tokens. The snippets keep
+    // every token inside a single line, so cutting on "\n" never splits a
+    // Prism span in half.
+    const numberedCode = source => pre(
+        css`jetz-code jetz-code-numbered`,
+        code(
+            css`language-javascript`,
+            ...Prism
+                .highlight(source, Prism.languages.javascript, 'javascript')
+                .split('\n')
+                .map(line => html(
+                    `<span class="jetz-code-line">${line || ' '}</span>`
+                ))
+        )
+    );
+
+    const copyCodeButton = source => button(
+        {
+            class: 'jetz-code-copy',
+            type: 'button',
+            onclick(event) {
+                const trigger = event.currentTarget;
+                const done = () => {
+                    trigger.classList.add('is-copied');
+                    trigger.textContent = 'Copied';
+                    setTimeout(() => {
+                        trigger.classList.remove('is-copied');
+                        trigger.textContent = 'Copy';
+                    }, 1600);
+                };
+                if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(source).then(done, done);
+                } else {
+                    done();
+                }
+            }
+        },
+        'Copy'
+    );
 
     const examplePanel = key => ifElse(
         () => activeTab.value === key,
@@ -377,13 +542,75 @@ button(
                 p(examples[key].description)
             ),
 
-            pre(
-                css`jetz-code`,
+            div(
+                css`jetz-code-window`,
 
-                code(
-                    css`language-javascript`,
+                div(
+                    css`jetz-code-window-bar`,
 
-                    highlight(examples[key].code)
+                    div(
+                        css`jetz-window-dots`,
+
+                        span(),
+
+                        span(),
+
+                        span()
+                    ),
+
+                    span(
+                        css`jetz-code-file`,
+                        exampleFile[key]
+                    ),
+
+                    link(
+                        'playground',
+
+                        a(
+                            {
+                                class: 'jetz-code-open',
+                                href: '#playground'
+                            },
+
+                            'Open Playground ↗'
+                        )
+                    )
+                ),
+
+                div(
+                    css`jetz-code-split`,
+
+                    div(
+                        css`jetz-code-pane`,
+
+                        copyCodeButton(examples[key].code),
+
+                        numberedCode(examples[key].code),
+
+                        span(
+                            css`jetz-code-badge`,
+                            exampleBadge[key]
+                        )
+                    ),
+
+                    div(
+                        css`jetz-live-pane`,
+
+                        span(
+                            css`jetz-live-tag`,
+
+                            span(css`jetz-live-dot`),
+
+                            'LIVE PREVIEW'
+                        ),
+
+                        exampleDemo[key](),
+
+                        span(
+                            css`jetz-live-note`,
+                            '⚡ Fine-grained reactivity — no re-render'
+                        )
+                    )
                 )
             )
         ),
@@ -1545,7 +1772,7 @@ function nextPage() {
                         strong('Run this pattern live.'),
 
                         span(
-                            'The playground contains the same building blocks as runnable examples.'
+                            'Every tab pairs its snippet with a live widget you can click. Run the same pattern yourself when you are ready.'
                         )
                     ),
 
