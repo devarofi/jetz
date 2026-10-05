@@ -1524,7 +1524,7 @@ div#app:has(#welcome-page)>main>footer {
 .jetz-playground-promo-copy h2 {
     margin: 13px 0 14px;
 
-    color: white;
+    color: var(--jetz-ink);
 
     font-size: clamp(2rem, 4vw, 3.25rem);
     font-weight: 820;
@@ -1537,7 +1537,7 @@ div#app:has(#welcome-page)>main>footer {
 .jetz-playground-promo-copy p {
     margin: 0;
 
-    color: #91a8b7;
+    color: var(--jetz-muted);
 
     font-size: 16px;
     line-height: 1.75;
@@ -1547,7 +1547,7 @@ div#app:has(#welcome-page)>main>footer {
 .jetz-playground-steps {
     margin-top: 20px;
 
-    color: #65bff0;
+    color: var(--jetz-blue);
 
     font-family: Consolas, monospace;
     font-size: 12px;

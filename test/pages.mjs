@@ -366,9 +366,9 @@ assertTrue('/ home renders the paint-aware section', await page.$eval('#defer', 
 assert('/ home headlines the paint-aware claim', (await page.$eval('#defer h2', el => el.textContent.replace(/\s+/g, ' ').trim())), '60 FPS Feel, Even Under Extreme DOM Load');
 assert('/ home shows four paint metrics', await page.$$eval('#defer .jetz-metric-card', cards => cards.length), 4);
 assert('/ home reuses the card shell for the paint metrics', await page.$$eval('#defer .jetz-metric-card', cards => cards.every(card => card.classList.contains('jetz-benefit-card'))), true);
-assert('/ home reports the defer() figures', (await page.$$eval('#defer .jetz-metric-value', els => els.map(el => el.textContent).join('|'))), '38.80 ms|0.20 ms|73.1 MB|< 88.70 ms');
-assert('/ home names every paint metric', (await page.$$eval('#defer .jetz-metric-label', els => els.map(el => el.textContent).join('|'))), 'Paint Gap|Reactive String|JS Heap Usage|P95 / Max Latency');
-assert('/ home explains every paint metric', (await page.$$eval('#defer .jetz-metric-note', els => els.map(el => el.textContent).join('|'))), 'Instant UI Feedback|TextNode Isolation|50,000 Rows in Memory|Uninterrupted Main Thread');
+assert('/ home reports the defer() figures', (await page.$$eval('#defer .jetz-metric-value', els => els.map(el => el.textContent).join('|'))), '5.20 ms|0.10 ms|87.7 MB|< 60 ms');
+assert('/ home names every paint metric', (await page.$$eval('#defer .jetz-metric-label', els => els.map(el => el.textContent).join('|'))), 'Paint Gap|Reactive String|JS Heap Usage|P95 Frame Latency');
+assert('/ home explains every paint metric', (await page.$$eval('#defer .jetz-metric-note', els => els.map(el => el.textContent).join('|'))), 'Instant UI Feedback|TextNode Isolation (25)|50,000 Rows in Memory|Uninterrupted Main Thread');
 assert('/ home lays the paint metrics out two by two', await page.$eval('#defer .jetz-metric-grid', el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2);
 assert('/ home tags the defer() snippet with its language', await page.$eval('#defer pre.jetz-hero-code-content code', el => el.className), 'language-javascript');
 assertTrue('/ home highlights the defer() snippet', (await page.$$eval('#defer pre.jetz-hero-code-content .token.keyword', tokens => tokens.length)) > 0);

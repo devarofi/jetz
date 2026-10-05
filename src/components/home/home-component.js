@@ -516,8 +516,10 @@ button(
     // with defer() in the loop.
     // -------------------------------------------------------------------------
 
-    const paintGapMs = '38.80';
-    const paintLatencyMs = '88.70';
+    const paintGapMs = '5.20';
+    const paintReactiveMs = '0.10';
+    const paintReactiveRows = 25;
+    const paintLatencyMs = '60';
 
     const paintMetrics = [
         {
@@ -526,18 +528,18 @@ button(
             note: 'Instant UI Feedback'
         },
         {
-            value: '0.20 ms',
+            value: `${paintReactiveMs} ms`,
             label: 'Reactive String',
-            note: 'TextNode Isolation'
+            note: `TextNode Isolation (${paintReactiveRows})`
         },
         {
-            value: '73.1 MB',
+            value: `${benchmark.heapMb} MB`,
             label: 'JS Heap Usage',
-            note: '50,000 Rows in Memory'
+            note: `${benchmark.rows} Rows in Memory`
         },
         {
             value: `< ${paintLatencyMs} ms`,
-            label: 'P95 / Max Latency',
+            label: 'P95 Frame Latency',
             note: 'Uninterrupted Main Thread'
         }
     ];
@@ -1608,7 +1610,7 @@ function nextPage() {
         section(
             {
                 id: 'playground',
-                class: 'jetz-section jetz-section-dark'
+                class: 'jetz-section jetz-section-soft'
             },
 
             div(
@@ -1623,7 +1625,7 @@ function nextPage() {
                         css`jetz-playground-promo-copy`,
 
                         span(
-                            css`jetz-label jetz-label-light`,
+                            css`jetz-label`,
                             'LIVE PLAYGROUND'
                         ),
 
@@ -1649,7 +1651,7 @@ function nextPage() {
 
                                 a(
                                     {
-                                        class: 'jetz-btn-primary jetz-btn-light',
+                                        class: 'jetz-btn-primary',
                                         href: '#playground'
                                     },
 
