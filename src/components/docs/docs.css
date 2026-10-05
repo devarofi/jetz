@@ -609,7 +609,16 @@ html.jetz-theme-dark #jetz-docs {
 }
 
 #jetz-docs .jetz-docs-nav-group > summary {
+    color: var(--docs-muted);
     transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* The group parent is not a link, so it carries no Tailwind color utilities to
+   remap. It needs its own themed hover, otherwise the light sidebar gets the
+   zinc-900 chip the utility would have produced in the dark shell. */
+#jetz-docs .jetz-docs-nav-group > summary:hover {
+    background: var(--docs-hover);
+    color: var(--docs-ink);
 }
 
 #jetz-docs .jetz-docs-nav-group > summary::after {

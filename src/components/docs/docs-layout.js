@@ -77,7 +77,7 @@ function sidebarGroup(title, items, activePath) {
         open: true,
         class: "jetz-docs-nav-group mb-2",
     },
-        summary(css`mb-1 cursor-pointer list-none rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`,
+        summary(css`mb-1 cursor-pointer list-none rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`,
             title
         ),
         ul(css`space-y-1 border-l border-zinc-800 ml-3 pl-2`,

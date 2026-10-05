@@ -301,6 +301,22 @@ assert('/docs header logo loads', await page.$eval('.jetz-docs-topbar img', el =
 assert('/docs header has an explicit Home link', await page.$eval('.jetz-docs-home-link', el => el.getAttribute('href')), '/');
 assert('/docs theme toggle starts in light mode', await page.$eval('.jetz-docs-theme-toggle', el => el.getAttribute('aria-label')), 'Switch to dark theme');
 assert('/docs starts with its light surface', await page.$eval('#jetz-docs', el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+// the group parent must not keep the dark zinc hover utilities: they are not
+// remapped by docs.css, so they would paint a near-black chip over the light
+// sidebar. The themed rule in docs.css owns this state instead.
+assertTrue('/docs parent menu drops the dark hover utilities', await page.$eval('.jetz-docs-nav-group > summary', el => !/hover:bg-zinc-9|hover:text-zinc-3/.test(el.className)));
+await page.hover('.jetz-docs-nav-group > summary');
+// the summary animates background-color/color over 200ms, so the computed
+// style still reports the pre-hover values right after the mouse move.
+await new Promise(resolve => setTimeout(resolve, 400));
+const parentHover = await page.evaluate(() => {
+	const el = document.querySelector('.jetz-docs-nav-group > summary');
+	const { backgroundColor, color } = getComputedStyle(el);
+	return { backgroundColor, color, hovering: el.matches(':hover') };
+});
+assertTrue('/docs parent menu enters the hover state', parentHover.hovering);
+assert('/docs parent menu hovers with the light theme', parentHover.backgroundColor, 'rgb(241, 245, 249)');
+assert('/docs parent menu text stays readable on hover', parentHover.color, 'rgb(23, 32, 51)');
 await page.click('.jetz-docs-theme-toggle');
 await new Promise(resolve => setTimeout(resolve, 100));
 assert('/docs theme toggle applies the shared dark theme', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), true);
