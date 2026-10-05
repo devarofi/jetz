@@ -474,20 +474,16 @@ button(
         // to an English reader
         rows: '50,000',
         // heap after GC with the full dataset resident
-        heapMb: 123,
-        // the same dataset before the row-level memory work
-        heapBeforeMb: 1351,
-        get savingPercent() {
-            return Math.round((1 - this.heapMb / this.heapBeforeMb) * 100);
-        },
+        heapMb: 87.7,
+        // one 500-row page turn, inside a single 60 FPS frame
+        pageChangeMs: 14.03,
+        // the defer() scheduling gap between signal and write
+        paintGapMs: 5.20,
         // fine-grained write to one already-rendered row
-        rowUpdateMs: '0.00',
-        // creating the DOM for one page
-        mountPerRowMs: '~0.15',
-        mountPageMs: '~77',
+        rowUpdateMs: 1.60,
         pageSize: 500,
         // page flips sustained before the heap curve flattens out
-        sweepCycles: '300+',
+        sweepCycles: '2,500+',
         detachedNodes: 0
     };
 
@@ -495,17 +491,17 @@ button(
         {
             value: `${benchmark.heapMb} MB`,
             label: 'JS Heap Footprint',
-            note: `Raw RAM usage for ${benchmark.rows} live reactive rows.`
+            note: `Raw RAM usage for ${benchmark.rows} live reactive rows in memory.`
         },
         {
-            value: `${benchmark.rowUpdateMs} ms`,
-            label: 'Single Row Update Time',
-            note: 'State changes go straight to the target DOM node, with no diffing.'
+            value: `${benchmark.pageChangeMs} ms`,
+            label: 'Average Page Change',
+            note: `Instant ${benchmark.pageSize}-row DOM reconciliation under 1 frame (60 FPS).`
         },
         {
-            value: '0%',
-            label: 'Memory Leak',
-            note: 'Automatic subscription cleanup when an element unmounts.'
+            value: `${benchmark.paintGapMs} ms`,
+            label: 'Non-Blocking Paint Gap',
+            note: 'Powered by native defer() scheduling for zero visual delay.'
         }
     ];
 
@@ -2131,27 +2127,27 @@ function nextPage() {
                             `${benchmark.heapMb} MB`
                         ),
 
-                        span('JS Heap after GC')
+                        span('JS Heap After GC')
                     ),
 
                     div(
                         css`jetz-bench-proof-item`,
 
                         strong(
-                            `${benchmark.savingPercent}%`
+                            `${benchmark.rowUpdateMs} ms`
                         ),
 
-                        span('Lighter than the previous version')
+                        span('Single Row Update')
                     ),
 
                     div(
                         css`jetz-bench-proof-item`,
 
                         strong(
-                            `${benchmark.mountPerRowMs} ms`
+                            '0%'
                         ),
 
-                        span(`Per row to mount ${benchmark.pageSize} rows`)
+                        span('Memory Leak (Auto-cleanup on unmount)')
                     ),
 
                     div(
@@ -2161,13 +2157,13 @@ function nextPage() {
                             benchmark.sweepCycles
                         ),
 
-                        span('Stable pagination cycles')
+                        span('Tested Stable Page Cycles')
                     )
                 ),
 
                 p(
                     css`jetz-bench-source`,
-                    `Measured in Chrome DevTools against the ${benchmark.rows} reactive row stress test. Footprint of ${benchmark.heapMb} MB (post-GC) versus ${benchmark.heapBeforeMb.toLocaleString('en-US')} MB before the memory work, with ${benchmark.detachedNodes} detached DOM elements left behind.`
+                    `Measured in Chrome DevTools against the ${benchmark.rows} reactive row stress test. Footprint of ${benchmark.heapMb} MB (post-GC) with ${benchmark.detachedNodes} detached DOM elements left behind.`
                 ),
 
 

@@ -304,19 +304,19 @@ assert('/ home badges the section as a benchmark', (await page.$eval('#benchmark
 assert('/ home headlines the 50,000 row scale', (await page.$eval('#benchmark h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Scale 50,000 Data Without Memory Compromise');
 assert('/ home shows three key metric cards', await page.$$eval('#benchmark .jetz-metric-card', cards => cards.length), 3);
 assert('/ home reuses the page card shell for its metrics', await page.$$eval('#benchmark .jetz-metric-card', cards => cards.every(card => card.classList.contains('jetz-benefit-card'))), true);
-assert('/ home reports the heap footprint', (await page.$$eval('#benchmark .jetz-metric-value', els => els.map(el => el.textContent).join('|'))), '123 MB|0.00 ms|0%');
-assert('/ home names every metric card', (await page.$$eval('#benchmark .jetz-metric-label', els => els.map(el => el.textContent).join('|'))), 'JS Heap Footprint|Single Row Update Time|Memory Leak');
-assert('/ home explains every metric card', (await page.$$eval('#benchmark .jetz-metric-note', els => els.map(el => el.textContent).join('|'))), 'Raw RAM usage for 50,000 live reactive rows.|State changes go straight to the target DOM node, with no diffing.|Automatic subscription cleanup when an element unmounts.');
+assert('/ home reports the heap footprint', (await page.$$eval('#benchmark .jetz-metric-value', els => els.map(el => el.textContent).join('|'))), '87.7 MB|14.03 ms|5.2 ms');
+assert('/ home names every metric card', (await page.$$eval('#benchmark .jetz-metric-label', els => els.map(el => el.textContent).join('|'))), 'JS Heap Footprint|Average Page Change|Non-Blocking Paint Gap');
+assert('/ home explains every metric card', (await page.$$eval('#benchmark .jetz-metric-note', els => els.map(el => el.textContent).join('|'))), 'Raw RAM usage for 50,000 live reactive rows in memory.|Instant 500-row DOM reconciliation under 1 frame (60 FPS).|Powered by native defer() scheduling for zero visual delay.');
 assert('/ home accents the metric numbers in the house blue', await page.$eval('.jetz-metric-value', el => getComputedStyle(el).color), 'rgb(36, 118, 173)');
 assert('/ home backs the cards with a measured proof strip', await page.$$eval('.jetz-bench-proof-item', items => items.length), 4);
-assertTrue('/ home derives the memory saving from the two heap figures', (await page.$eval('.jetz-bench-proof', el => el.textContent)).includes('91%'));
-assertTrue('/ home cites the DevTools measurement behind the numbers', (await page.$eval('.jetz-bench-source', el => el.textContent)).includes('1,351 MB'));
+assert('/ home backs the cards with the supporting metrics', (await page.$eval('.jetz-bench-proof', el => el.textContent.replace(/\s+/g, ' ').trim())), '87.7 MBJS Heap After GC1.6 msSingle Row Update0%Memory Leak (Auto-cleanup on unmount)2,500+Tested Stable Page Cycles');
+assertTrue('/ home cites the DevTools measurement behind the numbers', (await page.$eval('#benchmark .jetz-bench-source', el => el.textContent)).includes('87.7 MB (post-GC)'));
 assert('/ home reuses the comparison table for the benchmark', await page.$$eval('#benchmark .jetz-compare', tables => tables.length), 1);
 assert('/ home compares six benchmark concerns', await page.$$eval('#benchmark .jetz-compare-row:not(.jetz-compare-head)', rows => rows.length), 6);
 assert('/ home heads the benchmark table with both architectures', (await page.$$eval('#benchmark .jetz-compare-head > span', els => els.map(el => el.textContent).join('|'))), 'Feature / Metric|Jetz Framework|Virtual DOM (React-like)');
 assertTrue('/ home keeps the Jetz column highlighted', await page.$eval('#benchmark .jetz-compare-jetz', el => el.classList.contains('jetz-compare-cell')));
 assertTrue('/ home leaves the authoring comparison wording alone', (await page.$eval('#special .jetz-compare-head', el => el.textContent)).includes('JSX and template frameworks'));
-assertTrue('/ home states the single row update win', (await page.$eval('#benchmark .jetz-compare', el => el.textContent)).includes('0.00 ms (Near Instant)'));
+assertTrue('/ home states the single row update win', (await page.$eval('#benchmark .jetz-compare', el => el.textContent)).includes('1.6 ms (Near Instant)'));
 // the whole benchmark section is English-only: no Indonesian wording survives
 assertTrue('/ home writes the benchmark section in English', !(await page.$eval('#benchmark', el => el.textContent))
 	.match(/Skala|Kompromi|Penggunaan|reaktif aktif|Mendekati|Footprint Memori|Stabilitas Sweep|Siklus paginasi|Fitur \/ Metrik|Diukur|dibersihkan otomatis|Perlu dipantau|Coba Stress|Baca Dokumentasi|Arsitektur Reaktivitas/));
