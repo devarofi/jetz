@@ -582,7 +582,7 @@ export const Playground = () => {
   return div(css`playground-shell`,
     header(css`playground-header`,
       a(css`playground-brand`, { href: "/", "aria-label": "Back to Jetz home" },
-        img({ src: logoUrl, alt: "Jetz", class: "playground-logo" }),
+        img({ src: logoUrl, alt: "Jetz", class: "playground-logo object-contain" }),
         span("Playground"),
       ),
       div(css`playground-controls`,

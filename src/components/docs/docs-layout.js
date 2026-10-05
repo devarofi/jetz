@@ -1,10 +1,12 @@
 import { link } from "../../lib/jetz-router.js";
-import { html, onMount } from "../../lib/jetz.js";
+import { html, ifElse, onMount } from "../../lib/jetz.js";
+import logoUrl from "../../../public/img/logo/small.png";
+import { storedTheme, THEME_DARK, THEME_LIGHT } from "../../theme.js";
 import hljs from "highlight.js/lib/common";
 import "highlight.js/styles/github-dark.css";
 import "./docs.css";
 import {
-    a, article, aside, code, css, details, div, h1, header, href, li, main, nav,
+    a, article, aside, button, code, css, details, div, h1, header, href, img, li, main, nav,
     p, pre, span, summary, ul,
 } from "../../lib/jetz-ui.js";
 
@@ -160,17 +162,43 @@ export function docsLayout(activePath, content) {
         header(css`jetz-docs-topbar sticky top-0 z-30 h-16 border-b border-zinc-800 bg-[#09090b]/95 backdrop-blur`,
             div(css`flex h-full items-center justify-between px-5 sm:px-7`,
                 link("/", a(href`/`, css`flex items-center gap-3 text-white`,
-                    span(css`flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-400 text-sm font-black text-zinc-950`, "J"),
+                    img({ src: logoUrl, alt: "Jetz", width: "32", height: "32" }, css`h-8 w-8 object-contain rounded-lg`),
                     span(css`text-base font-bold tracking-wide`, "JETZ"),
                     span(css`hidden rounded border border-zinc-700 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-zinc-400 sm:inline`, "DOCS")
                 )),
                 div(css`flex items-center gap-3`,
                     span(css`hidden text-xs text-zinc-500 sm:inline`, "v1.1.2"),
+                    link("/", a(href`/`,
+                        css`jetz-docs-home-link rounded-md px-2 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-800 hover:text-white`,
+                        "Home"
+                    )),
                     a({
                         href: "https://github.com/devarofi/jetz",
                         target: "_blank",
                         rel: "noreferrer",
-                    }, css`rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-500 hover:text-white`, "GitHub")
+                    }, css`rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-500 hover:text-white`, "GitHub"),
+                    button({
+                        class: "jetz-docs-theme-toggle",
+                        type: "button",
+                        "aria-label": () => storedTheme.value === THEME_DARK
+                            ? "Switch to light theme"
+                            : "Switch to dark theme",
+                        title: () => storedTheme.value === THEME_DARK
+                            ? "Switch to light theme"
+                            : "Switch to dark theme",
+                        "aria-pressed": () => storedTheme.value === THEME_DARK ? "true" : "false",
+                        onclick() {
+                            storedTheme.setState(
+                                storedTheme.getValue() === THEME_DARK ? THEME_LIGHT : THEME_DARK
+                            );
+                        }
+                    },
+                        ifElse(
+                            () => storedTheme.getValue() === THEME_DARK,
+                            () => span("☀"),
+                            () => span("☾")
+                        )
+                    )
                 )
             )
         ),

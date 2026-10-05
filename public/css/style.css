@@ -445,6 +445,112 @@ div#app:has(#welcome-page)>main>footer {
 }
 
 
+.jetz-nav-dropdown {
+    position: relative;
+}
+
+
+.jetz-nav-dropdown-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    padding: 8px 0;
+
+    border: 0;
+
+    background: transparent;
+
+    color: var(--jetz-muted);
+    font: inherit;
+
+    cursor: pointer;
+    list-style: none;
+
+    transition: color 160ms ease;
+}
+
+
+.jetz-nav-dropdown-trigger::-webkit-details-marker {
+    display: none;
+}
+
+
+.jetz-nav-dropdown-trigger:hover,
+.jetz-nav-dropdown[open] .jetz-nav-dropdown-trigger {
+    color: var(--jetz-ink);
+}
+
+
+.jetz-nav-dropdown-trigger:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid var(--jetz-blue);
+    outline-offset: 4px;
+}
+
+
+.jetz-nav-chevron {
+    font-size: 11px;
+    transition: transform 160ms ease;
+}
+
+
+.jetz-nav-dropdown[open] .jetz-nav-chevron {
+    transform: rotate(180deg);
+}
+
+
+.jetz-nav-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 120;
+
+    display: none;
+    min-width: 180px;
+    padding: 6px;
+
+    border: 1px solid var(--jetz-line);
+    border-radius: 12px;
+
+    background: var(--jetz-card);
+
+    box-shadow: 0 14px 36px rgba(16, 32, 47, 0.14);
+}
+
+
+.jetz-nav-dropdown[open] .jetz-nav-dropdown-menu {
+    display: grid;
+}
+
+
+.jetz-nav-dropdown-item {
+    padding: 9px 11px;
+
+    border-radius: 7px;
+
+    color: var(--jetz-muted) !important;
+
+    transition:
+        color 140ms ease,
+        background 140ms ease;
+}
+
+
+.jetz-nav-dropdown-item:hover,
+.jetz-nav-dropdown-item:focus-visible {
+    background: var(--jetz-surface-2);
+
+    color: var(--jetz-ink) !important;
+}
+
+
+.jetz-nav-dropdown-item:focus-visible {
+    outline: 2px solid var(--jetz-blue);
+    outline-offset: 1px;
+}
+
+
 .jetz-nav-github {
     display: inline-flex;
     align-items: center;
@@ -2900,17 +3006,19 @@ html.jetz-theme-dark .jetz-theme-toggle:hover {
 
 
     .jetz-nav {
-        gap: 12px;
+        gap: 6px;
+        font-size: 11px;
     }
 
 
-    .jetz-nav>a:not(.jetz-nav-github) {
-        display: none;
+    .jetz-nav-dropdown-trigger {
+        gap: 3px;
     }
 
 
     .jetz-nav-github {
-        padding: 8px 11px;
+        gap: 4px;
+        padding: 7px 8px;
     }
 
 

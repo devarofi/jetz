@@ -205,7 +205,7 @@ export function ToDo() {
     return main({ id: 'todo-page' },
         header(css`todo-topbar`,
             a(css`todo-brand`, { href: '/', 'aria-label': 'Back to Jetz home' },
-                img({ src: logoUrl, alt: 'Jetz', class: 'todo-logo' }),
+                img({ src: logoUrl, alt: 'Jetz', class: 'todo-logo object-contain' }),
                 span('Todo')
             ),
             // the same shared switch the welcome page and the playground use, so

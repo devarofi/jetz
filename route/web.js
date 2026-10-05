@@ -1,6 +1,7 @@
 // Route table — import every route component here.
 import { group, route } from "../src/lib/jetz-router.js";
-import { title } from "../src/lib/jetz-ui.js";
+import { title, link as headLink } from "../src/lib/jetz-ui.js";
+import logoUrl from "../public/img/logo/small.png";
 import { Landing } from "../src/components/landing/landing.js";
 import { Home } from "../src/components/home/home-component.js";
 import { ToDo } from "../src/components/todo/Todo.js";
@@ -36,31 +37,41 @@ function titled(component, pageTitle) {
     };
 }
 
+function docsTitled(component, pageTitle) {
+    return {
+        component,
+        head: () => [
+            title(`${pageTitle} | Jetz`),
+            headLink({ rel: "icon", type: "image/png", href: logoUrl }),
+        ],
+    };
+}
+
 export let routeWeb = [
     route('/', titled(Home, "Home")),
     route('playground', titled(Playground, "Playground")),
     group('/docs', {
         routes: [
-            route('/', titled(DocsOverview, "Documentation")),
-            route('/quick-start', titled(DocsQuickStart, "Quick start")),
-            route('/elements', titled(DocsElements, "Elements & attributes")),
-            route('/composition', titled(DocsComposition, "UI composition")),
-            route('/reactive-state', titled(DocsReactiveState, "State & persistence")),
-            route('/reactivity', titled(DocsReactivity, "Computed & effects")),
-            route('/collections', titled(DocsCollections, "Lists & conditionals")),
-            route('/lifecycle', titled(DocsLifecycle, "Binding & lifecycle")),
-            route('/performance', titled(DocsPerformance, "Large data sets")),
-            route('/components', titled(DocsComponents, "Components")),
-            route('/routing', titled(DocsRouting, "Routing & middleware")),
-            route('/integrations', titled(DocsIntegrations, "Sessions & utilities")),
-            route('/devtools', titled(DocsDevtools, "DevTools & testing")),
-            route('/api-reference', titled(DocsApiReference, "API reference")),
-            route('/api/state', titled(DocsApiState, "Reactive state API")),
-            route('/api/collections', titled(DocsApiCollections, "Collections & branching API")),
-            route('/api/components', titled(DocsApiComponents, "Components & lifecycle API")),
-            route('/api/elements', titled(DocsApiElements, "Elements & utilities API")),
-            route('/api/application', titled(DocsApiApplication, "Routing & application API")),
-            route('/next-steps', titled(DocsNextSteps, "Next steps")),
+            route('/', docsTitled(DocsOverview, "Documentation")),
+            route('/quick-start', docsTitled(DocsQuickStart, "Quick start")),
+            route('/elements', docsTitled(DocsElements, "Elements & attributes")),
+            route('/composition', docsTitled(DocsComposition, "UI composition")),
+            route('/reactive-state', docsTitled(DocsReactiveState, "State & persistence")),
+            route('/reactivity', docsTitled(DocsReactivity, "Computed & effects")),
+            route('/collections', docsTitled(DocsCollections, "Lists & conditionals")),
+            route('/lifecycle', docsTitled(DocsLifecycle, "Binding & lifecycle")),
+            route('/performance', docsTitled(DocsPerformance, "Large data sets")),
+            route('/components', docsTitled(DocsComponents, "Components")),
+            route('/routing', docsTitled(DocsRouting, "Routing & middleware")),
+            route('/integrations', docsTitled(DocsIntegrations, "Sessions & utilities")),
+            route('/devtools', docsTitled(DocsDevtools, "DevTools & testing")),
+            route('/api-reference', docsTitled(DocsApiReference, "API reference")),
+            route('/api/state', docsTitled(DocsApiState, "Reactive state API")),
+            route('/api/collections', docsTitled(DocsApiCollections, "Collections & branching API")),
+            route('/api/components', docsTitled(DocsApiComponents, "Components & lifecycle API")),
+            route('/api/elements', docsTitled(DocsApiElements, "Elements & utilities API")),
+            route('/api/application', docsTitled(DocsApiApplication, "Routing & application API")),
+            route('/next-steps', docsTitled(DocsNextSteps, "Next steps")),
         ],
     }),
     route('my', titled(TryMe, "Try Jetz")),

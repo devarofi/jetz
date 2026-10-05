@@ -7,7 +7,14 @@
     --docs-subtle: #f8fafc;
     --docs-accent: #4f46e5;
     --docs-accent-soft: #eef2ff;
+    --docs-accent-fill: #4f46e5;
     --docs-code: #111827;
+    --docs-header: rgb(255 255 255 / 94%);
+    --docs-preview-line: #e2e8f0;
+    --docs-input-line: #cbd5e1;
+    --docs-hover: #f1f5f9;
+    --docs-accent-hover: #4338ca;
+    --docs-link-hover: #fafaff;
 
     min-height: 100vh;
     overflow-x: clip;
@@ -33,7 +40,7 @@
 #jetz-docs h2,
 #jetz-docs h3 {
     margin: 0;
-    color: #111827;
+    color: var(--docs-ink);
     font-family: inherit;
 }
 
@@ -45,7 +52,7 @@
 #jetz-docs > header {
     height: 60px;
     border-color: var(--docs-line) !important;
-    background: rgb(255 255 255 / 94%) !important;
+    background: var(--docs-header) !important;
     box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
     backdrop-filter: blur(12px);
 }
@@ -59,10 +66,8 @@
     color: var(--docs-ink) !important;
 }
 
-#jetz-docs > header a:first-child > span:first-child {
+#jetz-docs > header a:first-child > img {
     border-radius: 8px;
-    background: var(--docs-accent) !important;
-    color: #fff !important;
 }
 
 #jetz-docs > header a:first-child > span:last-child {
@@ -80,8 +85,39 @@
 }
 
 #jetz-docs > header > div > div:last-child > a:hover {
-    border-color: #cbd5e1 !important;
+    border-color: var(--docs-input-line) !important;
     background: var(--docs-subtle);
+}
+
+#jetz-docs .jetz-docs-theme-toggle {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--docs-line);
+    border-radius: 8px;
+    background: var(--docs-surface);
+    color: var(--docs-ink);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+#jetz-docs .jetz-docs-theme-toggle:hover {
+    border-color: var(--docs-accent);
+    background: var(--docs-subtle);
+}
+
+#jetz-docs .jetz-docs-theme-toggle:focus-visible {
+    outline: 2px solid var(--docs-accent);
+    outline-offset: 2px;
+}
+
+#jetz-docs .jetz-docs-theme-toggle span {
+    margin: 0;
 }
 
 #jetz-docs > div {
@@ -95,7 +131,7 @@
     height: calc(100vh - 60px);
     padding: 28px 18px;
     border-color: var(--docs-line) !important;
-    background: #fff;
+    background: var(--docs-surface);
 }
 
 #jetz-docs .jetz-docs-sidebar > div {
@@ -105,7 +141,7 @@
 #jetz-docs .jetz-docs-sidebar > div > p {
     margin: 0 0 8px;
     padding-inline: 12px;
-    color: #94a3b8 !important;
+    color: var(--docs-faint) !important;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.11em;
@@ -128,7 +164,7 @@
     padding: 8px 12px;
     border: 0;
     border-radius: 6px;
-    color: #475569 !important;
+    color: var(--docs-muted) !important;
     font-size: 13px;
     font-weight: 500;
     line-height: 20px;
@@ -137,8 +173,8 @@
 }
 
 #jetz-docs .jetz-docs-sidebar a:hover {
-    background: #f8fafc !important;
-    color: #1e293b !important;
+    background: var(--docs-subtle) !important;
+    color: var(--docs-ink) !important;
     padding-left: 16px;
 }
 
@@ -179,7 +215,7 @@
 
 @keyframes docs-active-pill {
     from {
-        background: #fff !important;
+        background: var(--docs-surface) !important;
     }
     to {
         background: var(--docs-accent-soft);
@@ -253,7 +289,7 @@
 #jetz-docs > div > main {
     min-width: 0;
     padding: 0 56px 72px;
-    background: #fff;
+    background: var(--docs-surface);
 }
 
 #jetz-docs main > article {
@@ -277,7 +313,7 @@
 
 #jetz-docs main h1 {
     max-width: 820px;
-    color: #111827 !important;
+    color: var(--docs-ink) !important;
     font-size: clamp(32px, 4vw, 44px);
     font-weight: 700;
     letter-spacing: -0.04em;
@@ -291,7 +327,7 @@
 #jetz-docs main > article > div:first-child > div > p {
     max-width: 720px;
     margin-top: 16px;
-    color: #64748b !important;
+    color: var(--docs-muted) !important;
     font-size: 16px;
     line-height: 1.75;
 }
@@ -316,7 +352,7 @@
 #jetz-docs main > article > div > div:first-child > p {
     max-width: 760px;
     margin-top: 14px;
-    color: #64748b !important;
+    color: var(--docs-muted) !important;
     font-size: 15px;
     line-height: 1.8;
 }
@@ -324,16 +360,16 @@
 #jetz-docs .text-zinc-200,
 #jetz-docs .text-zinc-300,
 #jetz-docs .text-zinc-400 {
-    color: #64748b !important;
+    color: var(--docs-muted) !important;
 }
 
 #jetz-docs .text-zinc-500,
 #jetz-docs .text-zinc-600 {
-    color: #64748b !important;
+    color: var(--docs-muted) !important;
 }
 
 #jetz-docs .text-white {
-    color: #172033 !important;
+    color: var(--docs-ink) !important;
 }
 
 #jetz-docs .text-emerald-400,
@@ -342,18 +378,18 @@
 }
 
 #jetz-docs .bg-emerald-400 {
-    background: var(--docs-accent) !important;
+    background: var(--docs-accent-fill) !important;
     color: #fff !important;
 }
 
 #jetz-docs .hover\:bg-emerald-300:hover {
-    background: #4338ca !important;
+    background: var(--docs-accent-hover) !important;
 }
 
 #jetz-docs .bg-zinc-800,
 #jetz-docs .bg-zinc-900,
 #jetz-docs .bg-zinc-900\/60 {
-    background: #f8fafc !important;
+    background: var(--docs-subtle) !important;
 }
 
 #jetz-docs .border-zinc-700,
@@ -441,37 +477,37 @@
 
 #jetz-docs .jetz-docs-preview {
     border-color: var(--docs-line) !important;
-    background: #fff !important;
+    background: var(--docs-surface) !important;
     box-shadow: 0 2px 5px rgb(15 23 42 / 4%);
 }
 
 #jetz-docs .jetz-docs-preview > div:first-child {
     min-height: 44px;
     border-color: var(--docs-line) !important;
-    background: #fff;
+    background: var(--docs-surface);
 }
 
 #jetz-docs .jetz-docs-preview > div:first-child > span:first-child {
-    color: #475569 !important;
+    color: var(--docs-muted) !important;
 }
 
 #jetz-docs .jetz-docs-preview > div:last-child {
     min-height: 280px;
-    background: #fff;
+    background: var(--docs-surface);
 }
 
 #jetz-docs .jetz-docs-preview > div:last-child > div {
-    border-color: #e2e8f0 !important;
-    background: #f8fafc !important;
+    border-color: var(--docs-preview-line) !important;
+    background: var(--docs-subtle) !important;
 }
 
 #jetz-docs .jetz-docs-preview input {
     width: 100%;
     min-height: 40px;
-    border: 1px solid #cbd5e1 !important;
+    border: 1px solid var(--docs-input-line) !important;
     border-radius: 6px;
-    background: #fff !important;
-    color: #172033 !important;
+    background: var(--docs-surface) !important;
+    color: var(--docs-ink) !important;
     font: inherit;
     padding: 8px 10px;
 }
@@ -485,7 +521,7 @@
     margin: 12px 0 0;
     border: 0;
     border-radius: 6px;
-    background: var(--docs-accent) !important;
+    background: var(--docs-accent-fill) !important;
     color: #fff !important;
     font-size: 13px;
     font-weight: 600;
@@ -493,7 +529,7 @@
 }
 
 #jetz-docs .jetz-docs-preview button:hover {
-    background: #4338ca !important;
+    background: var(--docs-accent-hover) !important;
 }
 
 #jetz-docs .jetz-docs-preview p,
@@ -516,8 +552,8 @@
 }
 
 #jetz-docs main > article > div:last-child a:hover {
-    border-color: #c7d2fe !important;
-    background: #fafaff !important;
+    border-color: var(--docs-accent-soft) !important;
+    background: var(--docs-link-hover) !important;
 }
 
 #jetz-docs main > nav {
@@ -525,15 +561,33 @@
     top: 60px;
     z-index: 5;
     border-color: var(--docs-line) !important;
-    background: rgb(255 255 255 / 96%);
+    background: var(--docs-header);
 }
 
 #jetz-docs main > nav a {
-    color: #475569 !important;
+    color: var(--docs-muted) !important;
 }
 
 #jetz-docs main > nav a:hover {
-    background: #f1f5f9 !important;
+    background: var(--docs-hover) !important;
+}
+
+html.jetz-theme-dark #jetz-docs {
+    --docs-ink: #e6f0f7;
+    --docs-muted: #a6bac8;
+    --docs-faint: #7893a5;
+    --docs-line: #263d4b;
+    --docs-surface: #0a1620;
+    --docs-subtle: #10202c;
+    --docs-accent: #86cfff;
+    --docs-accent-soft: #153448;
+    --docs-accent-fill: #155e82;
+    --docs-header: rgb(10 22 32 / 94%);
+    --docs-preview-line: #304858;
+    --docs-input-line: #405969;
+    --docs-hover: #172c3a;
+    --docs-accent-hover: #257aa6;
+    --docs-link-hover: #12293a;
 }
 
 @media (max-width: 767px) {

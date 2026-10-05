@@ -238,9 +238,60 @@ assertTrue('/ home turns hero numbers into Prism tokens', (await page.$$eval('.j
 assert('/ home paints hero tokens with the same Prism palette', await page.$eval('.jetz-hero-code-content .token.keyword', el => getComputedStyle(el).color), 'rgb(101, 191, 240)');
 assertTrue('/ home keeps the highlighted hero source unchanged', (await page.$eval('.jetz-hero-code-content', el => el.textContent)).includes('Jetz.mount(App, "#app");'));
 
+// --- the header keeps the primary destinations easy to find ------------------
+section('/: header navigation');
+assert('/ home links to the documentation', await page.$eval('.jetz-nav a[href="/docs"]', el => el.textContent.trim()), 'Docs');
+assert('/ home links to the playground', await page.$eval('.jetz-nav a[href="/playground"]', el => el.textContent.trim()), 'Playground');
+assert('/ home logo uses the built image path', await page.$eval('.jetz-brand img', el => new URL(el.src).pathname), '/img/logo/small.png');
+assert('/ home logo image loads', await page.$eval('.jetz-brand img', el => el.complete && el.naturalWidth > 0), true);
+assert('/ home groups section links under Explore', await page.$eval('.jetz-nav-dropdown summary', el => el.textContent.trim().startsWith('Explore')), true);
+assert('/ home keeps section links collapsed by default', await page.$eval('.jetz-nav-dropdown', el => el.open), false);
+await page.click('.jetz-nav-dropdown-trigger');
+assert('/ home includes all seven section links in Explore', await page.$$eval('.jetz-nav-dropdown-menu a', links => links.map(link => link.textContent.trim()).join('|')), 'Why Jetz|Features|Examples|Compare|Benchmark|Chart|Get started');
+await page.evaluate(() => {
+	const sectionLink = document.querySelector('.jetz-nav-dropdown-menu a[href="#why"]');
+	sectionLink.addEventListener('click', event => event.preventDefault(), { once: true });
+	sectionLink.click();
+});
+assert('/ home closes Explore after selecting a section', await page.$eval('.jetz-nav-dropdown', el => el.open), false);
+await page.setViewport({ width: 375, height: 812 });
+assertTrue('/ home keeps Docs visible on mobile', await page.$eval('.jetz-nav a[href="/docs"]', el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
+assertTrue('/ home keeps Playground visible on mobile', await page.$eval('.jetz-nav a[href="/playground"]', el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
+assertTrue('/ home keeps GitHub visible on mobile', await page.$eval('.jetz-nav-github', el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
+assertTrue('/ home keeps the theme toggle visible on mobile', await page.$eval('.jetz-theme-toggle', el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
+assertTrue('/ home keeps the mobile navigation inside the viewport', await page.$eval('.jetz-header-inner', el => el.getBoundingClientRect().right <= document.documentElement.clientWidth));
+await page.setViewport({ width: 1280, height: 900 });
+await page.goto(`http://127.0.0.1:${port}/docs`, { waitUntil: 'load' });
+assert('/docs uses the built PNG favicon', await page.$eval('link[rel="icon"]:last-of-type', el => new URL(el.href).pathname), '/img/logo/small.png');
+assert('/docs header logo loads', await page.$eval('.jetz-docs-topbar img', el => el.complete && el.naturalWidth > 0), true);
+assert('/docs header has an explicit Home link', await page.$eval('.jetz-docs-home-link', el => el.getAttribute('href')), '/');
+assert('/docs theme toggle starts in light mode', await page.$eval('.jetz-docs-theme-toggle', el => el.getAttribute('aria-label')), 'Switch to dark theme');
+assert('/docs starts with its light surface', await page.$eval('#jetz-docs', el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+await page.click('.jetz-docs-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 100));
+assert('/docs theme toggle applies the shared dark theme', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), true);
+assert('/docs dark mode repaints its page surface', await page.$eval('#jetz-docs', el => getComputedStyle(el).backgroundColor), 'rgb(10, 22, 32)');
+assert('/docs dark mode repaints the header', await page.$eval('.jetz-docs-topbar', el => getComputedStyle(el).backgroundColor), 'rgba(10, 22, 32, 0.94)');
+assert('/docs dark mode repaints its sidebar', await page.$eval('.jetz-docs-sidebar', el => getComputedStyle(el).backgroundColor), 'rgb(10, 22, 32)');
+assert('/docs dark mode repaints lesson headings', await page.$eval('#jetz-docs main h1', el => getComputedStyle(el).color), 'rgb(230, 240, 247)');
+assert('/docs dark mode updates the action label', await page.$eval('.jetz-docs-theme-toggle', el => el.getAttribute('aria-label')), 'Switch to light theme');
+assert('/docs favicon image loads', await page.evaluate(async () => {
+	const response = await fetch('/img/logo/small.png');
+	return response.ok;
+}), true);
+await page.evaluate(() => localStorage.removeItem('app-remember-state'));
+await page.click('.jetz-docs-home-link');
+await page.waitForFunction(() => location.pathname === '/');
+assert('/docs Home link navigates back to home', new URL(page.url()).pathname, '/');
+assert('/docs theme preference carries over to home', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), true);
+assert('/home theme toggle reflects the Docs theme choice', await page.$eval('.jetz-theme-toggle', el => el.getAttribute('aria-label')), 'Beralih ke tema terang');
+await page.click('.jetz-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 100));
+assert('/home can switch back to light after changing theme in Docs', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), false);
+await page.evaluate(() => localStorage.removeItem('app-remember-state'));
+
 // --- the comparison section answers "why another framework?" -----------------
 section('/: comparison section');
-assertTrue('/ home points the Compare nav link at the section', (await page.$eval('.jetz-nav a[href="#special"]', el => el.textContent)) === 'Compare');
 assert('/ home compares six framework concerns', await page.$$eval('#special .jetz-compare-row:not(.jetz-compare-head)', rows => rows.length), 6);
 assertTrue('/ home names Jetz and the alternatives', (await page.$eval('.jetz-compare-head', el => el.textContent)).includes('Jetz'));
 assert('/ home shows both the fit and the trade-off cards', await page.$$eval('#special .jetz-fit-card', cards => cards.length), 2);
@@ -248,7 +299,6 @@ assertTrue('/ home keeps the comparison anchored on the page', await page.$eval(
 
 // --- the benchmark section proves the memory & speed claims ------------------
 section('/: benchmark section');
-assertTrue('/ home points the Benchmark nav link at the section', (await page.$eval('.jetz-nav a[href="#benchmark"]', el => el.textContent)) === 'Benchmark');
 assertTrue('/ home renders the benchmark section', await page.$eval('#benchmark', el => el.classList.contains('jetz-section-soft')));
 assert('/ home badges the section as a benchmark', (await page.$eval('#benchmark .jetz-eyebrow', el => el.textContent.trim())), 'BENCHMARK & PERFORMANCE');
 assert('/ home headlines the 50,000 row scale', (await page.$eval('#benchmark h2', el => el.textContent.replace(/\s+/g, ' ').trim())), 'Scale 50,000 Data Without Memory Compromise');
@@ -309,7 +359,6 @@ assertTrue('/ home names the methodology link', (await page.$eval('#chart .jetz-
 assertTrue('/ home writes the chart section in English', !(await page.$eval('#chart', el => el.textContent))
 	.match(/\bPerforma\b|\bLihat\b|\bDites\b|\bKompromi\b|reaktif aktif|\bMengungguli\b|\bTanpa\b|dataset reaktif|baris DOM|\bSiklus\b|\bPenggunaan\b|\bMemori\b/));
 assertTrue('/ home never renders a placeholder chart value', !(await page.$eval('#chart', el => el.textContent)).includes('[object Object]'));
-assertTrue('/ home points the Chart nav link at the section', (await page.$eval('.jetz-nav a[href="#chart"]', el => el.textContent)) === 'Chart');
 
 // --- defer() keeps the frame budget intact under a heavy DOM -----------------
 section('/: paint-aware scheduling section');

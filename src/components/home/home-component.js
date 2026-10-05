@@ -9,6 +9,7 @@ import {
     button,
     code,
     css,
+    details,
     div,
     footer,
     h1,
@@ -26,6 +27,7 @@ import {
     span,
     src,
     strong,
+    summary,
     ul,
     width
 } from "../../lib/jetz-ui.js";
@@ -942,63 +944,72 @@ function nextPage() {
                 nav(
                     css`jetz-nav`,
 
-                    a(
-                        {
-                            href: '#why'
-                        },
-                        'Why Jetz'
+                    // — Docs (route link) —
+                    link(
+                        '/docs',
+                        a(
+                            {
+                                href: '/docs',
+                                class: 'jetz-nav-link'
+                            },
+                            'Docs'
+                        )
                     ),
 
-                    a(
-                        {
-                            href: '#features'
-                        },
-                        'Features'
-                    ),
-
-                    a(
-                        {
-                            href: '#examples'
-                        },
-                        'Examples'
-                    ),
-
-                    a(
-                        {
-                            href: '#special'
-                        },
-                        'Compare'
-                    ),
-
-                    a(
-                        {
-                            href: '#benchmark'
-                        },
-                        'Benchmark'
-                    ),
-
-                    a(
-                        {
-                            href: '#chart'
-                        },
-                        'Chart'
-                    ),
-
-                    a(
-                        {
-                            href: '#start'
-                        },
-                        'Get started'
-                    ),
-
+                    // — Playground (route link) —
                     link(
                         'playground',
 
                         a(
                             {
-                                href: '#playground'
+                                href: '/playground',
+                                class: 'jetz-nav-link'
                             },
                             'Playground'
+                        )
+                    ),
+
+                    details(
+                        {
+                            class: 'jetz-nav-dropdown'
+                        },
+
+                        summary(
+                            {
+                                class: 'jetz-nav-dropdown-trigger'
+                            },
+                            'Explore',
+                            span(
+                                {
+                                    class: 'jetz-nav-chevron'
+                                },
+                                '▾'
+                            )
+                        ),
+
+                        div(
+                            {
+                                class: 'jetz-nav-dropdown-menu'
+                            },
+
+                            ...[
+                                { href: '#why', label: 'Why Jetz' },
+                                { href: '#features', label: 'Features' },
+                                { href: '#examples', label: 'Examples' },
+                                { href: '#special', label: 'Compare' },
+                                { href: '#benchmark', label: 'Benchmark' },
+                                { href: '#chart', label: 'Chart' },
+                                { href: '#start', label: 'Get started' }
+                            ].map(item => a(
+                                {
+                                    href: item.href,
+                                    class: 'jetz-nav-dropdown-item',
+                                    onclick(e) {
+                                        e.currentTarget.closest('details').open = false;
+                                    }
+                                },
+                                item.label
+                            ))
                         )
                     ),
 

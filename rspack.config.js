@@ -40,6 +40,9 @@ export default (env, argv) => {
                 {
                     test: /\.(png|svg|jpg|jpeg|gif)$/i,
                     type: 'asset/resource',
+                    generator: {
+                        filename: 'img/logo/[name][ext]'
+                    }
                 },
                 {
                     // `?url` copies a file verbatim and hands back its URL. The
