@@ -1684,9 +1684,18 @@ class Jetz {
 		Jetz.#lifecycles.add(context);
 	}
 	static triggerByState() {
-		this.remountByAttr.forEach(element => {
-			element.collectionConditionalChild.forEach(rm => rm.trigger())
-		});
+		// Walk by index, not forEach(): forEach() visits a range fixed before the
+		// first callback, but a trigger can build new UI whose _if/_elseif children
+		// register their parent element onto remountByAttr mid-pass (e.g. an
+		// ifElse branch rendering a panel that contains its own conditionals).
+		// Such a parent would miss its first trigger and show every branch at once
+		// until the next state change. New entries only appear once per freshly
+		// built element (IfElse re-renders only on a condition change), so the
+		// growing index terminates.
+		for (let i = 0; i < this.remountByAttr.length; i++) {
+			const element = this.remountByAttr[i];
+			element.collectionConditionalChild.forEach(rm => rm.trigger());
+		}
 		if (!Jetz.#isMounting) {
 			Jetz.#sweepLifecycles();
 		}

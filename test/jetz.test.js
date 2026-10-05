@@ -1474,6 +1474,30 @@ describe('conditional element (_if/_elseif/_else)', () => {
 		state.setState(true);
 		expect(target.textContent).toContain('shown');
 	});
+	it('evaluates conditionals built inside a branch during the same trigger pass', () => {
+		// A lazy branch (ifElse) that renders _if/_else registers its parent onto
+		// Jetz.remountByAttr while triggerByState() is already iterating. The
+		// registration must still be visited in that pass, otherwise both
+		// branches stay in the DOM until the next state change.
+		const online = stateOf(false);
+		const tab = stateOf('other');
+		const target = mount(div(
+			ifElse(
+				() => tab.value === 'demo',
+				() => div(
+					div('online', _if(() => online.value)),
+					div('offline', _else)
+				),
+				() => div('placeholder')
+			)
+		));
+		tab.setState('demo');
+		expect(target.textContent).toContain('offline');
+		expect(target.textContent).not.toContain('online');
+		online.setState(true);
+		expect(target.textContent).toContain('online');
+		expect(target.textContent).not.toContain('offline');
+	});
 });
 
 describe('ifElse', () => {

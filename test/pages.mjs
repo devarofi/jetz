@@ -253,6 +253,14 @@ assert('/ home list preview appends an item', await page.$$eval('.jetz-live-list
 await page.click('.jetz-code-tabs .jetz-code-tab:nth-child(1)'); // back to State
 assert('/ home keeps the touched demo after a tab switch', await liveReadout(), 'Clicked 1 times');
 
+// _if/_else built lazily by the tab switch must get their first trigger in the
+// same pass - otherwise both branches stay in the DOM until the next click
+await page.click('.jetz-code-tabs .jetz-code-tab:nth-child(6)'); // Conditional
+assert('/ home conditional preview renders a single branch', await page.$$eval('.jetz-live-pane .jetz-live-readout', items => items.length), 1);
+assert('/ home conditional preview starts offline', await liveReadout(), 'You are offline');
+await page.click('.jetz-live-pane .jetz-live-btn'); // Toggle status
+assert('/ home conditional preview flips on toggle', await liveReadout(), 'You are online');
+
 // --- Prism paints the hero code window too ---------------------------------
 section('/: hero code window syntax highlighting');
 assert('/ home tags the hero code block with the highlighted language', await page.$eval('.jetz-hero-code-content code', el => el.className), 'language-javascript');
@@ -312,7 +320,10 @@ assert('/docs Home link navigates back to home', new URL(page.url()).pathname, '
 assert('/docs theme preference carries over to home', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), true);
 assert('/home theme toggle reflects the Docs theme choice', await page.$eval('.jetz-theme-toggle', el => el.getAttribute('aria-label')), 'Beralih ke tema terang');
 await page.click('.jetz-theme-toggle');
-await new Promise(resolve => setTimeout(resolve, 100));
+// the flip restarts the 220ms color transition on .jetz-chart-name, and the
+// chart colour asserts below must not catch it mid-flight (an un-settled read
+// reports rgb(37,60,84) instead of the final rgb(36,59,83))
+await new Promise(resolve => setTimeout(resolve, 300));
 assert('/home can switch back to light after changing theme in Docs', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), false);
 await page.evaluate(() => localStorage.removeItem('app-remember-state'));
 
