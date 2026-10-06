@@ -55,6 +55,7 @@
   "sideEffects": false,
   "scripts": {
     "test": "vitest run",
+    "minify": "node ./scripts/minify.mjs",
     "check-exports": "node ./scripts/check-exports.mjs"
   },
   "peerDependencies": {},

@@ -178,18 +178,7 @@
     padding-left: 16px;
 }
 
-#jetz-docs .jetz-docs-sidebar a[href="/docs"],
-#jetz-docs .jetz-docs-sidebar a[href="/docs/quick-start"],
-#jetz-docs .jetz-docs-sidebar a[href="/docs/composition"],
-#jetz-docs .jetz-docs-sidebar a[href="/docs/reactive-state"],
-#jetz-docs .jetz-docs-sidebar a[href="/docs/components"],
-#jetz-docs .jetz-docs-sidebar a[href="/docs/routing"],
-#jetz-docs .jetz-docs-sidebar a[href="/docs/next-steps"] {
-    border-left: 2px solid transparent;
-}
-
 #jetz-docs .jetz-docs-sidebar a[aria-current="page"] {
-    border-left-color: var(--docs-accent);
     background: var(--docs-accent-soft);
     color: var(--docs-accent) !important;
     font-weight: 700;

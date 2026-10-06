@@ -19,6 +19,7 @@ import {
     img,
     li,
     main,
+    meta as headMeta,
     nav,
     p,
     pre,
