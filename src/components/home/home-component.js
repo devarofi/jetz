@@ -952,7 +952,8 @@ function nextPage() {
                     ? img(
                         src(logo),
                         alt`Jetz Framework logo`,
-                        width`18`
+                        width`18`,
+                        css`w-full object-contain`
                     )
                     : html(FRAMEWORK_MARKS[bar.name])
             ),
@@ -1859,284 +1860,284 @@ function nextPage() {
             ),
 
 
-        // =====================================================================
-        // SPECIAL BY DESIGN
-        // =====================================================================
+            // =====================================================================
+            // SPECIAL BY DESIGN
+            // =====================================================================
 
-        section(
-            {
-                id: 'special',
-                class: 'jetz-section jetz-section-white'
-            },
-
-            div(
+            section(
                 {
-                    class: 'container'
+                    id: 'special',
+                    class: 'jetz-section jetz-section-white'
                 },
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
-
-                    span(
-                        css`jetz-label`,
-                        'SPECIAL BY DESIGN'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-compare jetz-reveal`,
-
-                    compareHead(SPECIAL_LABELS),
-
-                    compareRow(
-                        'Authoring',
-                        'Plain JavaScript functions: div(), button(), p()',
-                        'JSX, .vue or .svelte files that must be compiled first'
-                    ),
-
-                    compareRow(
-                        'Build step',
-                        'Nothing extra for syntax - standard ES modules',
-                        'Babel, SWC or a TypeScript JSX transform'
-                    ),
-
-                    compareRow(
-                        'Rendering',
-                        'State updates the exact bound text node or attribute',
-                        'Virtual-DOM diffing on every state change'
-                    ),
-
-                    compareRow(
-                        'Reactivity',
-                        'stateOf(), computed() and effect() track dependencies automatically',
-                        'Manual dependency arrays and memoization rules'
-                    ),
-
-                    compareRow(
-                        'Lists',
-                        'loop(list, keyFn, renderFn) recycles keyed elements',
-                        'Framework-specific key props and helper components'
-                    ),
-
-                    compareRow(
-                        'App features',
-                        'Router, route guards, session state and dispatcher included',
-                        'Assembled from separate ecosystem packages'
-                    )
-                ),
-
-
-                div(
-                    css`jetz-fit-grid jetz-reveal`,
-
-                    div(
-                        css`jetz-fit-card`,
-
-                        strong(
-                            'Use Jetz when you want...'
-                        ),
-
-                        ul(
-                            li(
-                                'Interactive web applications and SPAs with routing and lifecycle.'
-                            ),
-
-                            li(
-                                'Dashboards and internal tools without a heavy toolchain.'
-                            ),
-
-                            li(
-                                'JavaScript-first frontends built from small composable functions.'
-                            ),
-
-                            li(
-                                'Small interactive interfaces where direct DOM updates matter.'
-                            )
-                        )
-                    ),
-
-                    div(
-                        css`jetz-fit-card jetz-fit-card-alt`,
-
-                        strong(
-                            'Reach for something else when...'
-                        ),
-
-                        ul(
-                            li(
-                                'Your team is required to write JSX or TSX.'
-                            ),
-
-                            li(
-                                'You are shipping a content-heavy static site with no interactivity, where plain HTML or a static site generator is enough.'
-                            )
-                        )
-                    )
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // PERFORMANCE CHART
-        // =====================================================================
-
-        section(
-            {
-                id: 'chart',
-                class: 'jetz-section'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                // -- header ----------------------------------------------------
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
-
-                    div(
-                        css`jetz-eyebrow`,
-
-                        span(
-                            css`jetz-eyebrow-dot`
-                        ),
-
-                        'BENCHMARK & SPEED SPECTRUM'
-                    )
-                ),
-
-
-                // -- highlight strip ---------------------------------------------
-                //
-                // Sits above the tabs so the headline wins are read before the
-                // detail. The numbers come from CHART_METRICS, so they cannot
-                // drift away from the bars underneath.
-
-                div(
-                    css`jetz-chart-highlights`,
-
-                    ...CHART_HIGHLIGHTS.map(chartHighlight)
-                ),
-
-
-                // -- metric tabs ------------------------------------------------
 
                 div(
                     {
-                        class: 'jetz-chart-tabs jetz-reveal',
-                        role: 'tablist'
+                        class: 'container'
                     },
-
-                    ...CHART_TABS.map(tab => chartTab(tab.key, tab.label))
-                ),
-
-
-                // -- the bars ---------------------------------------------------
-
-                ...CHART_TABS.map(tab => chartPanel(tab.key)),
-
-
-                // -- methodology ----------------------------------------------
-
-                p(
-                    css`jetz-bench-source`,
-
-                    '* Tested in Chrome DevTools on an Intel i7/M-Series with 50,000 reactive records and 500 active DOM rows. Benchmarks are taken after triggering the Garbage Collector (post-GC). Bar lengths are scaled against the slowest framework in each metric, with a minimum width so the 0.00 ms result stays visible.'
-                ),
-
-                a(
-                    {
-                        class: 'jetz-chart-method-link',
-                        href: '/stress.html'
-                    },
-
-                    'See the Methodology & Interactive Stress Test Demo',
-
-                    span('→')
-                )
-            )
-        ),
-
-
-        // =====================================================================
-        // PAINT-AWARE SCHEDULING
-        // =====================================================================
-
-        section(
-            {
-                id: 'defer',
-                class: 'jetz-section jetz-section-soft'
-            },
-
-            div(
-                {
-                    class: 'container'
-                },
-
-                // -- header ----------------------------------------------------
-
-                div(
-                    css`jetz-section-heading text-center jetz-reveal`,
 
                     div(
-                        css`jetz-eyebrow`,
+                        css`jetz-section-heading text-center jetz-reveal`,
 
                         span(
-                            css`jetz-eyebrow-dot`
-                        ),
+                            css`jetz-label`,
+                            'SPECIAL BY DESIGN'
+                        )
+                    ),
 
-                        'PAINT-AWARE SCHEDULING'
-                    )
-                ),
-
-
-                // -- the whole scheduling API in six lines ---------------------
-
-                div(
-                    css`jetz-reveal`,
 
                     div(
-                        css`jetz-window jetz-snippet-window`,
+                        css`jetz-compare jetz-reveal`,
+
+                        compareHead(SPECIAL_LABELS),
+
+                        compareRow(
+                            'Authoring',
+                            'Plain JavaScript functions: div(), button(), p()',
+                            'JSX, .vue or .svelte files that must be compiled first'
+                        ),
+
+                        compareRow(
+                            'Build step',
+                            'Nothing extra for syntax - standard ES modules',
+                            'Babel, SWC or a TypeScript JSX transform'
+                        ),
+
+                        compareRow(
+                            'Rendering',
+                            'State updates the exact bound text node or attribute',
+                            'Virtual-DOM diffing on every state change'
+                        ),
+
+                        compareRow(
+                            'Reactivity',
+                            'stateOf(), computed() and effect() track dependencies automatically',
+                            'Manual dependency arrays and memoization rules'
+                        ),
+
+                        compareRow(
+                            'Lists',
+                            'loop(list, keyFn, renderFn) recycles keyed elements',
+                            'Framework-specific key props and helper components'
+                        ),
+
+                        compareRow(
+                            'App features',
+                            'Router, route guards, session state and dispatcher included',
+                            'Assembled from separate ecosystem packages'
+                        )
+                    ),
+
+
+                    div(
+                        css`jetz-fit-grid jetz-reveal`,
 
                         div(
-                            css`jetz-window-bar`,
+                            css`jetz-fit-card`,
 
-                            div(
-                                css`jetz-window-dots`,
-
-                                span(),
-
-                                span(),
-
-                                span()
+                            strong(
+                                'Use Jetz when you want...'
                             ),
 
-                            small('defer.js')
+                            ul(
+                                li(
+                                    'Interactive web applications and SPAs with routing and lifecycle.'
+                                ),
+
+                                li(
+                                    'Dashboards and internal tools without a heavy toolchain.'
+                                ),
+
+                                li(
+                                    'JavaScript-first frontends built from small composable functions.'
+                                ),
+
+                                li(
+                                    'Small interactive interfaces where direct DOM updates matter.'
+                                )
+                            )
                         ),
 
-                        pre(
-                            css`jetz-hero-code-content`,
+                        div(
+                            css`jetz-fit-card jetz-fit-card-alt`,
 
-                            code(
-                                css`language-javascript`,
+                            strong(
+                                'Reach for something else when...'
+                            ),
 
-                                highlight(deferSnippet)
+                            ul(
+                                li(
+                                    'Your team is required to write JSX or TSX.'
+                                ),
+
+                                li(
+                                    'You are shipping a content-heavy static site with no interactivity, where plain HTML or a static site generator is enough.'
+                                )
                             )
                         )
                     )
-                ),
-
-                p(
-                    css`jetz-bench-source`,
-
-                    '* Measured in Chrome on the bundled stress test with defer() enabled: the paint gap is the single frame Jetz waits out so the indicator is on screen before the heavy write runs, and the latency figures come from a full pagination sweep over 50,000 reactive rows.'
                 )
-            )
-        ),
+            ),
+
+
+            // =====================================================================
+            // PERFORMANCE CHART
+            // =====================================================================
+
+            section(
+                {
+                    id: 'chart',
+                    class: 'jetz-section'
+                },
+
+                div(
+                    {
+                        class: 'container'
+                    },
+
+                    // -- header ----------------------------------------------------
+
+                    div(
+                        css`jetz-section-heading text-center jetz-reveal`,
+
+                        div(
+                            css`jetz-eyebrow`,
+
+                            span(
+                                css`jetz-eyebrow-dot`
+                            ),
+
+                            'BENCHMARK & SPEED SPECTRUM'
+                        )
+                    ),
+
+
+                    // -- highlight strip ---------------------------------------------
+                    //
+                    // Sits above the tabs so the headline wins are read before the
+                    // detail. The numbers come from CHART_METRICS, so they cannot
+                    // drift away from the bars underneath.
+
+                    div(
+                        css`jetz-chart-highlights`,
+
+                        ...CHART_HIGHLIGHTS.map(chartHighlight)
+                    ),
+
+
+                    // -- metric tabs ------------------------------------------------
+
+                    div(
+                        {
+                            class: 'jetz-chart-tabs jetz-reveal',
+                            role: 'tablist'
+                        },
+
+                        ...CHART_TABS.map(tab => chartTab(tab.key, tab.label))
+                    ),
+
+
+                    // -- the bars ---------------------------------------------------
+
+                    ...CHART_TABS.map(tab => chartPanel(tab.key)),
+
+
+                    // -- methodology ----------------------------------------------
+
+                    p(
+                        css`jetz-bench-source`,
+
+                        '* Tested in Chrome DevTools on an Intel i7/M-Series with 50,000 reactive records and 500 active DOM rows. Benchmarks are taken after triggering the Garbage Collector (post-GC). Bar lengths are scaled against the slowest framework in each metric, with a minimum width so the 0.00 ms result stays visible.'
+                    ),
+
+                    a(
+                        {
+                            class: 'jetz-chart-method-link',
+                            href: '/stress.html'
+                        },
+
+                        'See the Methodology & Interactive Stress Test Demo',
+
+                        span('→')
+                    )
+                )
+            ),
+
+
+            // =====================================================================
+            // PAINT-AWARE SCHEDULING
+            // =====================================================================
+
+            section(
+                {
+                    id: 'defer',
+                    class: 'jetz-section jetz-section-soft'
+                },
+
+                div(
+                    {
+                        class: 'container'
+                    },
+
+                    // -- header ----------------------------------------------------
+
+                    div(
+                        css`jetz-section-heading text-center jetz-reveal`,
+
+                        div(
+                            css`jetz-eyebrow`,
+
+                            span(
+                                css`jetz-eyebrow-dot`
+                            ),
+
+                            'PAINT-AWARE SCHEDULING'
+                        )
+                    ),
+
+
+                    // -- the whole scheduling API in six lines ---------------------
+
+                    div(
+                        css`jetz-reveal`,
+
+                        div(
+                            css`jetz-window jetz-snippet-window`,
+
+                            div(
+                                css`jetz-window-bar`,
+
+                                div(
+                                    css`jetz-window-dots`,
+
+                                    span(),
+
+                                    span(),
+
+                                    span()
+                                ),
+
+                                small('defer.js')
+                            ),
+
+                            pre(
+                                css`jetz-hero-code-content`,
+
+                                code(
+                                    css`language-javascript`,
+
+                                    highlight(deferSnippet)
+                                )
+                            )
+                        )
+                    ),
+
+                    p(
+                        css`jetz-bench-source`,
+
+                        '* Measured in Chrome on the bundled stress test with defer() enabled: the paint gap is the single frame Jetz waits out so the indicator is on screen before the heavy write runs, and the latency figures come from a full pagination sweep over 50,000 reactive rows.'
+                    )
+                )
+            ),
         ),
 
 
