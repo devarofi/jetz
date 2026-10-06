@@ -329,6 +329,40 @@ assert('/docs favicon image loads', await page.evaluate(async () => {
 	const response = await fetch('/img/logo/small.png');
 	return response.ok;
 }), true);
+
+// --- the API reference renders themed collapsible examples -----------------
+await page.goto(`http://127.0.0.1:${port}/docs/api-reference`, { waitUntil: 'load' });
+await new Promise(resolve => setTimeout(resolve, 500));
+// the earlier /docs flow leaves the toggle in dark mode, so reset to light.
+if (await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark'))) {
+	await page.click('.jetz-docs-theme-toggle');
+	await new Promise(resolve => setTimeout(resolve, 200));
+}
+assert('/docs api-reference renders its heading', await page.$eval('#jetz-docs main h1', el => el.textContent), 'API reference');
+assert('/docs api-reference renders five section cards', await page.$$eval('#jetz-docs .jetz-docs-ref-list', lists => lists.length), 5);
+assert('/docs api-reference closes every example by default', await page.$$eval('#jetz-docs .jetz-docs-ref-item', items => items.filter(item => item.open).length), 0);
+assert('/docs api-reference paints cards with the light surface', await page.evaluate(() => {
+	const card = document.querySelector('#jetz-docs .jetz-docs-ref-item')?.closest('div.rounded-xl');
+	return card ? getComputedStyle(card).backgroundColor : null;
+}), 'rgb(248, 250, 252)');
+await page.click('#jetz-docs .jetz-docs-ref-item > summary');
+await new Promise(resolve => setTimeout(resolve, 300));
+assert('/docs api-reference opens the example on click', await page.$eval('#jetz-docs .jetz-docs-ref-item', item => item.open), true);
+assert('/docs api-reference reveals the highlighted example', await page.evaluate(() => {
+	const first = document.querySelector('#jetz-docs .jetz-docs-ref-item');
+	return first.querySelector('pre').offsetHeight > 0 && first.querySelectorAll('pre code .token').length > 0;
+}), true);
+await page.click('#jetz-docs .jetz-docs-ref-item > summary');
+assert('/docs api-reference collapses the example on second click', await page.$eval('#jetz-docs .jetz-docs-ref-item', item => item.open), false);
+await page.click('.jetz-docs-theme-toggle');
+await new Promise(resolve => setTimeout(resolve, 200));
+assert('/docs api-reference repaints cards in dark mode', await page.evaluate(() => {
+	const card = document.querySelector('#jetz-docs .jetz-docs-ref-item')?.closest('div.rounded-xl');
+	return card ? getComputedStyle(card).backgroundColor : null;
+}), 'rgb(16, 32, 44)');
+// the flow below expects docs to exit in dark mode (Home carries it over),
+// and the api-reference page is already dark here, so keep it that way.
+assert('/docs api-reference keeps the dark theme for the next flow', await page.evaluate(() => document.documentElement.classList.contains('jetz-theme-dark')), true);
 await page.evaluate(() => localStorage.removeItem('app-remember-state'));
 await page.click('.jetz-docs-home-link');
 await page.waitForFunction(() => location.pathname === '/');

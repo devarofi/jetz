@@ -634,3 +634,31 @@ html.jetz-theme-dark #jetz-docs {
     content: "−";
     transform: rotate(180deg);
 }
+
+/* API reference: each row is a collapsible example. The card uses plain
+   bordered edges (compiled divide-* helpers do not exist) and the summary
+   row shows a ▸/▾ disclosure arrow ahead of its "Example" hint. */
+#jetz-docs .jetz-docs-ref-list {
+    list-style: none;
+}
+
+#jetz-docs .jetz-docs-ref-item > summary {
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+#jetz-docs .jetz-docs-ref-item > summary:hover {
+    background: var(--docs-hover);
+}
+
+#jetz-docs .jetz-docs-ref-item > summary::-webkit-details-marker {
+    display: none;
+}
+
+#jetz-docs .jetz-docs-ref-item .jetz-docs-ref-toggle::before {
+    content: "▸ ";
+}
+
+#jetz-docs .jetz-docs-ref-item[open] .jetz-docs-ref-toggle::before {
+    content: "▾ ";
+}
