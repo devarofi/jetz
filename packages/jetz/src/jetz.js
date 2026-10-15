@@ -1508,14 +1508,18 @@ class JetzElement {
 			this.attributes['class'] = value;
 		} else {
 			if (Array.isArray(value)) {
-				const values = flatMap(value.map(x => (typeof x === 'string') ? x.split(' ') : x))
+				const values = flatMap(value.map(x => (typeof x === 'string') ? x.split(/\s+/) : x))
 					// classList stringifies whatever it is given, so a conditional
 					// that resolved to false/null would otherwise be added as a
 					// class literally named "false" or "null"
 					.filter(item => item != null && item !== false && item !== '');
 				this.#addClassClassification(values);
 			} else if (typeof value === 'string') {
-				this.o.classList.add(...(value.split(' ')));
+				// split on any whitespace run, not just plain spaces: a multiline
+				// class string would otherwise hand classList.add a token that
+				// still contains a newline, which throws and aborts the render.
+				const tokens = value.split(/\s+/).filter(item => item !== '');
+				if (tokens.length > 0) this.o.classList.add(...tokens);
 			}
 		}
 		return this;
