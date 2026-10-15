@@ -36,6 +36,7 @@ const DOC_PAGES = [
         items: [
             { path: "/docs/routing", label: "Routing & middleware" },
             { path: "/docs/integrations", label: "Sessions & utilities" },
+            { path: "/docs/global-state", label: "Global state (Dispatcher)" },
         ],
     },
     {

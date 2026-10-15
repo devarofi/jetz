@@ -23,6 +23,7 @@ import { DocsCollections } from "../src/components/docs/docs-collections.js";
 import { DocsLifecycle } from "../src/components/docs/docs-lifecycle.js";
 import { DocsPerformance } from "../src/components/docs/docs-performance.js";
 import { DocsIntegrations } from "../src/components/docs/docs-integrations.js";
+import { DocsGlobalState } from "../src/components/docs/docs-global-state.js";
 import { DocsDevtools } from "../src/components/docs/docs-devtools.js";
 import { DocsApiReference } from "../src/components/docs/docs-api-reference.js";
 import {
@@ -86,6 +87,7 @@ export let routeWeb = [
             route('/components', docsTitled(DocsComponents, "Components", "Create reusable Jetz components with state, lifecycle methods, and clean composition patterns.", "/docs/components")),
             route('/routing', docsTitled(DocsRouting, "Routing & middleware", "Route between pages, guard access with middleware, and manage SEO-friendly metadata in Jetz.", "/docs/routing")),
             route('/integrations', docsTitled(DocsIntegrations, "Sessions & utilities", "Integrate Jetz sessions and utilities for persistent state, navigation, and app tooling.", "/docs/integrations")),
+            route('/global-state', docsTitled(DocsGlobalState, "Global state with Dispatcher", "Build a shared global store with Dispatcher slices, waitFor() dependencies, and real components dispatching actions.", "/docs/global-state")),
             route('/devtools', docsTitled(DocsDevtools, "DevTools & testing", "Use Jetz DevTools and testing utilities to inspect state, debug routes, and validate app behavior.", "/docs/devtools")),
             route('/api-reference', docsTitled(DocsApiReference, "API reference", "Browse the Jetz API reference for public utilities, component helpers, and routing primitives.", "/docs/api-reference")),
             route('/api/state', docsTitled(DocsApiState, "Reactive state API", "Reference the reactive state API in Jetz for signals, computed values, and updates.", "/docs/api/state")),

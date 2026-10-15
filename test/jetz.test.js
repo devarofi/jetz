@@ -1738,6 +1738,28 @@ describe('Dispatcher', () => {
 		expect(later).toEqual([1]);
 	});
 
+	it('subscribe() accepts the token-first argument order', () => {
+		const got = [];
+		const d = new Dispatcher();
+		const unsub = d.subscribe('cart', (action, payload) => got.push([action, payload]));
+		d.subscribe('receipt', action => got.push(`receipt:${action}`));
+		d.dispatch('cart/add', { title: 'Coffee' });
+		expect(got).toEqual([['cart/add', { title: 'Coffee' }], 'receipt:cart/add']);
+		// waitFor resolves the token registered via the swapped form
+		const order = [];
+		const d2 = new Dispatcher();
+		d2.subscribe('summary', () => { d2.waitFor('cart'); order.push('summary'); });
+		d2.subscribe('cart', () => order.push('cart'));
+		d2.dispatch('ANY');
+		expect(order).toEqual(['cart', 'summary']);
+		// unsubscribe still works for the swapped form
+		unsub();
+		d.dispatch('cart/add', { title: 'Bagel' });
+		// 'cart' no longer reacts; only the still-subscribed 'receipt' logs
+		expect(got).toHaveLength(3);
+		expect(got[2]).toBe('receipt:cart/add');
+	});
+
 	it('waitFor() runs a dependency to completion before the caller continues', () => {
 		const order = [];
 		const users = stateOf(0);

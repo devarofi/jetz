@@ -255,7 +255,7 @@ export declare class JetzElement {
     /** Reads an inline style value. */
     getStyle(prop: string): string;
 
-    /** Adds one or more CSS class names. */
+    /** Adds one or more CSS class names. Whitespace-separated, so a multiline class string is split into its tokens. */
     addClass(value: string | string[]): this;
 
     /** Removes one or more CSS class names. */
@@ -359,6 +359,8 @@ export declare class Dispatcher {
     readonly size: number;
     /** Registers a handler; returns an unsubscribe function. */
     subscribe(handler: (action: any, ...args: any[]) => any, token?: any): () => void;
+    /** Token-first overload: `subscribe("cart", handler)`. */
+    subscribe(token: any, handler: (action: any, ...args: any[]) => any): () => void;
     /** Removes a handler passed to the constructor or `subscribe()`. */
     unsubscribe(handler: (action: any, ...args: any[]) => any): this;
     /** Runs a prerequisite handler to completion before the caller continues. */

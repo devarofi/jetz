@@ -61,6 +61,28 @@ export function DocsApiState() {
             '  familyName.value = "Hopper";\n' +
             '});',
             "Both values are assigned in the batch callback. Jetz then flushes dependent calculations, effects, and displayed content together instead of after each assignment."
+        ),
+        tutorial(
+            "5. Share global state across the app",
+            "Put a State in its own module and export it. Every file that imports the module receives the same State instance, so a value changed in one place updates everywhere it is displayed. A shopping cart is a typical case: product buttons add items, and a header badge shows the count.",
+            'import { computed, listOf } from "@daevsoft/jetz";\n\n' +
+            '// store/cart.js — created once, shared by every importer\n' +
+            'const items = listOf();\n\n' +
+            'export const cartCount = computed(() => items.size);\n' +
+            'export function addToCart(title, price) {\n' +
+            '  items.push({ title, price });\n' +
+            '}\n\n' +
+            '// product-page.js\n' +
+            'import { addToCart } from "./store/cart.js";\n' +
+            'import { button } from "@daevsoft/jetz/ui";\n\n' +
+            'button("Add coffee", {\n' +
+            '  onclick: () => addToCart("Coffee", 4.5)\n' +
+            '});\n\n' +
+            '// header.js — same store, updates on its own\n' +
+            'import { cartCount } from "./store/cart.js";\n' +
+            'import { p } from "@daevsoft/jetz/ui";\n\n' +
+            'p("Cart (", cartCount, ")");',
+            "The store module runs once, so items is a single shared list. addToCart() is the only way to change it, and cartCount derives the badge text. Any component that renders cartCount refreshes automatically when a product button adds an item — no events or prop drilling required."
         )
     );
 }

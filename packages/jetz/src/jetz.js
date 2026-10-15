@@ -566,17 +566,28 @@ class Dispatcher {
 	/**
 	 * Registers a handler invoked as `handler(action, ...args)`.
 	 *
+	 * Both argument orders are supported — pick whichever reads better:
+	 *
+	 *   dispatcher.subscribe(handler, "cart");   // handler first
+	 *   dispatcher.subscribe("cart", handler);   // token first
+	 *
 	 * A handler subscribed *during* a dispatch joins the roster for the *next*
 	 * cycle, never the running one: dispatch iterates a snapshot, so the current
 	 * fan-out is fixed the moment it starts.
 	 *
-	 * @param {(action: any, ...args: any[]) => any} handler
-	 * @param {any} [token] identifier usable with `waitFor()`; defaults to `handler`
+	 * @param {((action: any, ...args: any[]) => any) | any} handlerOrToken handler, or token when using the swapped form
+	 * @param {any} [tokenOrHandler] token when handler comes first, or the handler itself
 	 * @returns {() => void} unsubscribe function
 	 */
-	subscribe(handler, token) {
+	subscribe(handlerOrToken, tokenOrHandler) {
+		// Accept both subscribe(handler, token) and subscribe(token, handler).
+		let handler = handlerOrToken;
+		let token = tokenOrHandler;
+		if (typeof handler !== 'function' && typeof token === 'function') {
+			[handler, token] = [token, handler];
+		}
 		if (typeof handler !== 'function') {
-			throw new TypeError('Jetz Dispatcher: subscribe(handler) expects a function');
+			throw new TypeError('Jetz Dispatcher: subscribe(handler, token?) expects a function as the first argument (or second when the token comes first)');
 		}
 		const entry = { handler, token: token === undefined ? handler : token };
 		this.#handlers.push(entry);

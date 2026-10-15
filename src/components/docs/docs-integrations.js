@@ -1,4 +1,4 @@
-import { Dispatcher, computed, createList, effect, html, range, stateOf } from "../../lib/jetz.js";
+import { Dispatcher, computed, createList, effect, html, listOf, loop, range, stateOf } from "../../lib/jetz.js";
 import { JetzSession } from "../../lib/jetz-session.js";
 import { button, css, div, find, h2, inputText, p, span } from "../../lib/jetz-ui.js";
 import { lesson, lessonExample } from "./docs-layout.js";
@@ -103,7 +103,143 @@ export function DocsIntegrations() {
             ),
             "The Dispatcher sends the action name and payload to its handler. Clicking the button dispatches todos/add; the handler reads payload.title and writes a message to busLog, which updates the paragraph."
         )),
+        div(css`mt-4`, lessonExample(
+            'import { Dispatcher, stateOf } from "@daevsoft/jetz";\n' +
+            'import { button, p } from "@daevsoft/jetz/ui";\n\n' +
+            '// 1. Define action types upfront — like Flux / Pinia action names\n' +
+            'const ACTIONS = { REFRESH: "REFRESH", CLEAR: "CLEAR" };\n\n' +
+            'const users   = stateOf([]);\n' +
+            'const orders  = stateOf([]);\n' +
+            'const summary = stateOf("press Refresh");\n\n' +
+            'const d = new Dispatcher();\n\n' +
+            '// 2. Each subscriber = a store slice; guard by action type\n' +
+            'd.subscribe("users", (action) => {\n' +
+            '  if (action === ACTIONS.REFRESH) users.value  = [{ id: 1 }, { id: 2 }];\n' +
+            '  if (action === ACTIONS.CLEAR)   users.value  = [];\n' +
+            '});\n\n' +
+            'd.subscribe("orders", (action) => {\n' +
+            '  if (action === ACTIONS.REFRESH) orders.value = [{ id: 10 }];\n' +
+            '  if (action === ACTIONS.CLEAR)   orders.value = [];\n' +
+            '});\n\n' +
+            '// 3. "summary" is registered first but needs fresh data from both stores.\n' +
+            '//    waitFor() forces "users" and "orders" to run before this handler reads them.\n' +
+            'd.subscribe("summary", (action) => {\n' +
+            '  d.waitFor(["users", "orders"]);\n' +
+            '  if (action === ACTIONS.REFRESH)\n' +
+            '    summary.value = `${users.value.length} user(s), ${orders.value.length} order(s)`;\n' +
+            '  if (action === ACTIONS.CLEAR) summary.value = "cleared";\n' +
+            '});\n\n' +
+            '// 4. Dispatch a known action — readable and self-documenting\n' +
+            'button("Refresh", { onclick: () => d.dispatch(ACTIONS.REFRESH) });\n' +
+            'button("Clear",   { onclick: () => d.dispatch(ACTIONS.CLEAR) });\n' +
+            'p(summary);',
+            DispatcherFanOutDemo(),
+            "Define action-type constants first (like Flux or Pinia). Each named subscriber acts as a store slice and guards with if (action === ...) before mutating state. waitFor([\"users\",\"orders\"]) guarantees the two stores run to completion before \"summary\" reads them — even though \"summary\" was registered first."
+        )),
+        div(css`mt-4`, lessonExample(
+            'import { Dispatcher, listOf, stateOf } from "@daevsoft/jetz";\n' +
+            'import { button, inputText, p } from "@daevsoft/jetz/ui";\n\n' +
+            'const ACTIONS = { ADD: "ADD", REMOVE: "REMOVE" };\n\n' +
+            'const todos = listOf();\n' +
+            'const input = stateOf("");\n' +
+            'const d = new Dispatcher();\n\n' +
+            '// Payload is the second arg \u2014 destructure any shape you need\n' +
+            'd.subscribe("todos", (action, payload) => {\n' +
+            '  if (action === ACTIONS.ADD && payload.title.trim())\n' +
+            '    todos.push({ id: Date.now(), title: payload.title.trim() });\n' +
+            '  if (action === ACTIONS.REMOVE)\n' +
+            '    todos.remove(todos.find(t => t.id === payload.id)[0]);\n' +
+            '});\n\n' +
+            '// Pass the payload as the second argument to dispatch()\n' +
+            'button("Add", {\n' +
+            '  onclick: () => d.dispatch(ACTIONS.ADD, { title: input.value })\n' +
+            '});\n' +
+            'button("\u2715", {\n' +
+            '  onclick: () => d.dispatch(ACTIONS.REMOVE, { id: todo.id })\n' +
+            '});',
+            DispatcherPayloadDemo(),
+            "dispatch(action, payload) passes any value as the second argument. The subscriber receives it as (action, payload) \u2014 an object, string, number, whatever fits. Multiple extra args are also supported: dispatch(action, a, b) \u2192 handler(action, a, b)."
+        )),
         ...[ComponentDocsNote()]
+    );
+}
+
+function DispatcherFanOutDemo() {
+    const ACTIONS = { REFRESH: "REFRESH", CLEAR: "CLEAR" };
+
+    const users   = stateOf([]);
+    const orders  = stateOf([]);
+    const summary = stateOf("press Refresh");
+
+    const d = new Dispatcher();
+
+    d.subscribe("users", (action) => {
+        if (action === ACTIONS.REFRESH) users.value  = [{ id: 1 }, { id: 2 }];
+        if (action === ACTIONS.CLEAR)   users.value  = [];
+    });
+
+    d.subscribe("orders", (action) => {
+        if (action === ACTIONS.REFRESH) orders.value = [{ id: 10 }];
+        if (action === ACTIONS.CLEAR)   orders.value = [];
+    });
+
+    d.subscribe("summary", (action) => {
+        d.waitFor(["users", "orders"]);
+        if (action === ACTIONS.REFRESH)
+            summary.value = `${users.value.length} user(s), ${orders.value.length} order(s)`;
+        if (action === ACTIONS.CLEAR)
+            summary.value = "cleared";
+    });
+
+    return div(CARD,
+        span(EYEBROW, "Dispatcher — fan-out + waitFor()"),
+        p(css`mt-4 text-sm text-zinc-300`, summary),
+        div(css`mt-3 flex gap-2`,
+            button("Refresh", { type: "button", onclick: () => d.dispatch(ACTIONS.REFRESH) }),
+            button("Clear",   { type: "button", onclick: () => d.dispatch(ACTIONS.CLEAR) })
+        )
+    );
+}
+
+function DispatcherPayloadDemo() {
+    const ACTIONS = { ADD: "ADD", REMOVE: "REMOVE" };
+    const todos = listOf();
+    const input = stateOf("");
+    const log   = stateOf("Add a task above.");
+
+    const d = new Dispatcher();
+    d.subscribe("todos", (action, payload) => {
+        if (action === ACTIONS.ADD && payload.title.trim()) {
+            todos.push({ id: Date.now(), title: payload.title.trim() });
+            input.value = "";
+            log.value = `Added: "${payload.title.trim()}"  (${todos.size} total)`;
+        }
+        if (action === ACTIONS.REMOVE) {
+            const item = todos.find(t => t.id === payload.id)[0];
+            if (item) { todos.remove(item); log.value = `Removed: "${item.title}"`; }
+        }
+    });
+
+    return div(CARD,
+        span(EYEBROW, "dispatch() with payload"),
+        div(css`mt-4 flex gap-2`,
+            inputText({ bind: input, placeholder: "Task title…", "aria-label": "Task title" },
+                css`flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white`),
+            button("Add", {
+                type: "button",
+                onclick: () => d.dispatch(ACTIONS.ADD, { title: input.value }),
+            })
+        ),
+        div(css`mt-3 space-y-1`,
+            loop(todos, todo => div(css`flex items-center justify-between text-sm text-zinc-300`,
+                p(css`flex-1`, todo.title),
+                button("✕", {
+                    type: "button",
+                    onclick: () => d.dispatch(ACTIONS.REMOVE, { id: todo.id }),
+                })
+            ))
+        ),
+        p(css`mt-3 text-xs text-zinc-500`, log)
     );
 }
 

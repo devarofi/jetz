@@ -94,6 +94,8 @@ npm install @daevsoft/jetz
 - [Architecture Overview](#architecture-overview)
 - [API Quick Reference](#api-quick-reference)
 - [Testing](#testing)
+- [Dispatcher Pattern](#dispatcher-pattern)
+- [Architecture Overview](#architecture-overview)
 - [Development & Build](#development--build)
 - [Publishing](#publishing)
 - [License & Community](#license--community)
@@ -1816,6 +1818,197 @@ const App = main(
   currentPage
 );
 ```
+
+#### Subscriptions & named tokens
+
+Each subscriber receives the dispatched `action` as its first argument. Define action-type constants upfront so every call to `dispatch()` is readable and self-documenting — the same mental model as Flux, Redux, or Pinia.
+
+```javascript
+import { Dispatcher } from "jetz";
+
+// 1. Define action types as constants
+const ACTIONS = {
+  NAV_HOME:  "NAV_HOME",
+  NAV_ABOUT: "NAV_ABOUT",
+};
+
+const d = new Dispatcher();
+
+// Anonymous subscriber — receives every dispatched action
+d.subscribe(action => console.log("logger:", action));
+
+// Named subscriber (token "router") — guards by action type
+const unsubRouter = d.subscribe("router", action => {
+  if (action === ACTIONS.NAV_HOME)  currentPage.value = "home";
+  if (action === ACTIONS.NAV_ABOUT) currentPage.value = "about";
+});
+
+// Dispatch a known, named action — readable and self-documenting
+d.dispatch(ACTIONS.NAV_HOME);
+
+unsubRouter(); // remove the "router" subscriber
+```
+
+> **Argument order**: `subscribe(handler, "token")` and `subscribe("token", handler)` are equivalent — pick whichever reads better in your store. The token stays optional; it's only needed for `waitFor()`.
+
+#### Ordered fan-out
+
+When you dispatch an action, every subscriber runs **in the order it was registered**. This is the fan-out: one dispatch reaches many independent store slices. Each slice checks the action type and decides whether to react.
+
+```javascript
+import { stateOf, Dispatcher } from "jetz";
+
+// 1. Shared action-type constants
+const ACTIONS = { REFRESH: "REFRESH", CLEAR: "CLEAR" };
+
+const users  = stateOf([]);
+const orders = stateOf([]);
+const log    = stateOf("idle");
+
+const d = new Dispatcher();
+
+// 2. Each subscriber = one store slice, guarded by action type
+d.subscribe("users", action => {
+  if (action === ACTIONS.REFRESH) users.value  = [{ id: 1, name: "Alice" }];
+  if (action === ACTIONS.CLEAR)   users.value  = [];
+});
+
+d.subscribe("orders", action => {
+  if (action === ACTIONS.REFRESH) orders.value = [{ id: 10, total: 99 }];
+  if (action === ACTIONS.CLEAR)   orders.value = [];
+});
+
+d.subscribe("logger", action => {
+  if (action === ACTIONS.REFRESH) log.value = "all stores refreshed";
+  if (action === ACTIONS.CLEAR)   log.value = "all stores cleared";
+});
+
+// 3. One dispatch fans out to all three slices
+d.dispatch(ACTIONS.REFRESH);
+
+console.log(users.value);  // [{ id: 1, name: "Alice" }]
+console.log(orders.value); // [{ id: 10, total: 99 }]
+console.log(log.value);    // "all stores refreshed"
+```
+
+#### `waitFor()` — dependency ordering
+
+`waitFor(token)` (or `waitFor([token1, token2])`) forces the named subscriber(s) to run **to completion** before the calling handler continues. Use it when a derived store must read already-updated data from another store in the same dispatch cycle.
+
+```javascript
+import { stateOf, Dispatcher } from "jetz";
+
+// 1. Action-type constants
+const ACTIONS = { REFRESH: "REFRESH", CLEAR: "CLEAR" };
+
+const users   = stateOf([]);
+const orders  = stateOf([]);
+const summary = stateOf("");
+
+const d = new Dispatcher();
+
+// 2. Store slices — registered AFTER "summary" in this example
+d.subscribe("users", action => {
+  if (action === ACTIONS.REFRESH) users.value  = [{ id: 1 }];
+  if (action === ACTIONS.CLEAR)   users.value  = [];
+});
+
+d.subscribe("orders", action => {
+  if (action === ACTIONS.REFRESH) orders.value = [{ id: 10 }];
+  if (action === ACTIONS.CLEAR)   orders.value = [];
+});
+
+// 3. "summary" is registered FIRST, so without waitFor() it reads stale data.
+//    waitFor() guarantees "users" and "orders" run before this handler continues.
+d.subscribe("summary", action => {
+  d.waitFor(["users", "orders"]); // force dependencies first
+  if (action === ACTIONS.REFRESH)
+    summary.value = `${users.value.length} user(s), ${orders.value.length} order(s)`;
+  if (action === ACTIONS.CLEAR)
+    summary.value = "cleared";
+});
+
+// 4. Dispatch — readable because the action name is a known constant
+d.dispatch(ACTIONS.REFRESH);
+
+console.log(summary.value); // "1 user(s), 1 order(s)"
+```
+
+> **Notes**
+> - `waitFor()` is a **no-op** when called outside a `dispatch()` call.
+> - Circular `waitFor()` chains are safe — each handler runs at most once per dispatch.
+> - Calling `waitFor()` on an unknown token is silently ignored.
+
+#### Passing payload with `dispatch()`
+
+`dispatch(action, payload)` forwards any value as the **second argument** to every subscriber. Use a plain object so you can add fields without changing the call sites.
+
+```javascript
+import { stateOf, listOf, Dispatcher } from "jetz";
+
+const ACTIONS = { ADD: "ADD", REMOVE: "REMOVE" };
+
+const todos = listOf();
+const d = new Dispatcher();
+
+// Subscriber receives (action, payload) — destructure freely
+d.subscribe("todos", (action, payload) => {
+  if (action === ACTIONS.ADD && payload.title.trim())
+    todos.push({ id: Date.now(), title: payload.title.trim() });
+
+  if (action === ACTIONS.REMOVE)
+    todos.remove(todos.find(t => t.id === payload.id)[0]);
+});
+
+// Pass payload as the second argument
+d.dispatch(ACTIONS.ADD,    { title: "Write docs" });
+d.dispatch(ACTIONS.REMOVE, { id: 1234567890 });
+```
+
+> **Multiple args**: `dispatch(action, a, b, c)` → `handler(action, a, b, c)`.  
+> Any extra arguments after `action` are spread into the handler — object payloads are recommended for readability.
+
+#### Global store pattern
+
+The Dispatcher becomes *global state* when the store lives in its own module: the module body runs once, so every file that imports it shares the same `Dispatcher` and State instances. Any component can dispatch actions, and every place that renders the state updates automatically — no events, no prop drilling, no globals on `window`. A shopping cart is the classic case:
+
+```javascript
+// store/cartStore.js — created once, shared by every importer
+import { Dispatcher, computed, listOf } from "jetz";
+
+export const CART = { ADD: "cart/add", REMOVE: "cart/remove" };
+
+export const cart = listOf();
+export const cartCount = computed(() => cart.size);
+export const cartStore = new Dispatcher();
+
+cartStore.subscribe("cart", (action, payload) => {
+  if (action === CART.ADD)
+    cart.push({ id: Date.now(), title: payload.title, price: payload.price });
+  if (action === CART.REMOVE) {
+    const item = cart.find(i => i.id === payload.id)[0];
+    if (item) cart.remove(item);
+  }
+});
+```
+
+```javascript
+// product-card.js — far away from the cart panel, same store
+import { CART, cartStore } from "./store/cartStore.js";
+import { button } from "jetz/ui";
+
+button("Add coffee", {
+  onclick: () => cartStore.dispatch(CART.ADD, { title: "Coffee", price: 4.5 })
+});
+
+// header.js — renders the same shared state
+import { cartCount } from "./store/cartStore.js";
+import { p } from "jetz/ui";
+
+p("Cart (", cartCount, ")");
+```
+
+> **See it live**: the [Global state with Dispatcher](https://devarofi.github.io/jetz/docs/global-state) docs page walks through the complete pattern step by step — action names, store slices, a `waitFor()`-ordered receipt, and an interactive demo.
 
 ---
 
