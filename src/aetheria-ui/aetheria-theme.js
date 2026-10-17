@@ -65,6 +65,13 @@ export const AETHERIA_CSS = `
     --aetheria-border-strong: rgba(220, 210, 255, .46);
     --aetheria-border-quiet: rgba(255, 255, 255, .1);
 
+    /* Code panels keep the dark surface in both themes so the Prism palette
+       (written for dark backgrounds) stays legible in light mode. */
+    --aetheria-code-bg: #141024;
+    --aetheria-code-fg: #e9e5f7;
+    --aetheria-code-border: rgba(255, 255, 255, .09);
+    --aetheria-code-accent: #b9a5ff;
+
     --aetheria-text: #f3f0ff;
     --aetheria-text-strong: #ffffff;
     --aetheria-text-muted: #c1bbcf;
@@ -158,14 +165,16 @@ export const AETHERIA_CSS = `
     box-sizing: border-box;
 }
 
-.aetheria-root h1, .aetheria-root h2, .aetheria-root h3, .aetheria-root h4 {
+/* :where() keeps these base rules at element specificity so component classes
+   (.aetheria-docs-title and friends) can still override weight and size. */
+:where(.aetheria-root) :is(h1, h2, h3, h4) {
     font-weight: 600;
     letter-spacing: -0.01em;
     margin: 0;
     color: var(--aetheria-text-strong);
 }
 
-.aetheria-root p { margin: 0; }
+:where(.aetheria-root) p { margin: 0; }
 
 /* ------------------------------------------------------------ layout utils */
 
@@ -1585,7 +1594,7 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     display: flex;
     flex-direction: column;
     gap: var(--aetheria-space-4);
-    padding: var(--aetheria-space-5);
+    padding: var(--aetheria-space-6);
     margin: 0;
     min-width: 0;
 }
@@ -1595,7 +1604,7 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
 
 .aetheria-docs-split {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--aetheria-space-4);
     align-items: start;
     min-width: 0;
@@ -1606,16 +1615,19 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
+    color: var(--aetheria-text-muted);
 }
+.aetheria-docs-code .aetheria-docs-eyebrow { color: var(--aetheria-code-accent); }
 .aetheria-docs-code {
     min-width: 0;
     padding: var(--aetheria-space-4);
     overflow-x: auto;
     scrollbar-width: thin;
     font-size: var(--aetheria-text-sm);
-    background: var(--aetheria-bg-soft);
-    border: 1px solid var(--aetheria-border);
+    background: var(--aetheria-code-bg);
+    border: 1px solid var(--aetheria-code-border);
     border-radius: var(--aetheria-radius-md);
+    color: var(--aetheria-code-fg);
 }
 .aetheria-docs-code pre { margin: 0; font-family: var(--aetheria-mono); line-height: 1.55; }
 .aetheria-docs-code code { font-family: inherit; background: none; padding: 0; }
@@ -1629,11 +1641,19 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     min-width: 0;
 }
 .aetheria-docs-preview-body { width: 100%; min-width: 0; }
+.aetheria-demo-target {
+    min-height: 112px;
+    border: 1px dashed var(--aetheria-border-strong);
+    border-radius: var(--aetheria-radius-md);
+}
+
+@media (max-width: 900px) {
+    .aetheria-docs-split { grid-template-columns: minmax(0, 1fr); }
+}
 
 @media (max-width: 720px) {
     .aetheria-docs { padding: var(--aetheria-space-5) var(--aetheria-space-4); }
     .aetheria-docs-section { padding: var(--aetheria-space-4); }
-    .aetheria-docs-split { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ------------------------------------------------------------- responsive */

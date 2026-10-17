@@ -207,23 +207,25 @@ export class AetheriaDocs extends Component {
                     "Interactive buttons with glassmorphic styles, ripple sheen, and icon circle actions.",
                     `import { Button, IconButton } from "./aetheria-ui.js";
 
+const btnState = stateOf("Click Me");
+
 new Button().render({
     variant: "primary",
-    label: btnState.value,
+    label: btnState,
     onclick: () => { btnState.value = "Clicked!"; }
 });
-new IconButton().render({ icon: "✦", active: true });`,
+new IconButton().render({ icon: "star", active: true });`,
                     div(
                         { class: "aetheria-row" },
-                        computed(() => new Aetheria.Button().render({
+                        new Aetheria.Button().render({
                             variant: "primary",
-                            label: btnState.value,
+                            label: btnState,
                             onclick: () => { btnState.value = "Clicked!"; }
-                        })),
+                        }),
                         new Aetheria.Button().render({ variant: "secondary", label: "Secondary" }),
                         new Aetheria.Button().render({ variant: "border", label: "Bordered" }),
-                        new Aetheria.IconButton().render({ icon: "✦", active: true }),
-                        new Aetheria.IconButton().render({ icon: "⚙" })
+                        new Aetheria.IconButton().render({ icon: "star", active: true }),
+                        new Aetheria.IconButton().render({ icon: "settings" })
                     )
                 ),
                 showcase(
@@ -375,8 +377,7 @@ new ContextMenu().render({
                             onselect: item => { contextAction.value = `Selected: ${item}`; },
                             children: div(
                                 {
-                                    class: "aetheria-row aetheria-row-center aetheria-text-center aetheria-text-muted",
-                                    style: "min-height:112px; border:1px dashed var(--aetheria-border-strong); border-radius:var(--aetheria-radius-md);"
+                                    class: "aetheria-row aetheria-row-center aetheria-text-center aetheria-text-muted aetheria-demo-target"
                                 },
                                 "Right-click in this area"
                             )
@@ -636,15 +637,15 @@ new ListView().render({
 
 new CommandToolbar().render({
     commands: [
-        { label: "Save", icon: "💾" },
-        { label: "Export", icon: "📤" }
+        { label: "Save", icon: "save" },
+        { label: "Export", icon: "upload" }
     ]
 });`,
                     new Aetheria.CommandToolbar().render({
                         commands: [
-                            { label: "Commit", icon: "✓" },
-                            { label: "Branch", icon: "⎇" },
-                            { label: "Push", icon: "⬆" }
+                            { label: "Commit", icon: "check" },
+                            { label: "Branch", icon: "gitBranch" },
+                            { label: "Push", icon: "arrowUp" }
                         ]
                     })
                 ),
