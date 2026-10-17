@@ -31,6 +31,7 @@ describe('Aetheria UI in Jetz', () => {
         expect(Aetheria.Tooltip).toBeDefined();
         expect(Aetheria.Popover).toBeDefined();
         expect(Aetheria.DatePicker).toBeDefined();
+        expect(Aetheria.DateRangePicker).toBeDefined();
         expect(Aetheria.Calendar).toBeDefined();
         expect(Aetheria.FormValidation).toBeDefined();
         expect(Aetheria.Pagination).toBeDefined();
@@ -716,6 +717,219 @@ describe('Aetheria UI in Jetz', () => {
         expect(pivotTable.textContent).toContain('Grand Total');
         expect(docsTarget.textContent).toContain('"category": "Hardware"');
         expect(docsTarget.textContent).toContain('"region": "South America"');
+    });
+
+    it('keeps the chosen item in the dropdown trigger and dismisses on outside click', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        const picked = [];
+        Jetz.mount(new Aetheria.Dropdown().render({
+            trigger: 'Select Operation',
+            items: ['Deploy Container', 'Restart Engine'],
+            onselect: item => picked.push(item)
+        }), target);
+
+        const trigger = target.querySelector('button');
+        const panel = () => target.querySelector('.aetheria-dropdown-panel');
+        expect(trigger.textContent).toContain('Select Operation');
+
+        trigger.click();
+        expect(panel()).not.toBeNull();
+        panel().querySelectorAll('.aetheria-dropdown-item')[1].click();
+        expect(picked).toEqual(['Restart Engine']);
+        expect(panel()).toBeNull();
+        expect(trigger.textContent).toContain('Restart Engine');
+
+        trigger.click();
+        expect(panel()).not.toBeNull();
+        expect(panel().querySelectorAll('.aetheria-dropdown-item')[1].classList.contains('is-active')).toBe(true);
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        expect(panel()).toBeNull();
+
+        trigger.click();
+        expect(panel()).not.toBeNull();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(panel()).toBeNull();
+    });
+
+    it('dismisses an open popover on outside click and Escape', () => {
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.Popover().render({ trigger: 'Details', content: 'Popover body' }), target);
+
+        const trigger = target.querySelector('button');
+        const panel = () => target.querySelector('.aetheria-popover-panel');
+        trigger.click();
+        expect(panel()).not.toBeNull();
+        panel().click();
+        expect(panel()).not.toBeNull();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        expect(panel()).toBeNull();
+        trigger.click();
+        expect(panel()).not.toBeNull();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(panel()).toBeNull();
+    });
+
+    it('paints the selected length of the slider tracks through range custom properties', () => {
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toMatch(/\.aetheria-range::-webkit-slider-runnable-track\s*\{[\s\S]*?var\(--aetheria-range-from\)[\s\S]*?var\(--aetheria-range-to\)/);
+        expect(styles).toMatch(/\.aetheria-range::-moz-range-track\s*\{[\s\S]*?var\(--aetheria-range-from\)/);
+
+        const target = document.createElement('div');
+        const sliderValue = stateOf(60);
+        Jetz.mount(div(
+            new Aetheria.Slider().render({ min: 0, max: 100, value: sliderValue }),
+            new Aetheria.RangeSlider().render({ min: 0, max: 100, low: 20, high: 80 })
+        ), target);
+
+        const ranges = [...target.querySelectorAll('.aetheria-range')];
+        expect(ranges).toHaveLength(3);
+        expect(ranges[0].getAttribute('style')).toContain('--aetheria-range-to: 60%');
+        expect(ranges[1].getAttribute('style')).toContain('--aetheria-range-to: 20%');
+        expect(ranges[2].getAttribute('style')).toContain('--aetheria-range-from: 20%');
+        expect(ranges[2].getAttribute('style')).toContain('--aetheria-range-to: 80%');
+
+        sliderValue.value = 25;
+        expect(ranges[0].getAttribute('style')).toContain('--aetheria-range-to: 25%');
+    });
+
+    it('keeps the switch knob inside the track', () => {
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        const knob = styles.match(/\.aetheria-switch::before\s*\{[\s\S]*?\}/)[0];
+        expect(knob).toContain('top: 3px');
+        expect(knob).toContain('left: 3px');
+        expect(knob).not.toMatch(/margin:\s*auto/);
+        expect(knob).not.toMatch(/\binset:/);
+        // 46px track, 1px borders, 18px knob, 3px gaps: the travel must fit exactly.
+        expect(styles).toMatch(/\.aetheria-switch\s*\{[\s\S]*?width: 46px/);
+        expect(styles).toMatch(/\.aetheria-switch:checked::before\s*\{\s*transform: translateX\(20px\)/);
+    });
+
+    it('renders the rows-per-page select as a themed control with its own chevron', () => {
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.DataGrid().render({
+            columns: [{ key: 'name', label: 'Name' }],
+            rows: Array.from({ length: 12 }, (_, index) => ({ name: `Row ${index}` })),
+            pageable: true,
+            pageSize: 5
+        }), target);
+
+        const select = target.querySelector('.aetheria-datagrid-page-size');
+        expect(select).not.toBeNull();
+        expect(select.tagName).toBe('SELECT');
+        expect(select.classList.contains('aetheria-field')).toBe(false);
+        expect(select.parentElement.classList.contains('aetheria-datagrid-page-size-wrap')).toBe(true);
+        expect(select.parentElement.querySelector('.aetheria-datagrid-page-size-chevron')).not.toBeNull();
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toMatch(/\.aetheria-datagrid-page-size\s*\{[\s\S]*?appearance: none/);
+        expect(styles).toMatch(/\.aetheria-datagrid-page-size\s*\{[\s\S]*?min-height: var\(--aetheria-control-sm\)/);
+        expect(styles).toMatch(/\.aetheria-datagrid-page-size option\s*\{[\s\S]*?background: var\(--aetheria-surface-solid\)/);
+    });
+
+    it('resizes spreadsheet columns from the header handles and centres the row gutter', () => {
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.Spreadsheet().render({ rows: 3, cols: 3 }), target);
+
+        const headers = [...target.querySelectorAll('thead th')];
+        expect(headers).toHaveLength(4);
+        expect(headers[0].classList.contains('aetheria-spreadsheet-gutter')).toBe(true);
+        const handles = [...target.querySelectorAll('.aetheria-spreadsheet-resizer')];
+        expect(handles).toHaveLength(4);
+        expect(handles.map(handle => handle.getAttribute('aria-label')))
+            .toEqual(['Resize row number column', 'Resize column A', 'Resize column B', 'Resize column C']);
+        expect([...target.querySelectorAll('tbody td:first-child')]
+            .every(cell => cell.classList.contains('aetheria-spreadsheet-gutter'))).toBe(true);
+
+        const handle = handles[1];
+        handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 }));
+        expect(target.querySelector('table').classList.contains('is-resizing')).toBe(true);
+        document.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 160 }));
+        document.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+        expect(target.querySelector('table').classList.contains('is-resizing')).toBe(false);
+        expect(handle.parentElement.style.width).toBe('60px');
+
+        handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        expect(handle.parentElement.style.width).toBe('68px');
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toMatch(/\.aetheria-spreadsheet-table\s*\{[^}]*table-layout: fixed/);
+        expect(styles).toMatch(/\.aetheria-spreadsheet-resizer\s*\{[\s\S]*?cursor: col-resize/);
+        expect(styles).toMatch(/\.aetheria-spreadsheet-gutter\s*\{[\s\S]*?vertical-align: middle/);
+        // Fixed layout would otherwise squeeze every column below its minimum.
+        expect(target.querySelector('.aetheria-spreadsheet-table').getAttribute('style')).toContain('min-width: 260px');
+    });
+
+    it('picks a two-click range and emits an ISO interval', () => {
+        const target = document.createElement('div');
+        const range = stateOf('2025-04-10/2025-04-18');
+        const emitted = [];
+        Jetz.mount(new Aetheria.DateRangePicker().render({
+            value: range,
+            onchange: (interval, span) => emitted.push([interval, `${span.start?.toISOString().slice(0, 10)}..${span.end?.toISOString().slice(0, 10)}`])
+        }), target);
+
+        const trigger = target.querySelector('.aetheria-datepicker-trigger');
+        expect(trigger.textContent).toContain('Apr 10, 2025');
+        expect(trigger.textContent).toContain('Apr 18, 2025');
+
+        trigger.click();
+        const modal = target.querySelector('.aetheria-calendar-modal');
+        expect(modal.classList.contains('is-open')).toBe(true);
+        const day = number => [...target.querySelectorAll('.aetheria-calendar-day')]
+            .find(cell => cell.textContent === String(number) && !cell.classList.contains('aetheria-calendar-outside'));
+        expect(target.querySelector('.aetheria-calendar-day.is-range-start')).not.toBeNull();
+        expect(target.querySelector('.aetheria-calendar-day.is-range')).not.toBeNull();
+        expect(target.querySelector('.aetheria-calendar-day.is-range-end')).not.toBeNull();
+
+        day(5).click();
+        expect(target.querySelector('.aetheria-calendar-day.is-range-end')).toBeNull();
+        day(12).click();
+        target.querySelectorAll('.aetheria-calendar-actions button')[2].click();
+
+        expect(range.value).toBe('2025-04-05/2025-04-12');
+        expect(emitted[0][0]).toBe('2025-04-05/2025-04-12');
+        expect(trigger.textContent).toContain('Apr 5, 2025');
+        expect(target.querySelector('.aetheria-calendar-modal').classList.contains('is-open')).toBe(false);
+    });
+
+    it('reorders a reversed range click and clears back to the placeholder', () => {
+        const target = document.createElement('div');
+        const emitted = [];
+        Jetz.mount(new Aetheria.DateRangePicker().render({
+            placeholder: 'Pick dates',
+            onchange: interval => emitted.push(interval)
+        }), target);
+
+        expect(target.querySelector('.aetheria-datepicker-trigger').textContent).toContain('Pick dates');
+        target.querySelector('.aetheria-datepicker-trigger').click();
+        const day = number => [...target.querySelectorAll('.aetheria-calendar-day')]
+            .find(cell => cell.textContent === String(number) && !cell.classList.contains('aetheria-calendar-outside'));
+        day(20).click();
+        day(9).click();
+        expect(target.querySelector('.aetheria-calendar-day.is-range-start').textContent).toBe('9');
+        expect(target.querySelector('.aetheria-calendar-day.is-range-end').textContent).toBe('20');
+        target.querySelectorAll('.aetheria-calendar-actions button')[2].click();
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        expect(emitted).toEqual([`${today.getFullYear()}-${month}-09/${today.getFullYear()}-${month}-20`]);
+
+        target.querySelector('.aetheria-datepicker-trigger').click();
+        target.querySelectorAll('.aetheria-calendar-actions button')[0].click();
+        expect(emitted[1]).toBe('');
+        expect(target.querySelector('.aetheria-datepicker-trigger').textContent).toContain('Pick dates');
+    });
+
+    it('shows the DateRangePicker showcase in the documentation page', async () => {
+        const { AetheriaDocs } = await import('../src/aetheria-ui/aetheria-docs.js');
+        const target = document.createElement('div');
+        Jetz.mount(new AetheriaDocs().render(), target);
+        const heading = [...target.querySelectorAll('h2, h3')]
+            .find(title => title.textContent === 'DateRangePicker');
+        expect(heading).toBeDefined();
+        const section = heading.closest('.aetheria-docs-section');
+        expect(section.querySelector('.aetheria-datepicker-range')).not.toBeNull();
+        expect(section.textContent).toContain('YYYY-MM-DD/YYYY-MM-DD');
     });
 
     it('can render AetheriaDocs documentation page', async () => {

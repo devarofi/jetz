@@ -561,24 +561,28 @@ export const AETHERIA_CSS = `
     cursor: pointer;
     transition: background var(--aetheria-fast), border-color var(--aetheria-fast);
 }
+.aetheria-switch:checked { background: var(--aetheria-accent); border-color: var(--aetheria-accent); }
+
+/* Explicit offsets: inset/margin auto would fight the translateX below and
+   push the knob past the right edge of the track. */
 .aetheria-switch::before {
     content: "";
     position: absolute;
-    inset: 0;
-    margin: auto;
+    top: 3px;
+    left: 3px;
     width: 18px;
     height: 18px;
-    left: 3px;
     border-radius: 50%;
     background: var(--aetheria-text-muted);
     transition: transform var(--aetheria-fast) var(--aetheria-ease), background var(--aetheria-fast);
 }
-.aetheria-switch:checked { background: var(--aetheria-accent); border-color: var(--aetheria-accent); }
 .aetheria-switch:checked::before { transform: translateX(20px); background: var(--aetheria-accent-ink); }
 
 .aetheria-range {
     appearance: none;
     -webkit-appearance: none;
+    --aetheria-range-from: 0%;
+    --aetheria-range-to: 0%;
     width: 100%;
     height: 26px;
     margin: 0;
@@ -588,12 +592,18 @@ export const AETHERIA_CSS = `
 .aetheria-range::-webkit-slider-runnable-track {
     height: 6px;
     border-radius: var(--aetheria-radius-pill);
-    background: var(--aetheria-scrim);
+    background: linear-gradient(to right,
+        transparent 0 var(--aetheria-range-from),
+        var(--aetheria-accent) var(--aetheria-range-from) var(--aetheria-range-to),
+        transparent var(--aetheria-range-to) 100%) var(--aetheria-scrim);
 }
 .aetheria-range::-moz-range-track {
     height: 6px;
     border-radius: var(--aetheria-radius-pill);
-    background: var(--aetheria-scrim);
+    background: linear-gradient(to right,
+        transparent 0 var(--aetheria-range-from),
+        var(--aetheria-accent) var(--aetheria-range-from) var(--aetheria-range-to),
+        transparent var(--aetheria-range-to) 100%) var(--aetheria-scrim);
 }
 .aetheria-range::-webkit-slider-thumb {
     appearance: none;
@@ -1178,16 +1188,49 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     color: var(--aetheria-text-muted);
 }
 .aetheria-datagrid-page-summary { font-variant-numeric: tabular-nums; }
-.aetheria-datagrid-page-size-label { margin-right: var(--aetheria-space-2); }
+.aetheria-datagrid-page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--aetheria-space-2);
+    margin-right: 0;
+}
+.aetheria-datagrid-page-size-wrap { position: relative; display: inline-flex; }
+.aetheria-datagrid-page-size-chevron {
+    position: absolute;
+    top: 50%;
+    right: var(--aetheria-space-2);
+    width: 14px;
+    height: 14px;
+    color: var(--aetheria-text-muted);
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+/* The native select paints its own system background, so the control drops
+   appearance entirely and takes the chevron from the wrapper instead. */
 .aetheria-datagrid-page-size {
-    min-width: 72px;
+    appearance: none;
+    -webkit-appearance: none;
+    width: auto;
+    min-width: 68px;
+    min-height: var(--aetheria-control-sm);
     height: var(--aetheria-control-sm);
-    padding: 0 var(--aetheria-space-2);
+    padding: 0 var(--aetheria-space-6) 0 var(--aetheria-space-3);
     font: inherit;
-    color: var(--aetheria-text);
+    font-size: var(--aetheria-text-sm);
+    color: var(--aetheria-text-strong);
     background: var(--aetheria-surface-input);
     border: 1px solid var(--aetheria-border);
     border-radius: var(--aetheria-radius-sm);
+    cursor: pointer;
+}
+.aetheria-datagrid-page-size:hover:not(:disabled) { border-color: var(--aetheria-border-strong); }
+.aetheria-datagrid-page-size:focus {
+    border-color: var(--aetheria-accent);
+    box-shadow: 0 0 0 3px var(--aetheria-accent-soft);
+}
+.aetheria-datagrid-page-size option {
+    background: var(--aetheria-surface-solid);
+    color: var(--aetheria-text);
 }
 .aetheria-datagrid-page-current { color: var(--aetheria-text-strong); font-weight: 600; }
 
@@ -1380,6 +1423,37 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
 }
 .aetheria-calendar-day.is-today { border-color: var(--aetheria-accent); }
 .aetheria-calendar-outside { color: var(--aetheria-text-faint); opacity: .6; }
+
+/* Range mode: the endpoints take the solid accent, the days between them keep
+   a squared soft band so the interval reads as one span. */
+.aetheria-calendar-day.is-range {
+    background: var(--aetheria-accent-soft);
+    color: var(--aetheria-text-strong);
+    border-radius: 0;
+}
+.aetheria-calendar-day.is-range-start,
+.aetheria-calendar-day.is-range-end,
+.aetheria-calendar-day.is-range-start.is-range-end {
+    background: var(--aetheria-accent);
+    color: var(--aetheria-accent-ink);
+    font-weight: 700;
+}
+.aetheria-calendar-day.is-range-start { border-radius: var(--aetheria-radius-sm) 0 0 var(--aetheria-radius-sm); }
+.aetheria-calendar-day.is-range-end { border-radius: 0 var(--aetheria-radius-sm) var(--aetheria-radius-sm) 0; }
+.aetheria-calendar-day.is-range-start.is-range-end { border-radius: var(--aetheria-radius-sm); }
+.aetheria-calendar-pending {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--aetheria-space-2);
+    margin-bottom: var(--aetheria-space-2);
+    font-size: var(--aetheria-text-sm);
+    color: var(--aetheria-text-muted);
+}
+.aetheria-calendar-pending strong { color: var(--aetheria-text-strong); font-weight: 600; }
+.aetheria-datepicker-range { flex: 1 1 auto; min-width: 0; }
+.aetheria-datepicker-range .aetheria-datepicker-trigger { gap: var(--aetheria-space-2); }
+.aetheria-datepicker-range-sep { color: var(--aetheria-text-faint); }
 .aetheria-calendar-day:disabled,
 .aetheria-calendar-month:disabled { opacity: .35; cursor: not-allowed; }
 
@@ -1480,14 +1554,17 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     box-shadow: 0 0 12px var(--aetheria-accent-glow);
 }
 
-.aetheria-spreadsheet-table { width: 100%; border-collapse: collapse; font-size: var(--aetheria-text-sm); }
+.aetheria-spreadsheet-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--aetheria-text-sm); }
 .aetheria-spreadsheet-table th,
 .aetheria-spreadsheet-table td {
     border: 1px solid var(--aetheria-border-quiet);
     padding: 0;
     min-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .aetheria-spreadsheet-table th {
+    position: relative;
     background: var(--aetheria-surface-input);
     color: var(--aetheria-text-faint);
     font-size: var(--aetheria-text-xs);
@@ -1495,6 +1572,40 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     text-align: center;
     padding: var(--aetheria-space-1);
 }
+/* Two classes: the generic table cell rules above outrank a single class. */
+.aetheria-spreadsheet-table .aetheria-spreadsheet-gutter {
+    width: 44px;
+    min-width: 44px;
+    padding: var(--aetheria-space-1);
+    text-align: center;
+    vertical-align: middle;
+}
+.aetheria-spreadsheet-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+    z-index: 1;
+}
+.aetheria-spreadsheet-resizer::after {
+    content: "";
+    position: absolute;
+    top: 25%;
+    bottom: 25%;
+    right: 2px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--aetheria-accent);
+    opacity: 0;
+    transition: opacity var(--aetheria-fast);
+}
+.aetheria-spreadsheet-resizer:hover::after,
+.aetheria-spreadsheet-resizer:focus-visible::after,
+.aetheria-spreadsheet-resizer.is-dragging::after { opacity: 1; }
+.aetheria-spreadsheet-table.is-resizing { user-select: none; cursor: col-resize; }
 .aetheria-spreadsheet-cell {
     width: 100%;
     min-height: 36px;

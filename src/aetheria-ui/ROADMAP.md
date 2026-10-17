@@ -13,6 +13,7 @@ Composite
 [x] Modal, Dialog & Drawer
 [x] Tooltip & Popover
 [x] DatePicker & Calendar
+[x] DateRangePicker
 [x] Form validation
 [x] Pagination & Breadcrumb
 

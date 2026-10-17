@@ -566,6 +566,12 @@ export class Slider extends Component {
             class: customClass = ''
         } = props;
         const currentValue = isReactive(value) ? value : stateOf(Number(prop(value, 50)));
+        const percentOf = next => {
+            const floor = Number(prop(min, 0));
+            const ceiling = Number(prop(max, 100));
+            const span = ceiling - floor || 1;
+            return Math.min(100, Math.max(0, ((Number(next) - floor) / span) * 100));
+        };
         return div(
             {
                 class: computed(() =>
@@ -579,6 +585,7 @@ export class Slider extends Component {
                 step: bind(step, 1),
                 disabled: computed(() => prop(disabled, false)),
                 value: currentValue,
+                style: computed(() => `--aetheria-range-from: 0%; --aetheria-range-to: ${percentOf(currentValue.value)}%;`),
                 oninput: (e) => {
                     const nextValue = Number(e.target.value);
                     currentValue.value = nextValue;
@@ -607,6 +614,12 @@ export class RangeSlider extends Component {
         } = props;
         const lowState = isReactive(low) ? low : stateOf(Number(prop(low, 25)));
         const highState = isReactive(high) ? high : stateOf(Number(prop(high, 75)));
+        const percentOf = next => {
+            const floor = Number(prop(min, 0));
+            const ceiling = Number(prop(max, 100));
+            const span = ceiling - floor || 1;
+            return Math.min(100, Math.max(0, ((Number(next) - floor) / span) * 100));
+        };
 
         return div(
             {
@@ -616,10 +629,12 @@ export class RangeSlider extends Component {
             input({
                 type: 'range',
                 class: 'aetheria-range',
+                'aria-label': 'Range start',
                 min: bind(min, 0),
                 max: bind(max, 100),
                 disabled: computed(() => prop(disabled, false)),
                 value: lowState,
+                style: computed(() => `--aetheria-range-from: 0%; --aetheria-range-to: ${percentOf(lowState.value)}%;`),
                 oninput: (e) => {
                     const nextValue = Math.min(Number(e.target.value), Number(highState.value));
                     lowState.value = nextValue;
@@ -629,10 +644,12 @@ export class RangeSlider extends Component {
             input({
                 type: 'range',
                 class: 'aetheria-range',
+                'aria-label': 'Range end',
                 min: bind(min, 0),
                 max: bind(max, 100),
                 disabled: computed(() => prop(disabled, false)),
                 value: highState,
+                style: computed(() => `--aetheria-range-from: ${percentOf(lowState.value)}%; --aetheria-range-to: ${percentOf(highState.value)}%;`),
                 oninput: (e) => {
                     const nextValue = Math.max(Number(e.target.value), Number(lowState.value));
                     highState.value = nextValue;
@@ -760,6 +777,36 @@ export class ProgressBar extends Component {
     }
 }
 
+/**
+ * Two-click dismissal for panels that render inside the component tree:
+ * a mousedown outside the host (or Escape) closes it. Listeners only exist
+ * while the panel is open.
+ */
+function panelDismissal(host, close) {
+    let handler = null;
+    return {
+        open() {
+            if (handler) return;
+            handler = event => {
+                if (event.type === 'keydown') {
+                    if (event.key === 'Escape') close();
+                    return;
+                }
+                if (host.o && event.target instanceof Node && host.o.contains(event.target)) return;
+                close();
+            };
+            document.addEventListener('mousedown', handler);
+            document.addEventListener('keydown', handler);
+        },
+        close() {
+            if (!handler) return;
+            document.removeEventListener('mousedown', handler);
+            document.removeEventListener('keydown', handler);
+            handler = null;
+        }
+    };
+}
+
 export class Dropdown extends Component {
     render(props = {}) {
         const {
@@ -769,7 +816,22 @@ export class Dropdown extends Component {
             class: customClass = ''
         } = props;
         const isOpen = stateOf(false);
-        return div(
+        const selected = stateOf('');
+        let dismissal = null;
+
+        const close = () => {
+            isOpen.value = false;
+            dismissal?.close();
+        };
+        const toggle = () => {
+            if (isOpen.value) close();
+            else {
+                isOpen.value = true;
+                dismissal.open();
+            }
+        };
+
+        const root = div(
             {
                 class: computed(() =>
                     `aetheria-dropdown ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim()),
@@ -780,9 +842,9 @@ export class Dropdown extends Component {
                     type: 'button',
                     class: 'aetheria-btn aetheria-btn-secondary',
                     'aria-expanded': computed(() => flag(isOpen, 'true', 'false')),
-                    onclick: () => { isOpen.value = !isOpen.value; }
+                    onclick: toggle
                 },
-                bind(triggerLabel, 'Open Dropdown'),
+                computed(() => selected.value || prop(triggerLabel, 'Open Dropdown')),
                 icon('chevronDown', 'aetheria-icon-sm')
             ),
             computed(() => {
@@ -794,9 +856,11 @@ export class Dropdown extends Component {
                         const lbl = item && typeof item === 'object' ? item.label : item;
                         return div(
                             {
-                                class: 'aetheria-dropdown-item',
+                                class: computed(() =>
+                                    `aetheria-dropdown-item${String(lbl) === selected.value ? ' is-active' : ''}`),
                                 onclick: () => {
-                                    isOpen.value = false;
+                                    selected.value = String(lbl ?? '');
+                                    close();
                                     if (onselect) onselect(item);
                                 }
                             },
@@ -806,6 +870,8 @@ export class Dropdown extends Component {
                 );
             })
         );
+        dismissal = panelDismissal(root, close);
+        return root;
     }
 }
 
@@ -1206,7 +1272,21 @@ export class Popover extends Component {
             class: customClass = ''
         } = props;
         const isOpen = stateOf(false);
-        return div(
+        let dismissal = null;
+
+        const close = () => {
+            isOpen.value = false;
+            dismissal?.close();
+        };
+        const toggle = () => {
+            if (isOpen.value) close();
+            else {
+                isOpen.value = true;
+                dismissal.open();
+            }
+        };
+
+        const root = div(
             {
                 class: computed(() =>
                     `aetheria-popover ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim()),
@@ -1217,7 +1297,7 @@ export class Popover extends Component {
                     type: 'button',
                     class: 'aetheria-btn aetheria-btn-secondary',
                     'aria-expanded': computed(() => flag(isOpen, 'true', 'false')),
-                    onclick: () => { isOpen.value = !isOpen.value; }
+                    onclick: toggle
                 },
                 bind(trigger, 'Toggle Popover')
             ),
@@ -1232,6 +1312,8 @@ export class Popover extends Component {
                 );
             })
         );
+        dismissal = panelDismissal(root, close);
+        return root;
     }
 }
 
@@ -1270,7 +1352,7 @@ function clampCalendarDay(year, month, day) {
     return new Date(year, month, Math.min(day, new Date(year, month + 1, 0).getDate()));
 }
 
-function createCalendarView({ cursor, selected, level, direction, locale, min, max, disabledDates, onSelect, onNavigate, onLevel }) {
+function createCalendarView({ cursor, selected, level, direction, locale, min, max, disabledDates, onSelect, onNavigate, onLevel, dayClass = null }) {
     const visibleDate = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
     const selectedDate = selected ? new Date(selected.getFullYear(), selected.getMonth(), selected.getDate()) : null;
     const minDate = parseCalendarDate(min);
@@ -1287,12 +1369,19 @@ function createCalendarView({ cursor, selected, level, direction, locale, min, m
         const isSelected = selectedDate && calendarDateKey(selectedDate) === calendarDateKey(date);
         const key = calendarDateKey(date);
         const isDisabled = (minDate && date < minDate) || (maxDate && date > maxDate) || disabledKeys.includes(key);
+        const rangeClass = dayClass ? dayClass(date) : '';
+        const classes = [
+            'aetheria-calendar-day',
+            isSelected ? 'is-selected' : '',
+            rangeClass,
+            extraClass
+        ].filter(Boolean).join(' ');
         return button(
             {
                 type: 'button',
-                class: `aetheria-calendar-day${isSelected ? ' is-selected' : ''}${extraClass ? ` ${extraClass}` : ''}`,
+                class: classes,
                 'aria-label': format(date, { dateStyle: 'full' }),
-                'aria-pressed': isSelected ? 'true' : 'false',
+                'aria-pressed': (isSelected || rangeClass.includes('is-range-start') || rangeClass.includes('is-range-end')) ? 'true' : 'false',
                 disabled: isDisabled,
                 onclick: () => onSelect(date)
             },
@@ -1528,6 +1617,8 @@ export class Calendar extends Component {
             min = null,
             max = null,
             disabledDates = [],
+            dayClass = null,
+            highlightSelected = true,
             class: customClass = ''
         } = props;
         const controlled = isReactive(value);
@@ -1550,6 +1641,13 @@ export class Calendar extends Component {
             const maxDate = parseCalendarDate(prop(max, null));
             if ((minDate && date < minDate) || (maxDate && date > maxDate) ||
                 disabledSource().some(item => calendarDateKey(parseCalendarDate(item)) === key)) return;
+            if (!prop(highlightSelected, true)) {
+                // Range pickers style the endpoints themselves; a single dot
+                // would fight the span highlight.
+                cursor.value = key;
+                if (onchange) onchange(date, key);
+                return;
+            }
             selectedDate.value = key;
             cursor.value = key;
             if (onchange) onchange(date, key);
@@ -1572,17 +1670,201 @@ export class Calendar extends Component {
             },
             computed(() => createCalendarView({
                 cursor: parseCalendarDate(cursor.value) || new Date(),
-                selected: parseCalendarDate(selectedDate.value),
+                selected: prop(highlightSelected, true) ? parseCalendarDate(selectedDate.value) : null,
                 level: viewLevel.value,
                 direction: direction.value,
                 locale: prop(locale, undefined),
                 min: prop(min, null),
                 max: prop(max, null),
                 disabledDates: disabledSource(),
+                dayClass: dayClass ? date => dayClass(date) : null,
                 onSelect: setSelected,
                 onNavigate: navigate,
                 onLevel: changeLevel
             }))
+        );
+    }
+}
+
+function parseCalendarInterval(raw) {
+    const [start, end] = String(raw || '').split('/');
+    return { start: parseCalendarDate(start), end: parseCalendarDate(end) };
+}
+
+function formatCalendarSpan(locale, from, to) {
+    const options = { dateStyle: 'medium' };
+    if (!from) return '';
+    if (!to || calendarDateKey(to) === calendarDateKey(from)) return from.toLocaleDateString(locale, options);
+    return `${from.toLocaleDateString(locale, options)} → ${to.toLocaleDateString(locale, options)}`;
+}
+
+export class DateRangePicker extends Component {
+    render(props = {}) {
+        const {
+            value = '',
+            onchange = null,
+            placeholder = 'Select a date range',
+            locale = undefined,
+            min = null,
+            max = null,
+            disabledDates = [],
+            label = 'Choose date range',
+            disabled = false,
+            class: customClass = ''
+        } = props;
+        const controlled = isReactive(value);
+        const initial = parseCalendarInterval(prop(value, ''));
+        const storedValue = stateOf(initial.start ? calendarDateKey(initial.start) : '');
+        const storedEnd = stateOf(initial.end ? calendarDateKey(initial.end) : '');
+        const draftStart = stateOf(storedValue.value);
+        const draftEnd = stateOf(storedEnd.value);
+        const isOpen = stateOf(false);
+
+        const intervalOf = (from, to) => [from, to].filter(Boolean).join('/');
+        const committedSpan = () => (controlled
+            ? parseCalendarInterval(prop(value, ''))
+            : { start: parseCalendarDate(storedValue.value), end: parseCalendarDate(storedEnd.value) });
+        const openDialog = () => {
+            if (prop(disabled, false)) return;
+            const { start, end } = committedSpan();
+            draftStart.value = start ? calendarDateKey(start) : '';
+            draftEnd.value = end ? calendarDateKey(end) : '';
+            isOpen.value = true;
+        };
+        const closeDialog = () => { isOpen.value = false; };
+        const pickDay = (date, key) => {
+            if (!draftStart.value || draftEnd.value) {
+                draftStart.value = key;
+                draftEnd.value = '';
+                return;
+            }
+            if (key < draftStart.value) {
+                draftEnd.value = draftStart.value;
+                draftStart.value = key;
+                return;
+            }
+            draftEnd.value = key;
+        };
+        const dayClass = date => {
+            const key = calendarDateKey(date);
+            const classes = [];
+            if (draftStart.value === key) classes.push('is-range-start');
+            if (draftEnd.value === key) classes.push('is-range-end');
+            if (draftStart.value && draftEnd.value && key > draftStart.value && key < draftEnd.value) {
+                classes.push('is-range');
+            }
+            return classes.join(' ');
+        };
+        const emit = (from, to) => {
+            if (onchange) {
+                onchange(intervalOf(from, to), {
+                    start: parseCalendarDate(from),
+                    end: parseCalendarDate(to || from)
+                });
+            }
+        };
+        const applyRange = () => {
+            if (!draftStart.value) { isOpen.value = false; return; }
+            if (controlled) value.value = intervalOf(draftStart.value, draftEnd.value);
+            storedValue.value = draftStart.value;
+            storedEnd.value = draftEnd.value;
+            isOpen.value = false;
+            emit(draftStart.value, draftEnd.value);
+        };
+        const clearRange = () => {
+            if (controlled) value.value = '';
+            storedValue.value = '';
+            storedEnd.value = '';
+            draftStart.value = '';
+            draftEnd.value = '';
+            emit('', '');
+        };
+
+        return div(
+            {
+                class: computed(() =>
+                    `aetheria-datepicker aetheria-datepicker-range aetheria-grow ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim())
+            },
+            button(
+                {
+                    type: 'button',
+                    class: 'aetheria-btn aetheria-btn-secondary aetheria-datepicker-trigger',
+                    'aria-haspopup': 'dialog',
+                    'aria-expanded': computed(() => isOpen.value ? 'true' : 'false'),
+                    disabled: computed(() => prop(disabled, false)),
+                    onclick: openDialog
+                },
+                span({ class: 'aetheria-truncate' }, computed(() => {
+                    const { start, end } = committedSpan();
+                    return formatCalendarSpan(prop(locale, undefined), start, end) || prop(placeholder, '');
+                })),
+                icon('calendar')
+            ),
+            div(
+                {
+                    class: computed(() => `aetheria-calendar-modal${isOpen.value ? ' is-open' : ''}`),
+                    'aria-hidden': computed(() => isOpen.value ? 'false' : 'true'),
+                    onclick: event => {
+                        if (event.target === event.currentTarget) closeDialog();
+                    },
+                    onkeydown: event => {
+                        if (event.key === 'Escape') closeDialog();
+                    }
+                },
+                div(
+                    {
+                        class: 'aetheria-glass aetheria-calendar-dialog aetheria-col aetheria-col-tight',
+                        role: 'dialog',
+                        'aria-modal': 'true',
+                        'aria-label': bind(label, 'Choose date range')
+                    },
+                    div(
+                        { class: 'aetheria-calendar-header aetheria-row aetheria-row-between aetheria-row-tight' },
+                        h3({ class: 'aetheria-calendar-title aetheria-truncate' }, bind(label, 'Choose date range')),
+                        button({
+                            type: 'button',
+                            class: 'aetheria-icon-close',
+                            'aria-label': 'Close date range picker',
+                            onclick: closeDialog
+                        }, icon('close'))
+                    ),
+                    div(
+                        { class: 'aetheria-calendar-pending' },
+                        computed(() => span(draftStart.value
+                            ? formatCalendarSpan(prop(locale, undefined), parseCalendarDate(draftStart.value), null)
+                            : 'Pick a start date')),
+                        computed(() => span(draftEnd.value
+                            ? formatCalendarSpan(prop(locale, undefined), parseCalendarDate(draftEnd.value), null)
+                            : (draftStart.value ? 'Pick an end date' : '—')))
+                    ),
+                    new Calendar().render({
+                        // Seeding the calendar with the start key makes the first
+                        // view land on the pending range instead of the current month.
+                        value: draftStart,
+                        locale,
+                        min,
+                        max,
+                        disabledDates,
+                        dayClass,
+                        highlightSelected: false,
+                        onchange: pickDay
+                    }),
+                    div(
+                        { class: 'aetheria-calendar-actions' },
+                        button({
+                            type: 'button',
+                            class: 'aetheria-btn aetheria-btn-muted',
+                            onclick: clearRange
+                        }, 'Clear'),
+                        button({ type: 'button', class: 'aetheria-btn aetheria-btn-muted', onclick: closeDialog }, 'Cancel'),
+                        button({
+                            type: 'button',
+                            class: 'aetheria-btn aetheria-btn-primary',
+                            onclick: applyRange
+                        }, 'Apply')
+                    )
+                )
+            )
         );
     }
 }
@@ -2036,18 +2318,23 @@ export class DataGrid extends Component {
                 label(
                     { class: 'aetheria-datagrid-page-size-label' },
                     'Rows per page',
-                    select({
-                        class: 'aetheria-field aetheria-datagrid-page-size',
-                        disabled: flag(disabled, true),
-                        onchange: event => {
-                            pageSize.value = Number(event.target.value);
-                            page.value = 1;
-                            if (onpagechange) onpagechange(1, getPageSize());
-                        }
-                    }, ...getPageSizes().map(optionSize => option({
-                        value: String(optionSize),
-                        selected: optionSize === size
-                    }, String(optionSize))))
+                    span(
+                        { class: 'aetheria-datagrid-page-size-wrap' },
+                        select({
+                            class: 'aetheria-datagrid-page-size',
+                            'aria-label': 'Rows per page',
+                            disabled: flag(disabled, true),
+                            onchange: event => {
+                                pageSize.value = Number(event.target.value);
+                                page.value = 1;
+                                if (onpagechange) onpagechange(1, getPageSize());
+                            }
+                        }, ...getPageSizes().map(optionSize => option({
+                            value: String(optionSize),
+                            selected: optionSize === size
+                        }, String(optionSize)))),
+                        icon('chevronDown', 'aetheria-datagrid-page-size-chevron')
+                    )
                 ),
                 button({
                     type: 'button',
@@ -2627,6 +2914,60 @@ export class Spreadsheet extends Component {
         const colCount = () => Math.max(1, Math.min(26, Math.floor(Number(prop(cols, 4)) || 4)));
         const nameOf = (index) => String.fromCharCode(65 + (index % 26));
         const keyOf = (row, col) => `${nameOf(col)}${row + 1}`;
+        // Widths live outside the reactive tree: the rebuilt table reads them
+        // back so a resize survives a rows/cols change.
+        const columnWidths = [];
+        const MIN_COLUMN = 40;
+        const styleOf = (index) => computed(() =>
+            columnWidths[index] ? `width: ${columnWidths[index]}px;` : '');
+        const beginResize = (event) => {
+            if (event.button !== undefined && event.button !== 0) return;
+            event.preventDefault();
+            const handle = event.currentTarget;
+            const header = handle.parentElement;
+            const index = Number(handle.dataset.column);
+            const table = header.closest('table');
+            const startX = event.clientX;
+            const startWidth = header.getBoundingClientRect().width;
+            const apply = width => {
+                const next = Math.max(MIN_COLUMN, Math.round(width));
+                columnWidths[index] = next;
+                header.style.width = `${next}px`;
+            };
+            const move = moveEvent => apply(startWidth + (moveEvent.clientX - startX));
+            const stop = () => {
+                document.removeEventListener('pointermove', move);
+                document.removeEventListener('pointerup', stop);
+                document.removeEventListener('pointercancel', stop);
+                table.classList.remove('is-resizing');
+                handle.classList.remove('is-dragging');
+            };
+            table.classList.add('is-resizing');
+            handle.classList.add('is-dragging');
+            document.addEventListener('pointermove', move);
+            document.addEventListener('pointerup', stop);
+            document.addEventListener('pointercancel', stop);
+        };
+        const nudgeResize = (event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault();
+            const handle = event.currentTarget;
+            const header = handle.parentElement;
+            const index = Number(handle.dataset.column);
+            const current = columnWidths[index] ?? header.getBoundingClientRect().width;
+            columnWidths[index] = Math.max(MIN_COLUMN, Math.round(current + (event.key === 'ArrowRight' ? 8 : -8)));
+            header.style.width = `${columnWidths[index]}px`;
+        };
+        const resizer = (index, label) => span({
+            class: 'aetheria-spreadsheet-resizer',
+            role: 'separator',
+            tabindex: '0',
+            'aria-orientation': 'vertical',
+            'aria-label': `Resize ${label}`,
+            'data-column': String(index),
+            onpointerdown: beginResize,
+            onkeydown: nudgeResize
+        });
 
         return div(
             {
@@ -2636,16 +2977,23 @@ export class Spreadsheet extends Component {
             computed(() => div(
                 { class: 'aetheria-scroll-x' },
                 table(
-                    { class: 'aetheria-table aetheria-table-flush aetheria-spreadsheet-table' },
+                    {
+                        class: 'aetheria-table aetheria-table-flush aetheria-spreadsheet-table',
+                        // Fixed layout lets a resized column keep its width, so the
+                        // natural minimum has to come from the column count instead.
+                        style: computed(() => `min-width: ${44 + colCount() * 72}px;`)
+                    },
                     thead(
                         tr(
-                            th('#'),
-                            ...Array.from({ length: colCount() }, (_, col) => th(nameOf(col)))
+                            th({ class: 'aetheria-spreadsheet-gutter', style: styleOf(-1) },
+                                '#', resizer(-1, 'row number column')),
+                            ...Array.from({ length: colCount() }, (_, col) => th({ style: styleOf(col) },
+                                nameOf(col), resizer(col, `column ${nameOf(col)}`)))
                         )
                     ),
                     tbody(
                         ...Array.from({ length: rowCount() }, (_, row) => tr(
-                            td({ class: 'aetheria-num aetheria-text-muted' }, String(row + 1)),
+                            td({ class: 'aetheria-num aetheria-text-muted aetheria-spreadsheet-gutter' }, String(row + 1)),
                             ...Array.from({ length: colCount() }, (_, col) => {
                                 const cellKey = keyOf(row, col);
                                 return td(

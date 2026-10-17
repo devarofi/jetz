@@ -493,6 +493,26 @@ new Calendar().render({
                     )
                 ),
                 showcase(
+                    "DateRangePicker",
+                    "Two clicks pick the start and end of a span; the days between stay highlighted. The value is an ISO interval: \u0022YYYY-MM-DD/YYYY-MM-DD\u0022.",
+                    `import { stateOf } from "../lib/jetz.js";
+import { DateRangePicker } from "./aetheria-ui.js";
+
+const reportRange = stateOf("2025-04-10/2025-04-18");
+new DateRangePicker().render({
+    value: reportRange,
+    min: "2025-01-01",
+    max: "2025-12-31",
+    onchange: (interval, span) => console.log(interval, span)
+});`,
+                    new Aetheria.DateRangePicker().render({
+                        value: stateOf("2025-04-10/2025-04-18"),
+                        min: "2025-01-01",
+                        max: "2025-12-31",
+                        onchange: interval => console.log("Selected range:", interval)
+                    })
+                ),
+                showcase(
                     "Form Validation",
                     "Reactive form with inline validation feedback and submit prevention.",
                     `import { FormValidation } from "./aetheria-ui.js";
