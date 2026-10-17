@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aetheria UI System — Glassmorphic Components</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            --lav: #b9a5ff;
+            --ice: #c8d9ff;
+            --pink: #efb8ec;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'DM Sans', sans-serif;
+            color: #f3f0ff;
+            background:
+                radial-gradient(ellipse at 2% 5%, rgba(139, 45, 103, .43), transparent 35%),
+                radial-gradient(ellipse at 94% 3%, rgba(94, 81, 151, .48), transparent 33%),
+                radial-gradient(ellipse at 55% 55%, rgba(39, 48, 112, .24), transparent 42%),
+                linear-gradient(125deg, #10091e 0%, #080d26 54%, #090c27 100%);
+            overflow-x: hidden;
+        }
+
+        body:before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: .12;
+            z-index: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            max-width: 1600px;
+            margin: auto;
+            padding: 42px clamp(18px, 3.8vw, 64px) 56px;
+        }
+
+        .serif {
+            font-family: 'Playfair Display', Georgia, serif;
+        }
+
+        .headline {
+            font-size: clamp(2.5rem, 5.3vw, 5.25rem);
+            letter-spacing: -.045em;
+            line-height: 1.05;
+            font-weight: 400;
+            background: linear-gradient(105deg, #fff 0%, #cbd4ff 52%, #e7c4f5 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .eyebrow {
+            color: #c8c2df;
+            letter-spacing: .08em;
+            font-size: clamp(.78rem, 1.6vw, 1.45rem);
+        }
+
+        .gem {
+            width: 94px;
+            height: 94px;
+            filter: drop-shadow(0 0 15px rgba(201, 184, 255, .8));
+        }
+
+        .glass {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            background: linear-gradient(135deg, rgba(255, 255, 255, .115), rgba(255, 255, 255, .045) 55%, rgba(177, 160, 255, .07));
+            border: 1px solid rgba(229, 224, 255, .23);
+            border-radius: 17px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 12px 35px rgba(0, 0, 0, .14);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            transition: transform .35s cubic-bezier(.2, .8, .2, 1), border-color .35s, box-shadow .35s, background .35s;
+        }
+
+        .glass:before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(440px circle at var(--mx, 50%) var(--my, 50%), rgba(208, 196, 255, .18), transparent 48%);
+            transition: opacity .3s;
+        }
+
+        .glass:hover {
+            transform: translateY(-3px);
+            border-color: rgba(220, 210, 255, .48);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .23), 0 15px 42px rgba(4, 3, 20, .28), 0 0 22px rgba(166, 143, 255, .09);
+        }
+
+        .glass:hover:before {
+            opacity: 1;
+        }
+
+        .panel {
+            padding: 20px;
+            min-width: 0;
+        }
+
+        .panel-title {
+            font-size: 1.18rem;
+            line-height: 1.25;
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: #f7f4ff;
+        }
+
+        .btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            min-height: 45px;
+            padding: 10px 20px;
+            border-radius: 999px;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all .25s ease;
+            overflow: hidden;
+        }
+
+        .btn:after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            opacity: 0;
+            background: linear-gradient(110deg, transparent, rgba(255, 255, 255, .35), transparent);
+            transform: translateX(-100%);
+            transition: transform .55s, opacity .3s;
+        }
+
+        .btn:hover:after {
+            opacity: 1;
+            transform: translateX(100%);
+        }
+
+        .btn-primary {
+            color: #17132c;
+            background: linear-gradient(110deg, #b8d1ff, #d7c4ff 62%, #f1c5f0);
+            box-shadow: 0 0 18px rgba(192, 167, 255, .42), inset 0 1px 0 #fff;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 28px rgba(196, 164, 255, .68);
+            transform: translateY(-2px) scale(1.015);
+        }
+
+        .btn-secondary {
+            color: #ece8f7;
+            border: 1px solid rgba(255, 255, 255, .13);
+            background: linear-gradient(120deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .07));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, .17);
+            border-color: rgba(255, 255, 255, .32);
+        }
+
+        .btn-border {
+            color: #e5defd;
+            border: 1px solid transparent;
+            background: linear-gradient(#21172f, #21172f) padding-box, linear-gradient(110deg, #7fb6ff, #cf8bff, #f1a9e8) border-box;
+        }
+
+        .btn-border:hover {
+            box-shadow: 0 0 20px rgba(192, 133, 255, .22);
+        }
+
+        .btn-muted {
+            color: #aaa4c1;
+            border: 1px solid rgba(255, 255, 255, .14);
+            background: rgba(255, 255, 255, .035);
+        }
+
+        .icon-btn {
+            width: 60px;
+            height: 60px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            color: #f0eaff;
+            border: 1px solid rgba(255, 255, 255, .26);
+            background: linear-gradient(135deg, rgba(255, 255, 255, .25), rgba(255, 255, 255, .05));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 8px 22px rgba(0, 0, 0, .15);
+            transition: .3s;
+        }
+
+        .icon-btn:hover,
+        .icon-btn.active {
+            transform: translateY(-3px);
+            background: linear-gradient(135deg, rgba(195, 191, 255, .55), rgba(205, 157, 255, .18));
+            box-shadow: 0 0 24px rgba(178, 157, 255, .45), inset 0 1px 0 rgba(255, 255, 255, .55);
+        }
+
+        .field {
+            width: 100%;
+            min-width: 0;
+            height: 44px;
+            border-radius: 11px;
+            border: 1px solid rgba(239, 234, 255, .3);
+            background: linear-gradient(120deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .06));
+            color: #f4f0ff;
+            padding: 0 14px;
+            outline: none;
+            transition: .25s;
+            box-shadow: inset 0 1px 4px rgba(0, 0, 0, .08);
+        }
+
+        .field::placeholder {
+            color: #b1abc4;
+        }
+
+        .field:focus {
+            border-color: #c5aaff;
+            box-shadow: 0 0 0 3px rgba(178, 150, 255, .15), 0 0 18px rgba(178, 150, 255, .12);
+        }
+
+        select.field {
+            appearance: none;
+        }
+
+        .input-icon {
+            position: relative;
+        }
+
+        .input-icon svg {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bcb5d5;
+            pointer-events: none;
+        }
+
+        .check {
+            appearance: none;
+            width: 23px;
+            height: 23px;
+            border: 1px solid rgba(232, 225, 255, .52);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, .1);
+            display: inline-grid;
+            place-items: center;
+            cursor: pointer;
+            transition: .2s;
+            flex: none;
+        }
+
+        .check:checked {
+            background: linear-gradient(135deg, #9b9cff, #d1aaff);
+            border-color: #d4c4ff;
+        }
+
+        .check:checked:after {
+            content: "✓";
+            font-size: 15px;
+            color: #17142a;
+            font-weight: 700;
+        }
+
+        .switch {
+            appearance: none;
+            width: 62px;
+            height: 32px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .18);
+            border: 1px solid rgba(255, 255, 255, .12);
+            position: relative;
+            cursor: pointer;
+            transition: .3s;
+            flex: none;
+        }
+
+        .switch:before {
+            content: "";
+            position: absolute;
+            width: 23px;
+            height: 23px;
+            left: 4px;
+            top: 3px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #d4d4e2, #9997ac);
+            box-shadow: 0 2px 8px #0004;
+            transition: .3s;
+        }
+
+        .switch:checked {
+            background: linear-gradient(100deg, #8b8dff, #c5a1ff);
+            box-shadow: 0 0 15px #9e8bff44;
+        }
+
+        .switch:checked:before {
+            transform: translateX(29px);
+            background: linear-gradient(135deg, #fff, #ded7ff);
+        }
+
+        input[type=range] {
+            accent-color: #b9a5ff;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .swatch {
+            height: 72px;
+            width: 72px;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 5px #fff8, 0 0 18px #b7a7ff22;
+            border: 1px solid #ffffff50;
+            margin: auto auto 12px;
+            transition: .3s;
+        }
+
+        .swatch:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 26px #c4b0ff88;
+        }
+
+        .swatch-aether {
+            background: linear-gradient(135deg, #c1aaff, #c9e1ff 65%, #f0c8ff);
+        }
+
+        .swatch-crystal {
+            background: linear-gradient(135deg, #e3e7ff, #b8c8e4 55%, #a5a6ba);
+        }
+
+        .swatch-blue {
+            background: linear-gradient(135deg, #9fc7ff, #5b8ce4);
+        }
+
+        .swatch-rose {
+            background: linear-gradient(135deg, #ffd3e4, #e88fae);
+        }
+
+        .mini {
+            font-size: .68rem;
+            color: #b9b3cf;
+            line-height: 1.5;
+        }
+
+        .chart-line {
+            fill: none;
+            stroke: url(#lineGrad);
+            stroke-width: 3.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .chart-area {
+            fill: url(#areaGrad);
+        }
+
+        .chart-glow {
+            filter: drop-shadow(0 0 5px rgba(148, 113, 255, .65));
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #5df0a0;
+            box-shadow: 0 0 14px #5df0a0;
+            display: inline-block;
+        }
+
+        .tab-btn {
+            padding: 12px 18px;
+            color: #aaa4bf;
+            transition: .25s;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .tab-btn.active {
+            color: #fbf9ff;
+            background: linear-gradient(140deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07));
+            border: 1px solid rgba(255, 255, 255, .15);
+            border-bottom-color: transparent;
+            border-radius: 14px 14px 0 0;
+            box-shadow: inset 0 1px 0 #ffffff24;
+        }
+
+        .tab-btn.active:after {
+            content: "";
+            position: absolute;
+            bottom: -1px;
+            left: 14px;
+            right: 14px;
+            height: 3px;
+            background: linear-gradient(90deg, #a7caff, #d9b3ff);
+            box-shadow: 0 0 10px #b7a5ff;
+        }
+
+        .tab-content {
+            padding: 18px 16px 0;
+            color: #dcd6ef;
+            min-height: 42px;
+        }
+
+        .icon-tile {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #d8d0ff;
+            filter: drop-shadow(0 0 6px #9d8dff55);
+            transition: .3s;
+        }
+
+        .icon-tile:hover {
+            color: #fff;
+            transform: translateY(-5px) scale(1.08);
+            filter: drop-shadow(0 0 10px #b5a3ff);
+        }
+
+        .card-sheen {
+            position: absolute;
+            top: -40%;
+            left: -70%;
+            height: 180%;
+            width: 45%;
+            transform: rotate(25deg);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .17), transparent);
+            transition: left .8s;
+            pointer-events: none;
+        }
+
+        .interactive-card:hover .card-sheen {
+            left: 140%;
+        }
+
+        .notice {
+            color: #c5bddc;
+            font-size: .82rem;
+        }
+
+        @media(max-width:720px) {
+            .page {
+                padding-top: 28px
+            }
+
+            .gem {
+                width: 66px;
+                height: 66px
+            }
+
+            .panel {
+                padding: 16px
+            }
+
+            .panel-title {
+                margin-bottom: 16px
+            }
+
+            .swatch {
+                width: 54px;
+                height: 54px
+            }
+
+            .icon-btn {
+                width: 51px;
+                height: 51px
+            }
+        }
+
+        @media(prefers-reduced-motion:reduce) {
+
+            *,
+            *:before,
+            *:after {
+                transition: none !important;
+                animation: none !important;
+                scroll-behavior: auto !important
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="page">
+        <header class="flex items-start justify-between gap-5 mb-9">
+            <div class="min-w-0">
+                <h1 class="headline serif">AETHERIA UI SYSTEM</h1>
+                <p class="eyebrow mt-3">PREMIUM GLASSMORPHIC DESIGN SYSTEM <span class="opacity-60">•</span> v1.0</p>
+            </div>
+            <svg class="gem shrink-0 mt-1 hidden sm:block" viewBox="0 0 100 100" fill="none"
+                aria-label="Aetheria geometric logo">
+                <defs>
+                    <linearGradient id="gemStroke" x1="8" y1="12" x2="90" y2="88">
+                        <stop stop-color="#fff" />
+                        <stop offset=".45" stop-color="#c4b7ff" />
+                        <stop offset="1" stop-color="#8ca9ff" />
+                    </linearGradient>
+                </defs>
+                <path d="M50 4 91 27 91 70 50 96 9 70 9 27Z" fill="#c8bbff" fill-opacity=".13" stroke="url(#gemStroke)"
+                    stroke-width="1.4" />
+                <path d="M50 4 50 96M9 27 91 70M91 27 9 70M9 27 50 46 91 27M9 70 50 46 91 70M50 4 28 48 50 96 72 48Z"
+                    stroke="url(#gemStroke)" stroke-width="1.2" />
+                <path d="M50 4 72 48 50 96 28 48Z" fill="#c5b5ff" fill-opacity=".09" />
+                <circle cx="50" cy="4" r="2.8" fill="#fff" />
+                <circle cx="50" cy="4" r="7" fill="#d9ccff" fill-opacity=".3" />
+            </svg>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+            <!-- Left column -->
+            <div class="flex flex-col gap-5">
+                <section class="glass panel">
+                    <h2 class="panel-title">Interactive Buttons</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="btn btn-primary w-full" type="button">Primary</button>
+                        <button class="btn btn-secondary w-full" type="button">Secondary</button>
+                        <button class="btn btn-border w-full" type="button">Bordered</button>
+                        <button class="btn btn-muted w-full" type="button">Secondary</button>
+                        <button class="btn btn-border w-full" type="button">Bordered</button>
+                        <button class="btn btn-muted w-full" type="button" id="outlineToggle">Glow outline</button>
+                    </div>
+                    <div class="flex items-center gap-3 mt-4 flex-wrap">
+                        <button class="btn btn-muted flex-1" id="collapseBtn" aria-expanded="false"
+                            aria-label="Toggle extra buttons">
+                            <svg id="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="1.8">
+                                <path d="m6 15 6-6 6 6" />
+                            </svg>
+                        </button>
+                        <button class="icon-btn active" aria-label="Home" title="Home"><svg width="26" height="26"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" />
+                            </svg></button>
+                        <button class="icon-btn" aria-label="Settings" title="Settings"><svg width="26" height="26"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.8 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.8-1l-1.7.6-1.4-2.4 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.8-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.8 1l1.7-.6 1.4 2.4-1.4 1.1a7 7 0 0 1 0 2Z"
+                                    transform="translate(-1 -1)" />
+                            </svg></button>
+                        <button class="icon-btn" aria-label="Next" title="Next"><svg width="27" height="27"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                <path d="M4 12h15m-7-7 7 7-7 7" />
+                            </svg></button>
+                    </div>
+                    <div id="extraButtons" class="hidden flex gap-2 mt-3">
+                        <button class="btn btn-secondary flex-1">Confirm</button><button
+                            class="btn btn-border flex-1">Cancel</button>
+                    </div>
+                </section>
+
+                <section class="glass panel">
+                    <h2 class="panel-title">Forms &amp; Input</h2>
+                    <form id="demoForm" class="space-y-4">
+                        <div class="input-icon"><input class="field pr-11" type="search"
+                                placeholder="Search anything..." aria-label="Search"><svg width="20" height="20"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                <circle cx="10.8" cy="10.8" r="6.8" />
+                                <path d="m16 16 5 5" />
+                            </svg></div>
+                        <div class="grid grid-cols-[1.35fr_.8fr] gap-3">
+                            <div class="relative"><input class="field pl-11" type="text" placeholder="Your name"
+                                    aria-label="Your name"><svg class="absolute left-3 top-3 text-purple-200/70"
+                                    width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <path d="M12 20H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />
+                                    <path d="m16 3 5 5-10 10-4 1 1-4Z" />
+                                </svg></div>
+                            <div class="relative"><select class="field pl-10 pr-8" aria-label="Choose category">
+                                    <option>Category</option>
+                                    <option>Design</option>
+                                    <option>Development</option>
+                                    <option>Product</option>
+                                </select><svg class="absolute left-3 top-3 text-purple-200/70" width="18" height="18"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                                    <path d="M14 17h7m-3.5-3.5v7" />
+                                </svg><svg class="absolute right-3 top-3 text-purple-200/70" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="m6 9 6 6 6-6" />
+                                </svg></div>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 pt-1">
+                            <label class="flex items-center gap-2.5 cursor-pointer"><input class="check" type="checkbox"
+                                    checked><span>Checkbox</span></label>
+                            <div class="flex items-center gap-3 flex-1 max-w-[62%]"><svg
+                                    class="shrink-0 text-purple-200/80" width="21" height="21" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="1.4">
+                                    <circle cx="10" cy="10" r="7" />
+                                    <path d="m15 15 6 6M10 6v8M6 10h8" />
+                                </svg><input type="range" min="0" max="100" value="62" aria-label="Intensity"></div>
+                        </div>
+                        <div class="flex items-center gap-4 pt-1">
+                            <input class="switch" type="checkbox" checked aria-label="Enable notifications">
+                            <input class="switch" type="checkbox" aria-label="Disable notifications">
+                            <div class="flex items-center gap-3 flex-1"><span
+                                    class="w-5 h-5 rounded-full bg-gradient-to-br from-slate-100 to-indigo-300 shadow-[0_0_12px_#b6aaff88]"></span><input
+                                    type="range" min="0" max="100" value="38" aria-label="Opacity"></div>
+                        </div>
+                        <p id="formMessage" class="notice hidden" role="status"></p>
+                    </form>
+                </section>
+            </div>
+
+            <!-- Middle column -->
+            <div class="flex flex-col gap-5">
+                <section class="glass panel">
+                    <h2 class="panel-title">Typography</h2>
+                    <div
+                        class="serif text-[clamp(2.3rem,4vw,3.2rem)] leading-tight mb-3 bg-gradient-to-r from-white via-indigo-100 to-purple-200 text-transparent bg-clip-text">
+                        H1. Elegance</div>
+                    <div class="serif text-3xl leading-tight mb-3 text-slate-100">H2. Translucent</div>
+                    <p class="text-[1.55rem] mb-3 text-slate-200">Body Text</p>
+                    <p class="text-sm text-slate-300/90 leading-snug"><span class="block mb-1">Caption</span>Teips ipsum
+                        dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+                        dolore.</p>
+                </section>
+
+                <section class="glass panel flex-1">
+                    <h2 class="panel-title">Interactive Cards</h2>
+                    <div class="grid grid-cols-[1.15fr_.9fr] gap-4">
+                        <article
+                            class="glass interactive-card p-4 flex flex-col justify-between min-h-[210px] rounded-2xl">
+                            <span class="card-sheen"></span>
+                            <h3 class="text-lg">Card</h3>
+                            <svg class="w-full h-[105px] mt-2" viewBox="0 0 220 105" preserveAspectRatio="none"
+                                aria-label="Decorative upward trend chart">
+                                <defs>
+                                    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                                        <stop stop-color="#8d72ff" />
+                                        <stop offset=".55" stop-color="#bca1ff" />
+                                        <stop offset="1" stop-color="#75d9ff" />
+                                    </linearGradient>
+                                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop stop-color="#9d7bff" stop-opacity=".32" />
+                                        <stop offset="1" stop-color="#9d7bff" stop-opacity="0" />
+                                    </linearGradient>
+                                </defs>
+                                <path class="chart-area"
+                                    d="M0 89 C18 72 22 55 35 69 S55 101 72 59 S97 48 110 61 S128 79 143 31 S158 70 177 62 S203 10 220 9 L220 105 L0 105Z" />
+                                <path class="chart-line chart-glow"
+                                    d="M0 89 C18 72 22 55 35 69 S55 101 72 59 S97 48 110 61 S128 79 143 31 S158 70 177 62 S203 10 220 9" />
+                                <circle cx="143" cy="31" r="5" fill="#dce9ff" stroke="#8d8aff" stroke-width="2" />
+                            </svg>
+                            <p class="text-slate-300 text-sm mt-2">System Online</p>
+                        </article>
+                        <div class="flex flex-col gap-4">
+                            <article
+                                class="glass interactive-card rounded-2xl p-4 flex-1 min-h-[94px] flex flex-col justify-between">
+                                <span class="card-sheen"></span>
+                                <div class="flex items-center gap-2 text-emerald-300 whitespace-nowrap"><span
+                                        class="status-dot"></span><span>System Online</span></div>
+                                <svg class="w-full h-10 mt-2" viewBox="0 0 180 42" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="miniLine" x1="0" y1="0" x2="1" y2="0">
+                                            <stop stop-color="#8b6bff" />
+                                            <stop offset="1" stop-color="#c5a2ff" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M0 33 C22 24 25 37 44 28 S64 30 81 16 S109 29 125 20 S152 27 180 6"
+                                        fill="none" stroke="url(#miniLine)" stroke-width="3" stroke-linecap="round"
+                                        style="filter:drop-shadow(0 0 4px #9d7dff)" />
+                                </svg>
+                            </article>
+                            <article
+                                class="glass interactive-card rounded-2xl p-4 min-h-[94px] grid place-items-center text-center bg-gradient-to-br from-white/10 via-violet-300/10 to-pink-300/20">
+                                <span class="card-sheen"></span><span
+                                    class="font-medium text-lg leading-snug">PREMIUM<br>VERSION</span>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right column -->
+            <div class="flex flex-col gap-5">
+                <section class="glass panel">
+                    <h2 class="panel-title">Glass Color Palette</h2>
+                    <div class="glass rounded-2xl p-3 grid grid-cols-4 gap-2 text-center">
+                        <button class="swatch-item" data-color="Aether Glow" aria-label="Aether Glow color">
+                            <div class="swatch swatch-aether"></div><span class="text-sm block whitespace-nowrap">Aether
+                                Glow</span><span class="mini block mt-1">Opx. 40%</span><span class="mini block">HEX
+                                #e0FFFA</span>
+                        </button>
+                        <button class="swatch-item" data-color="Crystal Frost" aria-label="Crystal Frost color">
+                            <div class="swatch swatch-crystal"></div><span
+                                class="text-sm block whitespace-nowrap">Crystal Frost</span><span
+                                class="mini block mt-1">Opx. 40%</span><span class="mini block">HEX #08FFFP</span>
+                        </button>
+                        <button class="swatch-item" data-color="Aura Blue" aria-label="Aura Blue color">
+                            <div class="swatch swatch-blue"></div><span class="text-sm block whitespace-nowrap">Aura
+                                Blue</span><span class="mini block mt-1">Opx. 40%</span><span class="mini block">HEX
+                                #08BFFF</span>
+                        </button>
+                        <button class="swatch-item" data-color="Satin Rose" aria-label="Satin Rose color">
+                            <div class="swatch swatch-rose"></div><span class="text-sm block whitespace-nowrap">Satin
+                                Rose</span><span class="mini block mt-1">Opx. 40%</span><span class="mini block">HEX
+                                #009390</span>
+                        </button>
+                    </div>
+                    <p id="paletteMessage" class="notice mt-3 hidden" aria-live="polite"></p>
+                </section>
+
+                <section class="glass panel">
+                    <h2 class="panel-title">Navigation &amp; Tab</h2>
+                    <div class="border-b border-white/10 flex items-end gap-1" role="tablist"
+                        aria-label="Main navigation">
+                        <button class="tab-btn active" role="tab" aria-selected="true"
+                            data-tab="Dashboard">Dashboard</button>
+                        <button class="tab-btn" role="tab" aria-selected="false" data-tab="Analytics">Analytics</button>
+                        <button class="tab-btn" role="tab" aria-selected="false" data-tab="Settings">Settings</button>
+                    </div>
+                    <div class="tab-content glass rounded-b-xl rounded-tr-xl" id="tabContent" role="tabpanel">
+                        <div class="flex gap-5 flex-wrap text-sm"><span class="text-white">Dashboard</span><span
+                                class="text-slate-300">Analytics</span><span class="text-slate-300">Settings</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="glass panel">
+                    <h2 class="panel-title">Premium Glass Icons</h2>
+                    <div class="grid grid-cols-6 gap-3">
+                        <button class="icon-tile" title="Home" aria-label="Home icon"><svg viewBox="0 0 40 40"
+                                width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.7"
+                                stroke-linejoin="round">
+                                <path d="m3 17 17-14 17 14M8 15v21h24V15M16 36V23h8v13" />
+                            </svg></button>
+                        <button class="icon-tile" title="Settings" aria-label="Settings icon"><svg viewBox="0 0 40 40"
+                                width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.7">
+                                <path
+                                    d="m17 3 6 0 1 4 4 2 4-2 4 5-3 3v5l3 3-4 5-4-2-4 2-1 4h-6l-1-4-4-2-4 2-4-5 3-3v-5l-3-3 4-5 4 2 4-2Z"
+                                    transform="translate(0 0) scale(.9) translate(2 2)" />
+                                <circle cx="20" cy="20" r="6" />
+                            </svg></button>
+                        <button class="icon-tile" title="Notifications" aria-label="Notifications icon"><svg
+                                viewBox="0 0 40 40" width="42" height="42" fill="none" stroke="currentColor"
+                                stroke-width="1.7" stroke-linecap="round">
+                                <path d="M10 28h20l-3-5V16a7 7 0 0 0-14 0v7Z" />
+                                <path d="M16 32a4 4 0 0 0 8 0M17 7a3 3 0 0 1 6 0" />
+                            </svg></button>
+                        <button class="icon-tile" title="Security" aria-label="Security icon"><svg viewBox="0 0 40 40"
+                                width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.7"
+                                stroke-linejoin="round">
+                                <path d="m20 3 15 6v10c0 9-7 14-15 18C12 33 5 28 5 19V9Z" />
+                                <path d="m20 9 9 4v6c0 6-4 9-9 12-5-3-9-6-9-12v-6Z" />
+                            </svg></button>
+                        <button class="icon-tile" title="Users" aria-label="Users icon"><svg viewBox="0 0 40 40"
+                                width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.7"
+                                stroke-linecap="round">
+                                <circle cx="15" cy="12" r="6" />
+                                <path d="M3 34v-4a12 12 0 0 1 24 0v4M28 7a6 6 0 0 1 0 11M31 23a9 9 0 0 1 6 8v3" />
+                            </svg></button>
+                        <button class="icon-tile" title="Target" aria-label="Target icon"><svg viewBox="0 0 40 40"
+                                width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.7"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="18" cy="22" r="15" />
+                                <circle cx="18" cy="22" r="9" />
+                                <circle cx="18" cy="22" r="3" />
+                                <path d="m18 22 18-18M26 4h10v10" />
+                            </svg></button>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="flex items-center justify-between gap-4 mt-7 text-xs text-slate-400/80">
+            <span>AETHERIA UI SYSTEM <span class="text-violet-200/80">●</span> Crafted in glass</span>
+            <span>Tailwind CSS + jQuery</span>
+        </footer>
+    </main>
+
+    <script>
+        $(function () {
+            // Pointer-following glass highlight, isolated to each glass surface.
+            $('.glass').on('mousemove', function (event) {
+                const rect = this.getBoundingClientRect();
+                $(this).css({ '--mx': (event.clientX - rect.left) + 'px', '--my': (event.clientY - rect.top) + 'px' });
+            });
+
+            // Toggle extra button examples.
+            $('#collapseBtn').on('click', function () {
+                const expanded = $(this).attr('aria-expanded') === 'true';
+                $(this).attr('aria-expanded', String(!expanded));
+                $('#extraButtons').stop(true, true).slideToggle(220);
+                $('#chevron').css('transform', expanded ? 'rotate(0deg)' : 'rotate(180deg)');
+            });
+
+            // Demonstration button states.
+            $('.icon-btn').on('click', function () {
+                $('.icon-btn').removeClass('active');
+                $(this).addClass('active');
+            });
+            $('#outlineToggle').on('click', function () {
+                $(this).toggleClass('btn-border btn-muted');
+                $(this).text($(this).hasClass('btn-border') ? 'Glow outline' : 'Glow outline off');
+            });
+
+            // Working tabs with content and active states.
+            const tabCopy = {
+                Dashboard: 'Your workspace overview is ready.',
+                Analytics: 'Live trends and performance insights.',
+                Settings: 'Customize your Aetheria experience.'
+            };
+            $('.tab-btn').on('click', function () {
+                const tab = $(this).data('tab');
+                $('.tab-btn').removeClass('active').attr('aria-selected', 'false');
+                $(this).addClass('active').attr('aria-selected', 'true');
+                $('#tabContent').html('<div class="font-medium mb-1">' + tab + '</div><p class="text-sm text-slate-300">' + tabCopy[tab] + '</p>');
+            });
+
+            // Palette swatches provide a tiny interaction feedback.
+            $('.swatch-item').on('click', function () {
+                $('#paletteMessage').text($(this).data('color') + ' selected').removeClass('hidden');
+                $('.swatch-item').css('filter', 'none');
+                $(this).css('filter', 'drop-shadow(0 0 9px rgba(204,184,255,.8))');
+            });
+
+            $('#demoForm').on('submit', function (e) { e.preventDefault(); });
+            $('#demoForm input[type="search"]').on('input', function () {
+                const value = $(this).val().trim();
+                $('#formMessage').text(value ? 'Searching for “' + value + '”…' : '').toggleClass('hidden', !value);
+            });
+            $('.switch').on('change', function () {
+                const label = $(this).attr('aria-label');
+                if ($(this).is(':checked')) $(this).attr('title', label + ' enabled');
+                else $(this).attr('title', label + ' disabled');
+            });
+        });
+    </script>
+</body>
+
+</html>

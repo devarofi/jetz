@@ -1,0 +1,685 @@
+import { describe, it, expect } from 'vitest';
+import * as Aetheria from '../src/aetheria-ui/aetheria-ui.js';
+import { Jetz, stateOf } from '../src/lib/jetz.js';
+import { div, span } from '../src/lib/jetz-ui.js';
+
+describe('Aetheria UI in Jetz', () => {
+    it('exports all roadmap components', () => {
+        expect(Aetheria.Button).toBeDefined();
+        expect(Aetheria.IconButton).toBeDefined();
+        expect(Aetheria.TextInput).toBeDefined();
+        expect(Aetheria.TextArea).toBeDefined();
+        expect(Aetheria.Checkbox).toBeDefined();
+        expect(Aetheria.Radio).toBeDefined();
+        expect(Aetheria.Switch).toBeDefined();
+        expect(Aetheria.Select).toBeDefined();
+        expect(Aetheria.MultiSelect).toBeDefined();
+        expect(Aetheria.Slider).toBeDefined();
+        expect(Aetheria.RangeSlider).toBeDefined();
+        expect(Aetheria.Badge).toBeDefined();
+        expect(Aetheria.Avatar).toBeDefined();
+        expect(Aetheria.Card).toBeDefined();
+        expect(Aetheria.Spinner).toBeDefined();
+        expect(Aetheria.ProgressBar).toBeDefined();
+        expect(Aetheria.Dropdown).toBeDefined();
+        expect(Aetheria.ContextMenu).toBeDefined();
+        expect(Aetheria.Autocomplete).toBeDefined();
+        expect(Aetheria.Tabs).toBeDefined();
+        expect(Aetheria.Accordion).toBeDefined();
+        expect(Aetheria.Modal).toBeDefined();
+        expect(Aetheria.Drawer).toBeDefined();
+        expect(Aetheria.Tooltip).toBeDefined();
+        expect(Aetheria.Popover).toBeDefined();
+        expect(Aetheria.DatePicker).toBeDefined();
+        expect(Aetheria.Calendar).toBeDefined();
+        expect(Aetheria.FormValidation).toBeDefined();
+        expect(Aetheria.Pagination).toBeDefined();
+        expect(Aetheria.Breadcrumb).toBeDefined();
+        expect(Aetheria.DataGrid).toBeDefined();
+        expect(Aetheria.TreeView).toBeDefined();
+        expect(Aetheria.TreeGrid).toBeDefined();
+        expect(Aetheria.ListView).toBeDefined();
+        expect(Aetheria.CommandToolbar).toBeDefined();
+        expect(Aetheria.FileManager).toBeDefined();
+        expect(Aetheria.SortableList).toBeDefined();
+        expect(Aetheria.Chart).toBeDefined();
+        expect(Aetheria.Sparkline).toBeDefined();
+        expect(Aetheria.Scheduler).toBeDefined();
+        expect(Aetheria.Gantt).toBeDefined();
+        expect(Aetheria.Spreadsheet).toBeDefined();
+        expect(Aetheria.RichTextEditor).toBeDefined();
+        expect(Aetheria.PivotGrid).toBeDefined();
+        expect(Aetheria.PdfViewer).toBeDefined();
+    });
+
+    it('can render Button and Card components', () => {
+        const btn = new Aetheria.Button().render({ label: 'Hello Glass' });
+        expect(btn).toBeDefined();
+        const card = new Aetheria.Card().render({ title: 'Glass Card' });
+        expect(card).toBeDefined();
+    });
+
+    it('renders a spaced, responsive Pagination control and preserves navigation', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        const changedPages = [];
+        Jetz.mount(new Aetheria.Pagination().render({
+            totalPages: 5,
+            currentPage: 2,
+            onchange: page => changedPages.push(page)
+        }), target);
+
+        const pagination = target.querySelector('.aetheria-pagination');
+        const activePage = () => target.querySelector('[aria-current="page"]');
+        expect(pagination.getAttribute('aria-label')).toBe('Pagination');
+        expect(activePage().textContent).toBe('2');
+        expect(target.querySelector('.aetheria-pagination-pages').children).toHaveLength(5);
+        expect(getComputedStyle(pagination).flexWrap).toBe('nowrap');
+        expect(getComputedStyle(target.querySelector('.aetheria-pagination-pages')).flexWrap).toBe('nowrap');
+        const paginationStyles = document.querySelector('#aetheria-styles').textContent;
+        expect(paginationStyles).toMatch(/\.aetheria-pagination-btn[\s\S]{0,220}?min-width: var\(--aetheria-control-md\)/);
+        expect(paginationStyles).toMatch(/\.aetheria-pagination-btn[\s\S]{0,220}?padding: 0 var\(--aetheria-space-2\)/);
+        expect(paginationStyles).toContain('--aetheria-control-md: 44px');
+        expect(document.querySelector('#aetheria-styles').textContent).toContain('.aetheria-pagination-pages');
+
+        target.querySelector('[aria-label="Next page"]').click();
+        expect(activePage().textContent).toBe('3');
+        target.querySelector('[aria-label="Page 5"]').click();
+        expect(activePage().textContent).toBe('5');
+        expect(target.querySelector('[aria-label="Next page"]').disabled).toBe(true);
+        target.querySelector('[aria-label="Previous page"]').click();
+        expect(activePage().textContent).toBe('4');
+        expect(changedPages).toEqual([3, 5, 4]);
+    });
+
+    it('transitions modal and drawer open and closed with reduced-motion support', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        const modalOpen = stateOf(true);
+        const drawerOpen = stateOf(true);
+        Jetz.mount(div(
+            new Aetheria.Modal().render({ open: modalOpen, title: 'Animated modal' }),
+            new Aetheria.Drawer().render({ open: drawerOpen, title: 'Animated drawer' })
+        ), target);
+
+        const modalBackdrop = target.querySelector('.aetheria-modal-backdrop');
+        const modalDialog = target.querySelector('.aetheria-modal-dialog');
+        const drawerBackdrop = target.querySelector('.aetheria-drawer-backdrop');
+        const drawer = target.querySelector('.aetheria-drawer');
+        expect(modalBackdrop.classList.contains('is-open')).toBe(true);
+        expect(modalDialog.classList.contains('is-open')).toBe(true);
+        expect(drawerBackdrop.classList.contains('is-open')).toBe(true);
+        expect(drawer.classList.contains('is-open')).toBe(true);
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toMatch(/\.aetheria-modal-backdrop[\s\S]*opacity: 0/);
+        expect(styles).toMatch(/\.aetheria-modal-dialog\.is-open\s*\{\s*transform: none; opacity: 1/);
+        expect(styles).toMatch(/\.aetheria-drawer\s*\{[\s\S]*?transform: translateX\(100%\)/);
+        expect(styles).toMatch(/\.aetheria-drawer\.is-open\s*\{\s*transform: none/);
+        expect(styles).toContain('transition: opacity var(--aetheria-fast), visibility var(--aetheria-fast)');
+        expect(styles).toContain('@media (prefers-reduced-motion: reduce)');
+
+        modalDialog.querySelector('[aria-label="Close dialog"]').click();
+        drawer.querySelector('[aria-label="Close drawer"]').click();
+        expect(modalBackdrop.classList.contains('is-open')).toBe(false);
+        expect(modalBackdrop.getAttribute('aria-hidden')).toBe('true');
+        expect(drawerBackdrop.classList.contains('is-open')).toBe(false);
+        expect(drawerBackdrop.getAttribute('aria-hidden')).toBe('true');
+        expect(target.contains(modalBackdrop)).toBe(true);
+        expect(target.contains(drawerBackdrop)).toBe(true);
+    });
+
+    it('renders the docs modal and drawer outside clipped showcase previews', async () => {
+        const { AetheriaDocs } = await import('../src/aetheria-ui/aetheria-docs.js');
+        const target = document.createElement('div');
+        Jetz.mount(new AetheriaDocs().render(), target);
+
+        const buttons = [...target.querySelectorAll('button')];
+        buttons.find(button => button.textContent === 'Open Dialog').click();
+        const modal = target.querySelector('.aetheria-modal-backdrop');
+        expect(modal).not.toBeNull();
+        expect(modal.closest('.aetheria-glass')).toBeNull();
+        modal.querySelector('button').click();
+        expect(modal.classList.contains('is-open')).toBe(false);
+        expect(target.contains(modal)).toBe(true);
+
+        buttons.find(button => button.textContent === 'Open Drawer').click();
+        const drawer = target.querySelector('.aetheria-drawer-backdrop');
+        expect(drawer).not.toBeNull();
+        expect(drawer.closest('.aetheria-glass')).toBeNull();
+        drawer.querySelector('button').click();
+        expect(drawer.classList.contains('is-open')).toBe(false);
+        expect(target.contains(drawer)).toBe(true);
+    });
+
+    it('renders the custom Select options inside the unclipped live preview', async () => {
+        const { AetheriaDocs } = await import('../src/aetheria-ui/aetheria-docs.js');
+        const target = document.createElement('div');
+        Jetz.mount(new AetheriaDocs().render(), target);
+
+        const heading = [...target.querySelectorAll('h3')]
+            .find(item => item.textContent === 'Select & MultiSelect');
+        const showcase = heading.closest('.aetheria-showcase-overflow-visible');
+        const preview = showcase.querySelector('.aetheria-showcase-preview');
+        const select = preview.querySelector('[role="combobox"]');
+        expect(showcase).not.toBeNull();
+        expect(getComputedStyle(showcase).overflow).toBe('visible');
+        expect(getComputedStyle(preview).overflow).toBe('visible');
+        select.click();
+        const options = preview.querySelectorAll('[role="option"]');
+        expect(options).toHaveLength(3);
+        expect(options[1].textContent).toContain('Frontend and platform development');
+        expect(options[1].classList.contains('is-active')).toBe(true);
+        expect(getComputedStyle(preview.querySelector('.aetheria-select-menu')).position).toBe('absolute');
+    });
+
+    it('supports styled Select options, keyboard selection, disabled options, and change callbacks', () => {
+        const target = document.createElement('div');
+        const value = stateOf('engineering');
+        const changes = [];
+        Jetz.mount(new Aetheria.Select().render({
+            value,
+            options: [
+                { value: 'design', label: 'Design', description: 'Create product visuals' },
+                { value: 'engineering', label: 'Engineering', description: 'Build and maintain software' },
+                { value: 'disabled', label: 'Unavailable', disabled: true }
+            ],
+            onchange: next => changes.push(next)
+        }), target);
+
+        const trigger = target.querySelector('[role="combobox"]');
+        expect(trigger.textContent).toContain('Engineering');
+        trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        const options = [...target.querySelectorAll('[role="option"]')];
+        expect(options[2].disabled).toBe(true);
+        expect(options[2].classList.contains('is-active')).toBe(false);
+        expect(target.querySelector('[role="option"].is-active').textContent).toContain('Design');
+        trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        expect(value.value).toBe('design');
+        expect(changes).toEqual(['design']);
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(target.querySelector('[role="listbox"]').getAttribute('aria-hidden')).toBe('true');
+        expect(target.querySelector('[role="option"][aria-selected="true"]').textContent).toContain('Design');
+    });
+
+    it('filters and sorts DataGrid rows', () => {
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.DataGrid().render({
+            columns: ['name', 'city'],
+            rows: [
+                { name: 'Grace Hopper', city: 'New York' },
+                { name: 'Ada Lovelace', city: 'London' },
+                { name: 'Alan Turing', city: 'Manchester' }
+            ]
+        }), target);
+
+        const gridRows = () => [...target.querySelectorAll('tbody tr')].map(row => row.textContent);
+        expect(gridRows()).toHaveLength(3);
+
+        const filter = target.querySelector('input[type="search"]');
+        filter.value = 'Grace';
+        filter.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(gridRows()).toEqual(['Grace HopperNew York']);
+
+        filter.value = '';
+        filter.dispatchEvent(new Event('input', { bubbles: true }));
+        const sortButtons = target.querySelectorAll('.aetheria-datagrid-sort');
+        expect(sortButtons).toHaveLength(2);
+        expect(sortButtons[0].classList.contains('aetheria-btn')).toBe(false);
+        const gridStyles = document.querySelector('#aetheria-styles').textContent;
+        expect(sortButtons[0].querySelector('.aetheria-datagrid-sort-icon svg.aetheria-icon')).not.toBeNull();
+        expect(sortButtons[0].getAttribute('aria-sort')).toBe('none');
+        expect(getComputedStyle(sortButtons[0]).cursor).toBe('pointer');
+        expect(gridStyles).toMatch(/button\.aetheria-datagrid-sort\s*\{[^}]*padding: 0;/);
+        expect(gridStyles).toMatch(/\.aetheria-datagrid\s*\{[^}]*padding: var\(--aetheria-space-4\)/);
+        expect(gridStyles).toMatch(/\.aetheria-datagrid-table tbody td\s*\{[^}]*padding: var\(--aetheria-space-3\)/);
+        expect(gridStyles).toContain('.aetheria-datagrid-sort-icon');
+        target.querySelector('.aetheria-datagrid-sort').click();
+        expect(target.querySelector('.aetheria-datagrid-sort').getAttribute('aria-sort')).toBe('ascending');
+        expect(gridRows()[0]).toBe('Ada LovelaceLondon');
+        target.querySelector('.aetheria-datagrid-sort').click();
+        expect(target.querySelector('.aetheria-datagrid-sort').getAttribute('aria-sort')).toBe('descending');
+        expect(gridRows()[0]).toBe('Grace HopperNew York');
+        expect(target.querySelector('thead th').getAttribute('scope')).toBe('col');
+        expect(document.querySelector('#aetheria-styles').textContent).toContain('.aetheria-datagrid-table tbody td');
+        expect(document.querySelector('#aetheria-styles').textContent).toContain('.aetheria-datagrid-sort-icon');
+    });
+
+    it('supports paging, selectable rows, custom cells, expandable details, and row events', () => {
+        const target = document.createElement('div');
+        const pageChanges = [];
+        const selectionChanges = [];
+        const rowClicks = [];
+        const expansionChanges = [];
+        const filterChanges = [];
+        const sortChanges = [];
+        const data = [
+            { id: 1, name: 'Ada', score: 9 },
+            { id: 2, name: 'Alan', score: 8 },
+            { id: 3, name: 'Grace', score: 10 }
+        ];
+        Jetz.mount(new Aetheria.DataGrid().render({
+            columns: [
+                { key: 'name', label: 'Engineer', render: value => span(`@${value}`) },
+                { key: 'score', label: 'Score', align: 'right', sortable: false }
+            ],
+            rows: data,
+            pageable: true,
+            pageSize: 2,
+            pageSizeOptions: [2, 3],
+            selectable: true,
+            expandable: true,
+            renderDetails: row => div({ class: 'row-detail' }, `${row.name} details`),
+            onpagechange: (page, size) => pageChanges.push([page, size]),
+            onselectionchange: rows => selectionChanges.push(rows.map(row => row.id)),
+            onrowclick: row => rowClicks.push(row.id),
+            onrowexpand: (row, expanded) => expansionChanges.push([row.id, expanded]),
+            onfilterchange: query => filterChanges.push(query),
+            onsortchange: (key, direction) => sortChanges.push([key, direction])
+        }), target);
+
+        expect([...target.querySelectorAll('tbody tr')]).toHaveLength(2);
+        expect(target.querySelector('tbody tr td:nth-child(3)').textContent).toBe('@Ada');
+        expect(getComputedStyle(target.querySelector('tbody tr td:nth-child(4)')).textAlign).toBe('right');
+        expect(target.querySelector('.aetheria-datagrid-page-current').textContent).toBe('Page 1 of 2');
+        expect(target.querySelector('.aetheria-datagrid-page-size').value).toBe('2');
+        expect(target.querySelector('.aetheria-datagrid-page-size option:checked').textContent).toBe('2');
+
+        const firstRowCheckbox = target.querySelector('[aria-label="Select row 1"]');
+        firstRowCheckbox.checked = true;
+        firstRowCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+        expect(target.querySelector('tbody tr').classList.contains('is-selected')).toBe(true);
+        expect(selectionChanges).toEqual([[1]]);
+        const selectPageCheckbox = target.querySelector('[aria-label="Select all rows on this page"]');
+        selectPageCheckbox.checked = true;
+        selectPageCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+        expect(selectionChanges).toEqual([[1], [1, 2]]);
+        expect(target.querySelectorAll('tbody tr.is-selected')).toHaveLength(2);
+        target.querySelector('[aria-label="Expand row details"]').click();
+        expect(target.querySelector('.row-detail').textContent).toBe('Ada details');
+        expect(expansionChanges).toEqual([[1, true]]);
+
+        target.querySelector('[aria-label="Next grid page"]').click();
+        expect(target.querySelector('tbody tr td:nth-child(3)').textContent).toBe('@Grace');
+        expect(target.querySelector('.aetheria-datagrid-page-current').textContent).toBe('Page 2 of 2');
+        expect(pageChanges).toEqual([[2, 2]]);
+        target.querySelector('tbody tr').click();
+        expect(rowClicks).toEqual([3]);
+        target.querySelector('[aria-label="Previous grid page"]').click();
+        target.querySelector('.aetheria-datagrid-page-size').value = '3';
+        target.querySelector('.aetheria-datagrid-page-size').dispatchEvent(new Event('change', { bubbles: true }));
+        expect(pageChanges).toEqual([[2, 2], [1, 2], [1, 3]]);
+        expect(target.querySelector('.aetheria-datagrid-page-size').value).toBe('3');
+        expect(target.querySelector('.aetheria-datagrid-page-size option:checked').textContent).toBe('3');
+        expect(target.querySelectorAll('tbody tr:not(.aetheria-datagrid-detail-row)')).toHaveLength(3);
+        const filter = target.querySelector('input[type="search"]');
+        filter.value = 'Ada';
+        filter.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(filterChanges).toEqual(['Ada']);
+        expect(target.querySelectorAll('tbody tr:not(.aetheria-datagrid-detail-row)')).toHaveLength(1);
+        filter.value = '';
+        filter.dispatchEvent(new Event('input', { bubbles: true }));
+        target.querySelector('.aetheria-datagrid-sort').click();
+        expect(sortChanges).toEqual([['name', 'ascending']]);
+    });
+
+    it('supports callback-driven server paging with external row totals', () => {
+        const target = document.createElement('div');
+        const requestedPages = [];
+        const page = stateOf(1);
+        Jetz.mount(new Aetheria.DataGrid().render({
+            columns: ['name'],
+            rows: [{ name: 'Current page row' }],
+            pageable: true,
+            serverSide: true,
+            totalRows: 11,
+            page,
+            pageSize: 5,
+            onpagechange: (requestedPage, size) => requestedPages.push([requestedPage, size])
+        }), target);
+
+        expect(target.querySelector('.aetheria-datagrid-page-summary').textContent).toBe('1–5 of 11');
+        target.querySelector('[aria-label="Next grid page"]').click();
+        expect(page.value).toBe(2);
+        expect(requestedPages).toEqual([[2, 5]]);
+        expect(target.querySelector('.aetheria-datagrid-page-current').textContent).toBe('Page 2 of 3');
+        expect(target.querySelector('tbody td').textContent).toBe('Current page row');
+    });
+
+    it('updates the virtual ListView window on scroll', () => {
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.ListView().render({
+            items: Array.from({ length: 20 }, (_, index) => `Item ${index + 1}`),
+            itemHeight: 20,
+            visibleCount: 3
+        }), target);
+
+        const scroller = target.firstElementChild;
+        const visibleItems = () => [...target.querySelector('.aetheria-glass > div').children]
+            .map(item => item.textContent);
+
+        expect(visibleItems()[0]).toBe('Item 1');
+        scroller.scrollTop = 100;
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        expect(visibleItems()[0]).toBe('Item 6');
+        expect(visibleItems()).toHaveLength(5);
+    });
+
+    it('renders grouped glass tabs with an animated active indicator', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.Tabs().render({
+            label: 'Account settings',
+            tabs: [
+                { label: 'Profile', content: 'Profile settings' },
+                { label: 'Security', content: 'Security settings' }
+            ]
+        }), target);
+
+        const tabs = [...target.querySelectorAll('[role="tab"]')];
+        const indicator = target.querySelector('.aetheria-tabs-indicator');
+        expect(target.querySelector('[role="tablist"]').getAttribute('aria-label')).toBe('Account settings');
+        expect(indicator).not.toBeNull();
+        expect(indicator.style.transform).toBe('translateX(0%)');
+        expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+        expect(tabs[0].getAttribute('tabindex')).toBe('0');
+        expect(tabs[1].getAttribute('aria-selected')).toBe('false');
+        expect(target.querySelector('[role="tabpanel"]').textContent).toBe('Profile settings');
+
+        tabs[1].click();
+        expect(indicator.style.transform).toBe('translateX(100%)');
+        expect(tabs[0].getAttribute('aria-selected')).toBe('false');
+        expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+        expect(target.querySelector('[role="tabpanel"]').textContent).toBe('Security settings');
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toContain('.aetheria-tabs-indicator');
+        expect(styles).toContain('transition: transform var(--aetheria-slow) var(--aetheria-ease), width var(--aetheria-slow) var(--aetheria-ease)');
+        expect(target.querySelector('.aetheria-tabs-indicator').style.width)
+            .toBe('calc(0.5 * (100% - 8px))');
+    });
+
+    it('provides readable contrast and visible hover feedback across component surfaces', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        Jetz.mount(div(
+            new Aetheria.Dropdown().render({ items: ['Open item'] }),
+            new Aetheria.Autocomplete().render({ items: ['Matching item'] }),
+            new Aetheria.Calendar().render(),
+            new Aetheria.Accordion().render({ items: [{ title: 'Section', content: 'Content' }] }),
+            new Aetheria.TreeView().render({ nodes: [{ label: 'Folder', children: [] }] }),
+            new Aetheria.FileManager().render({ files: [{ name: 'Document' }] }),
+            new Aetheria.SortableList().render({ items: ['Sortable'] }),
+            new Aetheria.ListView().render({ items: ['List row'] })
+        ), target);
+
+        target.querySelector('.aetheria-btn-secondary').click();
+        const autocomplete = target.querySelector('input.aetheria-field');
+        autocomplete.value = 'Matching';
+        autocomplete.dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(target.querySelector('.aetheria-dropdown-item')).not.toBeNull();
+        expect(target.querySelector('.aetheria-autocomplete-item')).not.toBeNull();
+        expect(target.querySelector('.aetheria-calendar-day')).not.toBeNull();
+        expect(target.querySelector('.aetheria-accordion-trigger')).not.toBeNull();
+        expect(target.querySelector('.aetheria-tree-trigger')).not.toBeNull();
+        expect(target.querySelector('.aetheria-file-item')).not.toBeNull();
+        expect(target.querySelector('.aetheria-sortable-item')).not.toBeNull();
+        expect(target.querySelector('.aetheria-list-item')).not.toBeNull();
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toContain('.aetheria-dropdown-item:hover');
+        expect(styles).toContain('.aetheria-autocomplete-item:hover');
+        expect(styles).toContain('.aetheria-calendar-day:not(.is-selected):hover');
+        expect(styles).toContain('.aetheria-accordion-trigger:hover');
+        expect(styles).toContain('.aetheria-tree-trigger:hover');
+        expect(styles).toContain('.aetheria-file-item:hover');
+        expect(styles).toContain('.aetheria-sortable-item:hover');
+        expect(styles).toContain('.aetheria-list-item:hover');
+        expect(styles).toContain('--aetheria-text-muted: #c1bbcf');
+        expect(styles).toContain('color: var(--aetheria-text-muted)');
+        expect(styles).toContain('.aetheria-btn-muted:hover:not(:disabled)');
+    });
+
+    it('uses consistent spacing, flush table edges, and accessible control targets', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        Jetz.mount(div(
+            new Aetheria.Calendar().render(),
+            new Aetheria.Checkbox().render({ label: 'Accept terms' }),
+            new Aetheria.DataGrid().render({ columns: ['name'], rows: [{ name: 'Ada' }] }),
+            new Aetheria.Spreadsheet().render({ rows: 1, cols: 1 }),
+            new Aetheria.PivotGrid().render()
+        ), target);
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toContain('--aetheria-space-4: 16px');
+        expect(styles).toContain('--aetheria-radius-lg: 16px');
+        expect(styles).toContain('box-sizing: border-box');
+        expect(styles).toContain('.aetheria-panel .aetheria-table-flush');
+        expect(styles).toContain('--aetheria-control-md: 44px');
+        expect(styles).toMatch(/\.aetheria-calendar-day\s*\{[^}]*min-height: var\(--aetheria-control-md\)/);
+        expect(target.querySelector('.aetheria-control-label')).not.toBeNull();
+        expect(target.querySelector('.aetheria-table-scroll .aetheria-table').classList.contains('aetheria-table-flush')).toBe(false);
+        expect(target.querySelectorAll('.aetheria-table-flush')).toHaveLength(2);
+    });
+
+    it('supports calendar view changes, navigation, selection, and date constraints', () => {
+        const target = document.createElement('div');
+        const selectedDates = [];
+        Jetz.mount(new Aetheria.Calendar().render({
+            value: '2024-05-15',
+            min: '2024-05-10',
+            max: '2025-06-10',
+            disabledDates: ['2024-05-20'],
+            onchange: (date, key) => selectedDates.push(key)
+        }), target);
+
+        expect(target.querySelector('[aria-label="Choose month, May 2024"]')).not.toBeNull();
+        expect(target.querySelector('[aria-label="Wednesday, May 8, 2024"]').disabled).toBe(true);
+        expect(target.querySelector('[aria-label="Monday, May 20, 2024"]').disabled).toBe(true);
+        expect(target.querySelector('.aetheria-calendar-mode-list')).toBeNull();
+        target.querySelector('[aria-label="Thursday, May 16, 2024"]').click();
+        expect(selectedDates).toEqual(['2024-05-16']);
+        expect(target.querySelector('[aria-label="Thursday, May 16, 2024"]').getAttribute('aria-pressed')).toBe('true');
+
+        target.querySelector('[aria-label="Choose month, May 2024"]').click();
+        expect(target.querySelector('[aria-label="Choose June"]')).not.toBeNull();
+        target.querySelector('[aria-label="Choose year, 2024"]').click();
+        expect(target.querySelector('.aetheria-calendar-year-grid')).not.toBeNull();
+        target.querySelector('[aria-label="Choose year 2025"]').click();
+        expect(target.querySelector('[aria-label="Choose June"]')).not.toBeNull();
+        target.querySelector('[aria-label="Choose June"]').click();
+        expect(target.querySelector('[aria-label="Choose month, June 2025"]')).not.toBeNull();
+    });
+
+    it('commits custom DatePicker dates only on Apply and preserves cancel behavior', () => {
+        const target = document.createElement('div');
+        const value = stateOf('2024-05-15');
+        const changes = [];
+        Jetz.mount(new Aetheria.DatePicker().render({
+            value,
+            onchange: (key, date) => changes.push([key, date.getDate()])
+        }), target);
+
+        target.querySelector('.aetheria-datepicker-trigger').click();
+        const dialog = target.querySelector('[role="dialog"]');
+        expect(dialog).not.toBeNull();
+        expect(dialog.classList.contains('aetheria-calendar-dialog')).toBe(true);
+        expect(document.querySelector('#aetheria-styles').textContent)
+            .toMatch(/\.aetheria-calendar-dialog\s*\{[^}]*padding: var\(--aetheria-space-4\)/);
+        expect(getComputedStyle(dialog.querySelector('.aetheria-calendar')).width).toBe('100%');
+        expect(getComputedStyle(dialog.querySelector('.aetheria-calendar-grid')).width).toBe('100%');
+        target.querySelector('[aria-label="Thursday, May 16, 2024"]').click();
+        target.querySelector('.aetheria-calendar-actions .aetheria-btn-muted').click();
+        expect(value.value).toBe('2024-05-15');
+        expect(changes).toEqual([]);
+
+        target.querySelector('.aetheria-datepicker-trigger').click();
+        target.querySelector('[aria-label="Friday, May 17, 2024"]').click();
+        target.querySelector('.aetheria-calendar-actions .aetheria-btn-primary').click();
+        expect(value.value).toBe('2024-05-17');
+        expect(target.querySelector('.aetheria-calendar-modal').classList.contains('is-open')).toBe(false);
+        expect(changes).toEqual([['2024-05-17', 17]]);
+    });
+
+    it('reorders SortableList items when dropped before or after a target', () => {
+        const target = document.createElement('div');
+        const changes = [];
+        Jetz.mount(new Aetheria.SortableList().render({
+            items: ['First', 'Second', 'Third'],
+            onchange: items => changes.push(items)
+        }), target);
+
+        const sortableItems = () => [...target.querySelectorAll('.aetheria-sortable-item')];
+        const labels = () => sortableItems().map(item => item.firstElementChild.textContent);
+        const transfer = {
+            value: '',
+            effectAllowed: '',
+            dropEffect: '',
+            setData(_type, value) { this.value = value; },
+            getData() { return this.value; }
+        };
+        const dispatchDrag = (element, type, clientY = 0) => {
+            const event = new Event(type, { bubbles: true, cancelable: true });
+            Object.defineProperties(event, {
+                dataTransfer: { value: transfer },
+                clientY: { value: clientY }
+            });
+            element.dispatchEvent(event);
+        };
+
+        const [first, , third] = sortableItems();
+        dispatchDrag(first, 'dragstart');
+        expect(transfer.value).toBe(first.dataset.sortableId);
+        dispatchDrag(third, 'dragover');
+        dispatchDrag(third, 'drop');
+        expect(labels()).toEqual(['Second', 'First', 'Third']);
+        expect(changes[0]).toEqual(['Second', 'First', 'Third']);
+
+        const [second, , last] = sortableItems();
+        last.getBoundingClientRect = () => ({ top: 0, height: 20 });
+        dispatchDrag(second, 'dragstart');
+        dispatchDrag(last, 'drop', 15);
+        expect(labels()).toEqual(['First', 'Third', 'Second']);
+    });
+
+    it('opens ContextMenu on right-click and calls the selected action', () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const selected = [];
+        Jetz.mount(new Aetheria.ContextMenu().render({
+            items: ['Open', 'Rename', { label: 'Delete', disabled: true }],
+            onselect: item => selected.push(item),
+            children: div('Right-click target')
+        }), target);
+
+        const contextTarget = target.querySelector('.aetheria-context-menu-area');
+        const rightClick = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 64,
+            clientY: 72
+        });
+        contextTarget.dispatchEvent(rightClick);
+
+        expect(rightClick.defaultPrevented).toBe(true);
+        const portal = document.body.querySelector('.aetheria-context-menu-backdrop');
+        const menu = portal?.querySelector('[role="menu"]');
+        expect(menu).not.toBeNull();
+        expect(menu.querySelectorAll('[role="menuitem"]')).toHaveLength(3);
+        expect(menu.querySelector('[role="menuitem"]:disabled').textContent).toBe('Delete');
+
+        const firstAction = menu.querySelector('[role="menuitem"]');
+        const menuStyles = document.querySelector('#aetheria-styles').textContent;
+        expect(menuStyles).toMatch(/\.aetheria-context-menu-backdrop \[role="menuitem"\]:not\(:disabled\):hover/);
+        firstAction.dispatchEvent(new MouseEvent('mouseenter'));
+        expect(firstAction.style.backgroundColor).toBe('');
+        firstAction.focus();
+        expect(firstAction.classList.contains('is-active')).toBe(true);
+        firstAction.blur();
+        expect(firstAction.classList.contains('is-active')).toBe(false);
+        firstAction.click();
+        expect(selected).toEqual(['Open']);
+        expect(document.body.querySelector('.aetheria-context-menu-backdrop')).toBeNull();
+        target.remove();
+    });
+
+    it('closes ContextMenu with Escape and when its source is removed', async () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        Jetz.mount(new Aetheria.ContextMenu().render({
+            items: ['Open'],
+            children: div('Right-click target')
+        }), target);
+
+        const contextTarget = target.querySelector('.aetheria-context-menu-area');
+        const openMenu = () => {
+            contextTarget.dispatchEvent(new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                clientX: 24,
+                clientY: 24
+            }));
+            return document.body.querySelector('.aetheria-context-menu-backdrop');
+        };
+
+        expect(openMenu()).not.toBeNull();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(document.body.querySelector('.aetheria-context-menu-backdrop')).toBeNull();
+
+        expect(openMenu()).not.toBeNull();
+        target.remove();
+        await Promise.resolve();
+        expect(document.body.querySelector('.aetheria-context-menu-backdrop')).toBeNull();
+    });
+
+    it('renders Chart and Sparkline as visible SVG graphics', () => {
+        const target = document.createElement('div');
+        Jetz.mount(div(
+            new Aetheria.Chart().render({ data: [-10, 0, 10], width: 200, height: 80 }),
+            new Aetheria.Sparkline().render({ data: [4], width: 90, height: 28 })
+        ), target);
+
+        const svgs = [...target.querySelectorAll('svg')];
+        expect(svgs).toHaveLength(2);
+        expect(svgs.every(svg => svg.namespaceURI === 'http://www.w3.org/2000/svg')).toBe(true);
+        expect(svgs.map(svg => svg.querySelector('polyline')?.getAttribute('points')))
+            .toEqual(['0,77 100,40 200,3', '45,14']);
+    });
+
+    it('aggregates PivotGrid data and shows matching documentation example', async () => {
+        const gridTarget = document.createElement('div');
+        Jetz.mount(new Aetheria.PivotGrid().render({
+            data: [
+                { category: 'Hardware', region: 'North', sales: 100 },
+                { category: 'Hardware', region: 'North', sales: 50 },
+                { category: 'Software', region: 'South', sales: 200 }
+            ]
+        }), gridTarget);
+
+        expect([...gridTarget.querySelectorAll('tbody tr')].map(row => row.textContent))
+            .toEqual(['Hardware1500150', 'Software0200200', 'Grand Total150200350']);
+
+        const { AetheriaDocs } = await import('../src/aetheria-ui/aetheria-docs.js');
+        const docsTarget = document.createElement('div');
+        Jetz.mount(new AetheriaDocs().render(), docsTarget);
+        const pivotHeading = [...docsTarget.querySelectorAll('h3')]
+            .find(heading => heading.textContent === 'Pivot Grid (Sales)');
+        const pivotPanel = pivotHeading.closest('.aetheria-panel');
+        const pivotTable = pivotPanel.querySelector('table');
+        expect(pivotTable.querySelectorAll('tbody tr')).toHaveLength(4);
+        expect(pivotTable.textContent).toContain('Grand Total');
+        expect(docsTarget.textContent).toContain('"category": "Hardware"');
+        expect(docsTarget.textContent).toContain('"region": "South America"');
+    });
+
+    it('can render AetheriaDocs documentation page', async () => {
+        const { AetheriaDocs } = await import('../src/aetheria-ui/aetheria-docs.js');
+        const target = document.createElement('div');
+        Jetz.mount(new AetheriaDocs().render(), target);
+        expect(target.textContent).toContain('Aetheria UI Documentation');
+        expect(target.querySelector('.aetheria-root')).not.toBeNull();
+    });
+});

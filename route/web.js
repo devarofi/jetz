@@ -10,6 +10,7 @@ import { Calculator } from "../src/components/calculator/calculator.js";
 import ToDoComponent from "../src/components/todo/todo-component.js";
 import { RememberTodo } from "../src/components/todo/todo-remember.js";
 import { Playground } from "../src/components/playground/playground.js";
+import { AetheriaDocs } from "../src/aetheria-ui/aetheria-docs.js";
 import { DocsOverview } from "../src/components/docs/docs-overview.js";
 import { DocsQuickStart } from "../src/components/docs/docs-quick-start.js";
 import { DocsComposition } from "../src/components/docs/docs-composition.js";
@@ -98,6 +99,7 @@ export let routeWeb = [
             route('/next-steps', docsTitled(DocsNextSteps, "Next steps", "Continue learning Jetz with advanced patterns, integrations, and production-ready project guidance.", "/docs/next-steps")),
         ],
     }),
+    route('aetheria-ui', titled(AetheriaDocs, "Aetheria UI", "Browse the glassmorphic Aetheria component system built with Jetz.", "/aetheria-ui")),
     route('my', titled(TryMe, "Try Jetz", "Try Jetz in a browser-based environment and explore a small, interactive app built with the framework.", "/my")),
     route('open-todo', titled(ToDo, "Tasks", "Manage tasks and work items with Jetz using a lightweight, reactive to-do interface.", "/open-todo")),
     route('counter', titled(counter, "Counter", "Use Jetz to build a tiny counter example with reactive state and direct UI updates.", "/counter")),
