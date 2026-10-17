@@ -467,7 +467,7 @@ describe('Aetheria UI in Jetz', () => {
         expect(styles).toContain('.aetheria-btn-muted:hover:not(:disabled)');
     });
 
-    it('uses consistent spacing, flush table edges, and accessible control targets', () => {
+    it('keeps flush tables aligned with card padding and controls tappable', () => {
         Aetheria.injectAetheriaStyles();
         const target = document.createElement('div');
         Jetz.mount(div(
@@ -482,7 +482,13 @@ describe('Aetheria UI in Jetz', () => {
         expect(styles).toContain('--aetheria-space-4: 16px');
         expect(styles).toContain('--aetheria-radius-lg: 16px');
         expect(styles).toContain('box-sizing: border-box');
-        expect(styles).toContain('.aetheria-panel .aetheria-table-flush');
+        // Bleeding a table past the card padding would push its 12px cell text
+        // out of alignment with the 20px inset every other card child uses.
+        expect(styles).toContain('.aetheria-table-flush { margin: 0; }');
+        expect(styles).not.toContain('.aetheria-panel .aetheria-table-flush');
+        expect(styles).not.toContain('backdrop-filter: blur(22px)');
+        expect(styles).toMatch(/\.aetheria-tree-trigger\s*\{[^}]*height: 24px/);
+        expect(styles).toMatch(/button\.aetheria-datagrid-sort\s*\{[^}]*min-height: 24px/);
         expect(styles).toContain('--aetheria-control-md: 44px');
         expect(styles).toMatch(/\.aetheria-calendar-day\s*\{[^}]*min-height: var\(--aetheria-control-md\)/);
         expect(target.querySelector('.aetheria-control-label')).not.toBeNull();

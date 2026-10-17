@@ -272,13 +272,19 @@ export const AETHERIA_CSS = `
     border: 1px solid var(--aetheria-border);
     border-radius: var(--aetheria-radius-lg);
     box-shadow: var(--aetheria-inset-hi), var(--aetheria-shadow-2);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
+    /* No backdrop-filter here on purpose: a filter turns the card into the
+       containing block for position:fixed descendants, which traps modals,
+       drawers and the date dialog inside the card instead of the viewport. */
     transition: border-color var(--aetheria-slow) var(--aetheria-ease),
         box-shadow var(--aetheria-slow) var(--aetheria-ease),
         background var(--aetheria-slow) var(--aetheria-ease);
 }
 /* Menus and popovers escape their host panel via .aetheria-showcase-overflow-visible. */
+.aetheria-glass:has(.aetheria-dropdown-panel),
+.aetheria-glass:has(.aetheria-popover-panel),
+.aetheria-glass:has(.aetheria-autocomplete-results),
+.aetheria-glass:has(.aetheria-select-menu.is-open),
+.aetheria-glass:has(.aetheria-tooltip.is-open) { overflow: visible; }
 
 .aetheria-card {
     padding: var(--aetheria-space-5);
@@ -303,6 +309,9 @@ export const AETHERIA_CSS = `
     overflow-wrap: anywhere;
 }
 .aetheria-panel-title:last-child { margin-bottom: 0; }
+/* Inside a header row the title's own bottom margin offsets it from the row's
+   centred line, so the caption sits above the middle of its close button. */
+.aetheria-row > .aetheria-panel-title { margin-bottom: 0; }
 
 /* ---------------------------------------------------------------- buttons */
 
@@ -1087,11 +1096,6 @@ export const AETHERIA_CSS = `
 .aetheria-table tbody tr:last-child td { border-bottom: none; }
 .aetheria-table tbody tr:hover td { background: var(--aetheria-scrim); }
 .aetheria-table-flush { margin: 0; }
-.aetheria-panel .aetheria-table-flush,
-.aetheria-glass .aetheria-table-flush {
-    margin-left: calc(-1 * var(--aetheria-space-5));
-    margin-right: calc(-1 * var(--aetheria-space-5));
-}
 
 .aetheria-datagrid { display: flex; flex-direction: column; gap: var(--aetheria-space-4); padding: var(--aetheria-space-4); }
 .aetheria-datagrid-content { min-width: 0; }
@@ -1130,6 +1134,7 @@ button.aetheria-datagrid-sort {
     display: inline-flex;
     align-items: center;
     gap: var(--aetheria-space-1);
+    min-height: 24px;
     padding: 0;
     font: inherit;
     font-size: inherit;
@@ -1228,8 +1233,8 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     flex: 0 0 auto;
     padding: 0;
     border: none;
@@ -1239,7 +1244,7 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     cursor: pointer;
 }
 .aetheria-tree-trigger:hover { color: var(--aetheria-accent); background: var(--aetheria-scrim); }
-.aetheria-tree-spacer { width: 22px; flex: 0 0 auto; }
+.aetheria-tree-spacer { width: 24px; flex: 0 0 auto; }
 .aetheria-tree-label { min-width: 0; font-size: var(--aetheria-text-sm); color: var(--aetheria-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aetheria-tree-meta { margin-left: auto; color: var(--aetheria-text-faint); font-size: var(--aetheria-text-xs); font-variant-numeric: tabular-nums; }
 
