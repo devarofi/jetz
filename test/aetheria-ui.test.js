@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import * as Aetheria from '../src/aetheria-ui/aetheria-ui.js';
 import { Jetz, stateOf } from '../src/lib/jetz.js';
 import { div, span } from '../src/lib/jetz-ui.js';
@@ -7,6 +7,10 @@ import { div, span } from '../src/lib/jetz-ui.js';
 const settled = () => new Promise(resolve => setTimeout(resolve, 200));
 
 describe('Aetheria UI in Jetz', () => {
+    // Portalled dialogs and ripples attach to body, so every test starts from a clean one.
+    afterEach(() => { document.body.innerHTML = ''; });
+
+
     it('exports all roadmap components', () => {
         expect(Aetheria.Button).toBeDefined();
         expect(Aetheria.IconButton).toBeDefined();
@@ -540,24 +544,59 @@ describe('Aetheria UI in Jetz', () => {
         }), target);
 
         target.querySelector('.aetheria-datepicker-trigger').click();
-        const dialog = target.querySelector('[role="dialog"]');
+        const dialog = document.querySelector('[role="dialog"]');
         expect(dialog).not.toBeNull();
         expect(dialog.classList.contains('aetheria-calendar-dialog')).toBe(true);
         expect(document.querySelector('#aetheria-styles').textContent)
             .toMatch(/\.aetheria-calendar-dialog\s*\{[^}]*padding: var\(--aetheria-space-4\)/);
         expect(getComputedStyle(dialog.querySelector('.aetheria-calendar')).width).toBe('100%');
         expect(getComputedStyle(dialog.querySelector('.aetheria-calendar-grid')).width).toBe('100%');
-        target.querySelector('[aria-label="Thursday, May 16, 2024"]').click();
-        target.querySelector('.aetheria-calendar-actions .aetheria-btn-muted').click();
+        document.querySelector('[aria-label="Thursday, May 16, 2024"]').click();
+        document.querySelector('.aetheria-calendar-actions .aetheria-btn-muted').click();
         expect(value.value).toBe('2024-05-15');
         expect(changes).toEqual([]);
 
         target.querySelector('.aetheria-datepicker-trigger').click();
-        target.querySelector('[aria-label="Friday, May 17, 2024"]').click();
-        target.querySelector('.aetheria-calendar-actions .aetheria-btn-primary').click();
+        document.querySelector('[aria-label="Friday, May 17, 2024"]').click();
+        document.querySelector('.aetheria-calendar-actions .aetheria-btn-primary').click();
         expect(value.value).toBe('2024-05-17');
-        expect(target.querySelector('.aetheria-calendar-modal').classList.contains('is-open')).toBe(false);
+        expect(document.querySelector('.aetheria-calendar-modal').classList.contains('is-open')).toBe(false);
         expect(changes).toEqual([['2024-05-17', 17]]);
+    });
+
+    it('raises the date dialog out of the isolated card that hosts it', async () => {
+        const card = document.createElement('div');
+        card.className = 'aetheria-glass';
+        const target = document.createElement('div');
+        card.append(target);
+        document.body.append(card);
+        Jetz.mount(new Aetheria.DatePicker().render({ value: stateOf('2024-05-15') }), target);
+
+        const trigger = target.querySelector('.aetheria-datepicker-trigger');
+        trigger.click();
+        const modal = document.querySelector('.aetheria-calendar-modal');
+        expect(modal.parentElement).toBe(document.body);
+        expect(modal.classList.contains('aetheria-root')).toBe(true);
+        expect(modal.classList.contains('is-open')).toBe(true);
+
+        // Closing hands the dialog back to the tree, so the card owns it again.
+        modal.querySelector('.aetheria-calendar-actions .aetheria-btn-muted').click();
+        expect(modal.parentElement).toBe(target.querySelector('.aetheria-datepicker'));
+
+        trigger.click();
+        expect(document.querySelectorAll('.aetheria-calendar-modal')).toHaveLength(1);
+        expect(modal.parentElement).toBe(document.body);
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        const modalRules = [...styles.matchAll(/\.aetheria-calendar-modal\s*\{[^}]*\}/g)].map(rule => rule[0]);
+        expect(modalRules).toHaveLength(1);
+        expect(modalRules[0]).toContain('z-index: var(--aetheria-z-modal)');
+
+        // Tearing down with the dialog still open must not leave the portal behind.
+        Jetz.unmount(target);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(document.querySelectorAll('.aetheria-calendar-modal')).toHaveLength(0);
+        card.remove();
     });
 
     it('reorders SortableList items when dropped before or after a target', () => {
@@ -798,6 +837,27 @@ describe('Aetheria UI in Jetz', () => {
         expect(panel()).toBeNull();
     });
 
+    it('lifts the isolating card above its siblings while the popover is open', async () => {
+        const card = document.createElement('div');
+        card.className = 'aetheria-glass';
+        card.style.position = 'relative';
+        const target = document.createElement('div');
+        card.append(target);
+        document.body.append(card);
+        Jetz.mount(new Aetheria.Popover().render({ trigger: 'Details', content: 'Popover body' }), target);
+
+        const trigger = target.querySelector('button');
+        trigger.click();
+        expect(card.classList.contains('aetheria-layer-host')).toBe(true);
+        expect(document.querySelector('#aetheria-styles').textContent)
+            .toMatch(/\.aetheria-layer-host\s*\{\s*z-index: var\(--aetheria-z-menu\)/);
+
+        trigger.click();
+        expect(card.classList.contains('aetheria-layer-host')).toBe(true);
+        await settled();
+        expect(card.classList.contains('aetheria-layer-host')).toBe(false);
+    });
+
     it('closes the autocomplete results on outside click after their exit animation', async () => {
         const target = document.createElement('div');
         document.body.append(target);
@@ -964,23 +1024,23 @@ describe('Aetheria UI in Jetz', () => {
         expect(trigger.textContent).toContain('Apr 18, 2025');
 
         trigger.click();
-        const modal = target.querySelector('.aetheria-calendar-modal');
+        const modal = document.querySelector('.aetheria-calendar-modal');
         expect(modal.classList.contains('is-open')).toBe(true);
-        const day = number => [...target.querySelectorAll('.aetheria-calendar-day')]
+        const day = number => [...document.querySelectorAll('.aetheria-calendar-day')]
             .find(cell => cell.textContent === String(number) && !cell.classList.contains('aetheria-calendar-outside'));
-        expect(target.querySelector('.aetheria-calendar-day.is-range-start')).not.toBeNull();
-        expect(target.querySelector('.aetheria-calendar-day.is-range')).not.toBeNull();
-        expect(target.querySelector('.aetheria-calendar-day.is-range-end')).not.toBeNull();
+        expect(document.querySelector('.aetheria-calendar-day.is-range-start')).not.toBeNull();
+        expect(document.querySelector('.aetheria-calendar-day.is-range')).not.toBeNull();
+        expect(document.querySelector('.aetheria-calendar-day.is-range-end')).not.toBeNull();
 
         day(5).click();
-        expect(target.querySelector('.aetheria-calendar-day.is-range-end')).toBeNull();
+        expect(document.querySelector('.aetheria-calendar-day.is-range-end')).toBeNull();
         day(12).click();
-        target.querySelectorAll('.aetheria-calendar-actions button')[2].click();
+        document.querySelectorAll('.aetheria-calendar-actions button')[2].click();
 
         expect(range.value).toBe('2025-04-05/2025-04-12');
         expect(emitted[0][0]).toBe('2025-04-05/2025-04-12');
         expect(trigger.textContent).toContain('Apr 5, 2025');
-        expect(target.querySelector('.aetheria-calendar-modal').classList.contains('is-open')).toBe(false);
+        expect(document.querySelector('.aetheria-calendar-modal').classList.contains('is-open')).toBe(false);
     });
 
     it('reorders a reversed range click and clears back to the placeholder', () => {
@@ -993,19 +1053,19 @@ describe('Aetheria UI in Jetz', () => {
 
         expect(target.querySelector('.aetheria-datepicker-trigger').textContent).toContain('Pick dates');
         target.querySelector('.aetheria-datepicker-trigger').click();
-        const day = number => [...target.querySelectorAll('.aetheria-calendar-day')]
+        const day = number => [...document.querySelectorAll('.aetheria-calendar-day')]
             .find(cell => cell.textContent === String(number) && !cell.classList.contains('aetheria-calendar-outside'));
         day(20).click();
         day(9).click();
-        expect(target.querySelector('.aetheria-calendar-day.is-range-start').textContent).toBe('9');
-        expect(target.querySelector('.aetheria-calendar-day.is-range-end').textContent).toBe('20');
-        target.querySelectorAll('.aetheria-calendar-actions button')[2].click();
+        expect(document.querySelector('.aetheria-calendar-day.is-range-start').textContent).toBe('9');
+        expect(document.querySelector('.aetheria-calendar-day.is-range-end').textContent).toBe('20');
+        document.querySelectorAll('.aetheria-calendar-actions button')[2].click();
         const today = new Date();
         const month = String(today.getMonth() + 1).padStart(2, '0');
         expect(emitted).toEqual([`${today.getFullYear()}-${month}-09/${today.getFullYear()}-${month}-20`]);
 
         target.querySelector('.aetheria-datepicker-trigger').click();
-        target.querySelectorAll('.aetheria-calendar-actions button')[0].click();
+        document.querySelectorAll('.aetheria-calendar-actions button')[0].click();
         expect(emitted[1]).toBe('');
         expect(target.querySelector('.aetheria-datepicker-trigger').textContent).toContain('Pick dates');
     });

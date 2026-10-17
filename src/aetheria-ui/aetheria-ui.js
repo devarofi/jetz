@@ -864,6 +864,51 @@ export function injectAetheriaStyles() {
 }
 
 /**
+ * Move a viewport overlay out of the tree that hosts it. Glass cards set
+ * `isolation: isolate`, which scopes every descendant's z-index inside the card,
+ * so a full-screen dialog left in place paints under whichever card follows it.
+ * Body is the only layer that escapes that, but a node parked there outlives its
+ * owner, so the caller gets a restore to run on close and a watcher covers the
+ * owner leaving the page while the overlay is still up.
+ */
+function raiseOverlay(host) {
+    const node = host && host.o;
+    if (!node || node.parentElement === document.body) return () => { };
+    const slot = { parent: node.parentElement, next: node.nextSibling };
+    document.body.append(node);
+    const watcher = new MutationObserver(() => {
+        if (slot.parent.isConnected) return;
+        watcher.disconnect();
+        node.remove();
+    });
+    watcher.observe(document.body, { childList: true, subtree: true });
+    return () => {
+        watcher.disconnect();
+        if (slot.parent.isConnected && node.parentElement === document.body) {
+            slot.parent.insertBefore(node, slot.next);
+        }
+    };
+}
+
+/**
+ * A panel can only outrank its host card's siblings if the card does too:
+ * .aetheria-glass sets isolation: isolate, which caps every descendant's z-index
+ * inside the card, so a panel that hangs past its edge lands under the next one.
+ * Mark each positioned ancestor while a panel is up and drop the marks once it
+ * has left, so a closed control never reorders the page around it.
+ */
+function liftAncestors(anchor) {
+    const lifted = [];
+    for (let node = anchor && anchor.parentElement; node && node !== document.body; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.position === 'static' || style.zIndex !== 'auto') continue;
+        node.classList.add('aetheria-layer-host');
+        lifted.push(node);
+    }
+    return () => lifted.forEach(node => node.classList.remove('aetheria-layer-host'));
+}
+
+/**
  * Open/close cycle for an in-tree panel. Closing marks the mounted panel with
  * `isClosing` and only unmounts it after PANEL_EXIT_MS, so the exit animation
  * plays instead of the panel being cut. Reopening cancels a pending exit.
@@ -873,7 +918,13 @@ function panelCycle(hostOf) {
     const isClosing = stateOf(false);
     let timer = null;
     let dismissal = null;
+    let lower = null;
 
+    const settle = () => {
+        if (!lower) return;
+        lower();
+        lower = null;
+    };
     const cancel = () => {
         if (timer === null) return;
         clearTimeout(timer);
@@ -884,10 +935,12 @@ function panelCycle(hostOf) {
         dismissal?.close();
         if (!isOpen.value) {
             isClosing.value = false;
+            settle();
             return;
         }
         if (prefersReducedMotion()) {
             isOpen.value = false;
+            settle();
             return;
         }
         isClosing.value = true;
@@ -895,12 +948,14 @@ function panelCycle(hostOf) {
             timer = null;
             isClosing.value = false;
             isOpen.value = false;
+            settle();
         }, PANEL_EXIT_MS);
     };
     const open = () => {
         cancel();
         isClosing.value = false;
         isOpen.value = true;
+        if (!lower) lower = liftAncestors(hostOf() && hostOf().o);
         if (!dismissal) dismissal = panelDismissal(hostOf, close);
         dismissal.open();
     };
@@ -1624,18 +1679,25 @@ export class DatePicker extends Component {
             if (prop(disabled, false)) return;
             const current = parseCalendarDate(committedValue());
             draftValue.value = calendarDateKey(current || new Date());
+            lowerDialog = raiseOverlay(dialog);
             isOpen.value = true;
         };
-        const closeDialog = () => { isOpen.value = false; };
+        const closeDialog = () => {
+            lowerDialog();
+            lowerDialog = () => { };
+            isOpen.value = false;
+        };
         const commitDate = () => {
             const date = parseCalendarDate(draftValue.value) || new Date();
             const key = calendarDateKey(date);
             if (controlled) value.value = key;
             storedValue.value = key;
-            isOpen.value = false;
+            closeDialog();
             if (onchange) onchange(key, date);
         };
         const activeDate = () => parseCalendarDate(committedValue());
+        let dialog;
+        let lowerDialog = () => { };
 
         return div(
             {
@@ -1659,9 +1721,11 @@ export class DatePicker extends Component {
                 })),
                 icon('calendar')
             ),
-            div(
+            dialog = div(
                 {
-                    class: computed(() => `aetheria-calendar-modal${isOpen.value ? ' is-open' : ''}`),
+                    // .aetheria-root travels with the portal: away from the mounted tree
+                    // the theme resets would otherwise not reach the dialog.
+                    class: computed(() => `aetheria-root aetheria-calendar-modal${isOpen.value ? ' is-open' : ''}`),
                     'aria-hidden': computed(() => isOpen.value ? 'false' : 'true'),
                     onclick: event => {
                         if (event.target === event.currentTarget) closeDialog();
@@ -1832,9 +1896,14 @@ export class DateRangePicker extends Component {
             const { start, end } = committedSpan();
             draftStart.value = start ? calendarDateKey(start) : '';
             draftEnd.value = end ? calendarDateKey(end) : '';
+            lowerDialog = raiseOverlay(dialog);
             isOpen.value = true;
         };
-        const closeDialog = () => { isOpen.value = false; };
+        const closeDialog = () => {
+            lowerDialog();
+            lowerDialog = () => { };
+            isOpen.value = false;
+        };
         const pickDay = (date, key) => {
             if (!draftStart.value || draftEnd.value) {
                 draftStart.value = key;
@@ -1867,11 +1936,11 @@ export class DateRangePicker extends Component {
             }
         };
         const applyRange = () => {
-            if (!draftStart.value) { isOpen.value = false; return; }
+            if (!draftStart.value) { closeDialog(); return; }
             if (controlled) value.value = intervalOf(draftStart.value, draftEnd.value);
             storedValue.value = draftStart.value;
             storedEnd.value = draftEnd.value;
-            isOpen.value = false;
+            closeDialog();
             emit(draftStart.value, draftEnd.value);
         };
         const clearRange = () => {
@@ -1882,6 +1951,8 @@ export class DateRangePicker extends Component {
             draftEnd.value = '';
             emit('', '');
         };
+        let dialog;
+        let lowerDialog = () => { };
 
         return div(
             {
@@ -1903,9 +1974,11 @@ export class DateRangePicker extends Component {
                 })),
                 icon('calendar')
             ),
-            div(
+            dialog = div(
                 {
-                    class: computed(() => `aetheria-calendar-modal${isOpen.value ? ' is-open' : ''}`),
+                    // .aetheria-root travels with the portal: away from the mounted tree
+                    // the theme resets would otherwise not reach the dialog.
+                    class: computed(() => `aetheria-root aetheria-calendar-modal${isOpen.value ? ' is-open' : ''}`),
                     'aria-hidden': computed(() => isOpen.value ? 'false' : 'true'),
                     onclick: event => {
                         if (event.target === event.currentTarget) closeDialog();

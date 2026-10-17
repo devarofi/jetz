@@ -806,6 +806,11 @@ export const AETHERIA_CSS = `
 .aetheria-drawer-backdrop.is-open,
 .aetheria-calendar-modal.is-open { opacity: 1; visibility: visible; }
 
+/* Put on each positioned ancestor while one of its panels is open: the glass
+   cards isolate, so the card itself has to outrank its siblings for the panel
+   hanging out of it to stay on top of the page. */
+.aetheria-layer-host { z-index: var(--aetheria-z-menu); }
+
 .aetheria-modal-dialog {
     width: min(560px, 100%);
     max-height: min(80vh, 640px);
@@ -1336,7 +1341,6 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     text-align: left;
     cursor: pointer;
 }
-.aetheria-calendar-modal { z-index: var(--aetheria-z-overlay); }
 .aetheria-calendar-dialog {
     width: min(420px, 100%);
     padding: var(--aetheria-space-4);
