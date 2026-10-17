@@ -105,6 +105,14 @@ const booleanAttributeProperties = {
 	playsinline: 'playsInline',
 	readonly: 'readOnly'
 };
+/**
+ * Writes one css declaration. Custom properties (--var) are only reachable
+ * through setProperty: assigning them as object keys is silently ignored.
+ */
+function writeStyle(style, key, value) {
+	if (key.startsWith('--')) style.setProperty(key, value);
+	else style[key] = value;
+}
 NodeList.prototype.last = function () {
 	return this[this.length - 1];
 }
@@ -1122,8 +1130,9 @@ class JetzElement {
 		const declarations = String(text).split(';');
 		for (const declaration of declarations) {
 			const separator = declaration.indexOf(':');
-			// skip blanks, malformed entries and custom properties (--var)
-			if (separator <= 0 || String(declaration).slice(0, separator).trimStart().startsWith('--')) continue;
+			// skip blanks and malformed entries; custom properties are real
+			// declarations and go through #applyStyleValue like any other
+			if (separator <= 0) continue;
 			this.#applyStyleValue(
 				declaration.slice(0, separator).trim(),
 				declaration.slice(separator + 1).trim()
@@ -1139,9 +1148,9 @@ class JetzElement {
 			// the container holds this element's CSSStyleDeclaration, so it
 			// must be dropped when the element (row) leaves the tree
 			this.#bindTeardown(() => value.removeContainer(styleState));
-			this.o.style[key] = value.value;
+			writeStyle(this.o.style, key, value.value);
 		} else {
-			this.o.style[key] = value;
+			writeStyle(this.o.style, key, value);
 		}
 	}
 	assignChildren() {
@@ -1303,7 +1312,8 @@ class JetzElement {
 		}
 		this.style = new Proxy(this.style, {
 			set: (function (target, symbol, value) {
-				this.o.style[symbol] = value;
+				if (typeof symbol === 'string') writeStyle(this.o.style, symbol, value);
+				else this.o.style[symbol] = value;
 				target[symbol] = value;
 				return true;
 			}).bind(this),
@@ -1949,7 +1959,7 @@ class State {
 			container.textContent = value;
 		} else if (container instanceof StyleState) {
 			container.value = value;
-			container.container[container.key] = container.value;
+			writeStyle(container.container, container.key, container.value);
 		}
 	}
 	getValue() {

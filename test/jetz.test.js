@@ -2117,4 +2117,26 @@ describe('style tagged template', () => {
 		expect(box.style.color).toBe('red');
 		expect(box.style.maxWidth).toBe('10px');
 	});
+
+	it('writes custom properties from a declaration block', () => {
+		const fill = stateOf('60%');
+		const target = mount(div(style`--aetheria-range-to: ${() => fill.value}; color: red;`));
+		const box = target.querySelector('div');
+		expect(box.style.getPropertyValue('--aetheria-range-to')).toBe('60%');
+		expect(box.style.color).toBe('red');
+
+		fill.value = '25%';
+		expect(box.style.getPropertyValue('--aetheria-range-to')).toBe('25%');
+	});
+
+	it('writes custom properties from the style attribute', () => {
+		const width = stateOf(30);
+		const target = mount(div({ style: computed(() => `--aetheria-range-from: 0%; --aetheria-range-to: ${width.value}%;`) }));
+		const box = target.querySelector('div');
+		expect(box.style.getPropertyValue('--aetheria-range-from')).toBe('0%');
+		expect(box.style.getPropertyValue('--aetheria-range-to')).toBe('30%');
+
+		width.value = 45;
+		expect(box.style.getPropertyValue('--aetheria-range-to')).toBe('45%');
+	});
 });
