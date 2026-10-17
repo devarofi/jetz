@@ -902,7 +902,7 @@ export const AETHERIA_CSS = `
 
 /* ------------------------------------------------------------ navigation */
 
-.aetheria-tabs { position: relative; min-width: 0; }
+.aetheria-tabs { min-width: 0; }
 .aetheria-tabs-list {
     display: flex;
     gap: var(--aetheria-space-1);
@@ -912,6 +912,7 @@ export const AETHERIA_CSS = `
 }
 .aetheria-tabs-list::-webkit-scrollbar { display: none; }
 .aetheria-tab-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: var(--aetheria-space-2);
@@ -928,18 +929,34 @@ export const AETHERIA_CSS = `
     cursor: pointer;
     transition: color var(--aetheria-fast), background var(--aetheria-fast);
 }
+.aetheria-tab-btn::after {
+    content: '';
+    position: absolute;
+    right: var(--aetheria-space-4);
+    bottom: 0;
+    left: var(--aetheria-space-4);
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--aetheria-accent);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform var(--aetheria-slow) var(--aetheria-ease);
+}
 .aetheria-tab-btn:hover { color: var(--aetheria-text); background: var(--aetheria-scrim); }
 .aetheria-tab-btn.active { color: var(--aetheria-accent); }
-.aetheria-tabs-indicator {
-    position: absolute;
-    bottom: 0;
-    height: 2px;
-    background: var(--aetheria-accent);
-    transition: transform var(--aetheria-slow) var(--aetheria-ease), width var(--aetheria-slow) var(--aetheria-ease);
+.aetheria-tab-btn.active::after { transform: scaleX(1); }
+.aetheria-tab-panel {
+    margin-top: var(--aetheria-space-4);
+    padding: var(--aetheria-space-5);
+    min-width: 0;
 }
-.aetheria-tab-panel { padding: var(--aetheria-space-4) 0 0; min-width: 0; }
 
-.aetheria-accordion-item { border-bottom: 1px solid var(--aetheria-border); }
+.aetheria-accordion { min-width: 0; }
+.aetheria-accordion-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--aetheria-space-3);
+}
 .aetheria-accordion-trigger {
     display: flex;
     align-items: center;
@@ -947,7 +964,7 @@ export const AETHERIA_CSS = `
     gap: var(--aetheria-space-3);
     width: 100%;
     min-height: var(--aetheria-control-md);
-    padding: var(--aetheria-space-3) 0;
+    padding: var(--aetheria-space-4);
     font: inherit;
     font-size: var(--aetheria-text-sm);
     font-weight: 600;
@@ -969,6 +986,10 @@ export const AETHERIA_CSS = `
 }
 .aetheria-accordion-content.is-open { grid-template-rows: 1fr; }
 .aetheria-accordion-content > * { overflow: hidden; min-width: 0; }
+.aetheria-accordion-body {
+    padding: 0 var(--aetheria-space-4) var(--aetheria-space-4);
+    min-width: 0;
+}
 
 .aetheria-pagination {
     display: flex;

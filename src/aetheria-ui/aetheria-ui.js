@@ -988,18 +988,12 @@ export class Tabs extends Component {
             },
             computed(() => {
                 const list = Array.isArray(prop(tabs, [])) ? prop(tabs, []) : [];
-                const count = Math.max(list.length, 1);
                 return div(
                     {
                         class: 'aetheria-tabs-list',
                         role: 'tablist',
                         'aria-label': prop(label, '') || 'Tabs'
                     },
-                    div({
-                        class: 'aetheria-tabs-indicator',
-                        'aria-hidden': 'true',
-                        style: computed(() => `width:calc((100% - 8px) / ${count}); transform:translateX(${activeIdx.value * 100}%)`)
-                    }),
                     ...list.map((tab, idx) => {
                         const isActive = computed(() => activeIdx.value === idx);
                         const lbl = tab && typeof tab === 'object' ? tab.label : tab;
@@ -1040,12 +1034,12 @@ export class Accordion extends Component {
         return div(
             {
                 class: computed(() =>
-                    `aetheria-col-tight ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim())
+                    `aetheria-accordion ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim())
             },
             computed(() => {
                 const list = Array.isArray(prop(items, [])) ? prop(items, []) : [];
                 return div(
-                    { class: 'aetheria-col-tight' },
+                    { class: 'aetheria-accordion-list' },
                     ...list.map((item, idx) => {
                         const isOpen = openStates[idx] || (openStates[idx] = stateOf(false));
                         const title = item && typeof item === 'object' ? item.title : item;
@@ -1067,7 +1061,7 @@ export class Accordion extends Component {
                                     class: computed(() =>
                                         `aetheria-accordion-content ${flag(isOpen, 'is-open')}`.replace(/\s+/g, ' ').trim())
                                 },
-                                div({ class: 'aetheria-pad-3' }, bind(content, ''))
+                                div(div({ class: 'aetheria-accordion-body' }, bind(content, '')))
                             )
                         );
                     })

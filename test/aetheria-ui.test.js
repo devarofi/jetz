@@ -366,7 +366,7 @@ describe('Aetheria UI in Jetz', () => {
         expect(visibleItems()).toHaveLength(5);
     });
 
-    it('renders grouped glass tabs with an animated active indicator', () => {
+    it('renders grouped glass tabs with an aligned active underline', () => {
         Aetheria.injectAetheriaStyles();
         const target = document.createElement('div');
         Jetz.mount(new Aetheria.Tabs().render({
@@ -378,26 +378,51 @@ describe('Aetheria UI in Jetz', () => {
         }), target);
 
         const tabs = [...target.querySelectorAll('[role="tab"]')];
-        const indicator = target.querySelector('.aetheria-tabs-indicator');
         expect(target.querySelector('[role="tablist"]').getAttribute('aria-label')).toBe('Account settings');
-        expect(indicator).not.toBeNull();
-        expect(indicator.style.transform).toBe('translateX(0%)');
+        expect(tabs).toHaveLength(2);
         expect(tabs[0].getAttribute('aria-selected')).toBe('true');
         expect(tabs[0].getAttribute('tabindex')).toBe('0');
         expect(tabs[1].getAttribute('aria-selected')).toBe('false');
         expect(target.querySelector('[role="tabpanel"]').textContent).toBe('Profile settings');
 
         tabs[1].click();
-        expect(indicator.style.transform).toBe('translateX(100%)');
         expect(tabs[0].getAttribute('aria-selected')).toBe('false');
         expect(tabs[1].getAttribute('aria-selected')).toBe('true');
         expect(target.querySelector('[role="tabpanel"]').textContent).toBe('Security settings');
 
         const styles = document.querySelector('#aetheria-styles').textContent;
-        expect(styles).toContain('.aetheria-tabs-indicator');
-        expect(styles).toContain('transition: transform var(--aetheria-slow) var(--aetheria-ease), width var(--aetheria-slow) var(--aetheria-ease)');
-        expect(target.querySelector('.aetheria-tabs-indicator').style.width)
-            .toBe('calc(0.5 * (100% - 8px))');
+        expect(styles).toContain('.aetheria-tab-btn.active::after');
+        expect(styles).toContain('.aetheria-tab-panel {');
+        expect(styles).toContain('padding: var(--aetheria-space-5)');
+    });
+
+    it('stacks accordion cards with aligned trigger and body padding', () => {
+        Aetheria.injectAetheriaStyles();
+        const target = document.createElement('div');
+        Jetz.mount(new Aetheria.Accordion().render({
+            items: [
+                { title: 'General', content: 'Core configuration.' },
+                { title: 'Advanced', content: 'Expert controls.' }
+            ]
+        }), target);
+
+        const root = target.querySelector('.aetheria-accordion');
+        const items = [...target.querySelectorAll('.aetheria-accordion-item')];
+        expect(root).not.toBeNull();
+        expect(target.querySelector('.aetheria-accordion-list').children).toHaveLength(2);
+        expect(items).toHaveLength(2);
+        expect(items[0].classList.contains('aetheria-glass')).toBe(true);
+        expect(items[0].querySelector('.aetheria-accordion-trigger').getAttribute('aria-expanded')).toBe('false');
+        expect(items[0].querySelector('.aetheria-accordion-body').textContent).toBe('Core configuration.');
+
+        items[0].querySelector('.aetheria-accordion-trigger').click();
+        expect(items[0].querySelector('.aetheria-accordion-trigger').getAttribute('aria-expanded')).toBe('true');
+        expect(items[0].querySelector('.aetheria-accordion-content').classList.contains('is-open')).toBe(true);
+        expect(items[1].querySelector('.aetheria-accordion-content').classList.contains('is-open')).toBe(false);
+
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toContain('.aetheria-accordion-list');
+        expect(styles).not.toContain('.aetheria-accordion-item { border-bottom');
     });
 
     it('provides readable contrast and visible hover feedback across component surfaces', () => {
