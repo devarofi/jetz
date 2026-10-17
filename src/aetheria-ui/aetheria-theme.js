@@ -111,7 +111,7 @@ export const AETHERIA_CSS = `
     --aetheria-surface-hover: rgba(23, 19, 44, .06);
 
     --aetheria-border: rgba(60, 40, 110, .16);
-    --aetheria-border-strong: rgba(96, 66, 190, .34);
+    --aetheria-border-strong: rgba(58, 38, 108, .55);
     --aetheria-border-quiet: rgba(60, 40, 110, .1);
 
     --aetheria-text: #241d38;
@@ -438,13 +438,25 @@ export const AETHERIA_CSS = `
 
 /* ----------------------------------------------------------------- fields */
 
+/* Checkbox / Radio / Switch wrapper: control and caption share one line, the
+   whole row is clickable and carries a comfortable hit area. */
 .aetheria-control-label {
-    display: block;
-    margin-bottom: var(--aetheria-space-2);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--aetheria-space-2);
+    min-width: 0;
+    min-height: var(--aetheria-control-sm);
+    margin: 0;
     font-size: var(--aetheria-text-sm);
-    font-weight: 600;
+    font-weight: 500;
+    line-height: 1.25;
     color: var(--aetheria-text);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
 }
+.aetheria-control-label > span { min-width: 0; }
+.aetheria-control-label:has(:disabled) { color: var(--aetheria-text-muted); cursor: not-allowed; }
 .aetheria-field,
 .aetheria-textarea,
 .aetheria-datepicker-trigger,
@@ -504,6 +516,11 @@ export const AETHERIA_CSS = `
 .aetheria-radio { border-radius: 50%; }
 .aetheria-check:checked,
 .aetheria-radio:checked { background: var(--aetheria-accent); border-color: var(--aetheria-accent); }
+.aetheria-control-label:hover :is(.aetheria-check, .aetheria-radio, .aetheria-switch):not(:checked):not(:disabled) { border-color: var(--aetheria-accent); }
+.aetheria-control-label:hover :is(.aetheria-check, .aetheria-radio):not(:checked):not(:disabled) { background: var(--aetheria-surface-hover); }
+.aetheria-check:disabled,
+.aetheria-radio:disabled,
+.aetheria-switch:disabled { opacity: .45; cursor: not-allowed; }
 .aetheria-check:checked::after {
     content: "";
     width: 11px;
