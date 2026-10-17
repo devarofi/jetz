@@ -763,7 +763,6 @@ export const AETHERIA_CSS = `
 
 .aetheria-modal-backdrop,
 .aetheria-drawer-backdrop,
-.aetheria-context-menu-backdrop,
 .aetheria-calendar-modal {
     position: fixed;
     inset: 0;
@@ -782,7 +781,6 @@ export const AETHERIA_CSS = `
 .aetheria-modal-backdrop.is-open,
 .aetheria-drawer-backdrop.is-open,
 .aetheria-calendar-modal.is-open { opacity: 1; visibility: visible; }
-.aetheria-context-menu-backdrop { z-index: var(--aetheria-z-overlay); }
 
 .aetheria-modal-dialog {
     width: min(560px, 100%);
@@ -836,11 +834,13 @@ export const AETHERIA_CSS = `
 .aetheria-dropdown-panel { list-style: none; margin: 0; }
 .aetheria-popover-panel { width: max-content; }
 
+/* The menu portal lives on document.body, so its dismiss layer must stay
+   transparent — unlike modal backdrops it never carries an is-open class. */
 .aetheria-context-menu-backdrop {
+    position: fixed;
+    inset: 0;
     z-index: var(--aetheria-z-overlay);
-    align-items: flex-start;
-    justify-content: flex-start;
-    padding: 0;
+    background: transparent;
 }
 .aetheria-context-menu-backdrop [role="menu"] {
     position: absolute;
@@ -852,7 +852,9 @@ export const AETHERIA_CSS = `
     border-radius: var(--aetheria-radius-md);
     background: var(--aetheria-surface-solid);
     box-shadow: var(--aetheria-shadow-3);
+    animation: aetheria-menu-in var(--aetheria-fast) var(--aetheria-ease);
 }
+@keyframes aetheria-menu-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
 .aetheria-context-menu-area { min-width: 0; }
 .aetheria-context-menu-backdrop [role="separator"] { border: none; }
 .aetheria-menu-sep {

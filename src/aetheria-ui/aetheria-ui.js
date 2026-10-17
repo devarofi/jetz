@@ -847,11 +847,6 @@ export class ContextMenu extends Component {
             menu.setAttribute('role', 'menu');
             menu.addEventListener('click', menuEvent => menuEvent.stopPropagation());
 
-            const menuWidth = Math.min(220, Math.max(0, window.innerWidth - 16));
-            const menuHeight = Math.min(list.length * 48 + 16, Math.max(0, window.innerHeight - 16));
-            menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8))}px`;
-            menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8))}px`;
-
             list.forEach(item => {
                 if (item?.separator) {
                     const separator = document.createElement('div');
@@ -886,6 +881,10 @@ export class ContextMenu extends Component {
             overlay.append(menu);
             document.body.append(overlay);
             portal = overlay;
+
+            // Clamp against the rendered box, which grows with item labels and separators.
+            menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8))}px`;
+            menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8))}px`;
 
             keydownHandler = keyEvent => {
                 if (keyEvent.key === 'Escape') closeMenu();

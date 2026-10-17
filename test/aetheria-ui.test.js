@@ -616,6 +616,15 @@ describe('Aetheria UI in Jetz', () => {
         expect(menu.querySelectorAll('[role="menuitem"]')).toHaveLength(3);
         expect(menu.querySelector('[role="menuitem"]:disabled').textContent).toBe('Delete');
 
+        // The portal is appended outside .aetheria-root and never gains an
+        // is-open class, so it must not inherit the hidden modal-layer state.
+        const portalStyles = getComputedStyle(portal);
+        expect(portalStyles.visibility).toBe('visible');
+        expect(portalStyles.opacity).toBe('1');
+        expect(portalStyles.position).toBe('fixed');
+        expect(menu.style.left).toBe('64px');
+        expect(menu.style.top).toBe('72px');
+
         const firstAction = menu.querySelector('[role="menuitem"]');
         const menuStyles = document.querySelector('#aetheria-styles').textContent;
         expect(menuStyles).toMatch(/\.aetheria-context-menu-backdrop \[role="menuitem"\]:not\(:disabled\):hover/);
