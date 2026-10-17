@@ -838,7 +838,9 @@ export class ContextMenu extends Component {
             const list = Array.isArray(prop(items, [])) ? prop(items, []) : [];
 
             const overlay = document.createElement('div');
-            overlay.className = 'aetheria-context-menu-backdrop';
+            // The portal sits outside the mounted tree, so it carries the theme
+            // root class itself: host pages scope their resets under .aetheria-root.
+            overlay.className = 'aetheria-root aetheria-context-menu-backdrop';
             overlay.addEventListener('click', closeMenu);
             overlay.addEventListener('contextmenu', menuEvent => menuEvent.preventDefault());
 

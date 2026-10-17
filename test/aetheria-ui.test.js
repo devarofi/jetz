@@ -617,6 +617,9 @@ describe('Aetheria UI in Jetz', () => {
 
         expect(rightClick.defaultPrevented).toBe(true);
         const portal = document.body.querySelector('.aetheria-context-menu-backdrop');
+        // Host pages scope their resets under .aetheria-root, and this portal is
+        // appended outside the mounted tree, so it must carry the class itself.
+        expect(portal.classList.contains('aetheria-root')).toBe(true);
         const menu = portal?.querySelector('[role="menu"]');
         expect(menu).not.toBeNull();
         expect(menu.querySelectorAll('[role="menuitem"]')).toHaveLength(3);
