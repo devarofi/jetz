@@ -7,15 +7,6 @@ import {
 
 import { AETHERIA_CSS } from './aetheria-theme.js';
 
-export function injectAetheriaStyles() {
-    if (typeof document === 'undefined') return;
-    if (document.getElementById('aetheria-styles')) return;
-    const tag = document.createElement('style');
-    tag.id = 'aetheria-styles';
-    tag.textContent = AETHERIA_CSS;
-    document.head.appendChild(tag);
-}
-
 /** True for a Jetz State or computed — anything with a reactive `.value`. */
 export function isReactive(value) {
     return value != null
@@ -780,9 +771,10 @@ export class ProgressBar extends Component {
 /**
  * Two-click dismissal for panels that render inside the component tree:
  * a mousedown outside the host (or Escape) closes it. Listeners only exist
- * while the panel is open.
+ * while the panel is open. `hostOf` is read at event time because the host is
+ * usually still being built when the dismissal is created.
  */
-function panelDismissal(host, close) {
+function panelDismissal(hostOf, close) {
     let handler = null;
     return {
         open() {
@@ -792,7 +784,8 @@ function panelDismissal(host, close) {
                     if (event.key === 'Escape') close();
                     return;
                 }
-                if (host.o && event.target instanceof Node && host.o.contains(event.target)) return;
+                const host = hostOf();
+                if (host && host.o && event.target instanceof Node && host.o.contains(event.target)) return;
                 close();
             };
             document.addEventListener('mousedown', handler);
@@ -807,6 +800,120 @@ function panelDismissal(host, close) {
     };
 }
 
+/** Keep in step with --aetheria-exit: the panel must stay mounted that long. */
+const PANEL_EXIT_MS = 120;
+/* Outlasts the 520ms --aetheria-ripple burst so the class never survives its node. */
+const RIPPLE_CLEAN_MS = 600;
+
+/** Controls that answer a press with a ripple. */
+const RIPPLE_SELECTOR = [
+    '.aetheria-btn', '.aetheria-icon-btn', '.aetheria-icon-close',
+    '.aetheria-select-trigger', '.aetheria-datepicker-trigger',
+    '.aetheria-tab-btn', '.aetheria-accordion-trigger',
+    '.aetheria-dropdown-item', '.aetheria-select-option', '.aetheria-autocomplete-item',
+    '.aetheria-pagination-btn', '.aetheria-datagrid-page-btn', '.aetheria-datagrid-sort',
+    '.aetheria-datagrid-expand', '.aetheria-calendar-day', '.aetheria-calendar-month',
+    '.aetheria-calendar-heading', '.aetheria-tree-trigger', '.aetheria-file-item',
+    '.aetheria-list-item', '.aetheria-editor-toolbar button', '[role="menuitem"]'
+].join(', ');
+
+function prefersReducedMotion() {
+    return typeof matchMedia === 'function'
+        && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Expanding burst from the press point. The host only gains overflow:hidden for
+ * the length of the burst, so panels escaping a control are never clipped.
+ */
+function spawnRipple(event) {
+    if (event.button || prefersReducedMotion()) return;
+    const source = event.target instanceof Element ? event.target : null;
+    const host = source && source.closest(RIPPLE_SELECTOR);
+    if (!host || host.disabled) return;
+    const bounds = host.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const diameter = Math.max(bounds.width, bounds.height) * 2;
+    const dot = document.createElement('span');
+    dot.className = 'aetheria-ripple';
+    dot.setAttribute('aria-hidden', 'true');
+    dot.style.width = `${diameter}px`;
+    dot.style.height = `${diameter}px`;
+    dot.style.left = `${event.clientX - bounds.left - diameter / 2}px`;
+    dot.style.top = `${event.clientY - bounds.top - diameter / 2}px`;
+    host.classList.add('aetheria-rippling');
+    host.append(dot);
+    const clear = () => {
+        dot.remove();
+        if (!host.querySelector('.aetheria-ripple')) host.classList.remove('aetheria-rippling');
+    };
+    dot.addEventListener('animationend', clear, { once: true });
+    // Fallback for hosts that never run the animation (reduced motion mid-press,
+    // a detached tree): the burst must not leave a clipped host behind.
+    setTimeout(clear, RIPPLE_CLEAN_MS);
+}
+
+export function injectAetheriaStyles() {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById('aetheria-styles')) return;
+    const tag = document.createElement('style');
+    tag.id = 'aetheria-styles';
+    tag.textContent = AETHERIA_CSS;
+    document.head.appendChild(tag);
+    document.addEventListener('pointerdown', spawnRipple);
+}
+
+/**
+ * Open/close cycle for an in-tree panel. Closing marks the mounted panel with
+ * `isClosing` and only unmounts it after PANEL_EXIT_MS, so the exit animation
+ * plays instead of the panel being cut. Reopening cancels a pending exit.
+ */
+function panelCycle(hostOf) {
+    const isOpen = stateOf(false);
+    const isClosing = stateOf(false);
+    let timer = null;
+    let dismissal = null;
+
+    const cancel = () => {
+        if (timer === null) return;
+        clearTimeout(timer);
+        timer = null;
+    };
+    const close = () => {
+        cancel();
+        dismissal?.close();
+        if (!isOpen.value) {
+            isClosing.value = false;
+            return;
+        }
+        if (prefersReducedMotion()) {
+            isOpen.value = false;
+            return;
+        }
+        isClosing.value = true;
+        timer = setTimeout(() => {
+            timer = null;
+            isClosing.value = false;
+            isOpen.value = false;
+        }, PANEL_EXIT_MS);
+    };
+    const open = () => {
+        cancel();
+        isClosing.value = false;
+        isOpen.value = true;
+        if (!dismissal) dismissal = panelDismissal(hostOf, close);
+        dismissal.open();
+    };
+
+    return {
+        isOpen,
+        isClosing,
+        open,
+        close,
+        toggle: () => (isOpen.value && !isClosing.value ? close() : open())
+    };
+}
+
 export class Dropdown extends Component {
     render(props = {}) {
         const {
@@ -815,21 +922,8 @@ export class Dropdown extends Component {
             onselect = null,
             class: customClass = ''
         } = props;
-        const isOpen = stateOf(false);
         const selected = stateOf('');
-        let dismissal = null;
-
-        const close = () => {
-            isOpen.value = false;
-            dismissal?.close();
-        };
-        const toggle = () => {
-            if (isOpen.value) close();
-            else {
-                isOpen.value = true;
-                dismissal.open();
-            }
-        };
+        const panel = panelCycle(() => root);
 
         const root = div(
             {
@@ -841,17 +935,21 @@ export class Dropdown extends Component {
                 {
                     type: 'button',
                     class: 'aetheria-btn aetheria-btn-secondary',
-                    'aria-expanded': computed(() => flag(isOpen, 'true', 'false')),
-                    onclick: toggle
+                    'aria-expanded': computed(() => flag(panel.isOpen, 'true', 'false')),
+                    onclick: panel.toggle
                 },
                 computed(() => selected.value || prop(triggerLabel, 'Open Dropdown')),
                 icon('chevronDown', 'aetheria-icon-sm')
             ),
             computed(() => {
-                if (!isOpen.value) return div({ class: 'aetheria-hidden' });
+                if (!panel.isOpen.value) return div({ class: 'aetheria-hidden' });
                 const list = prop(items, []);
                 return div(
-                    { class: 'aetheria-glass aetheria-dropdown-panel' },
+                    {
+                        class: computed(() =>
+                            `aetheria-glass aetheria-dropdown-panel ${flag(panel.isClosing, 'is-closing')}`
+                                .replace(/\s+/g, ' ').trim())
+                    },
                     ...(Array.isArray(list) ? list : []).map(item => {
                         const lbl = item && typeof item === 'object' ? item.label : item;
                         return div(
@@ -860,7 +958,7 @@ export class Dropdown extends Component {
                                     `aetheria-dropdown-item${String(lbl) === selected.value ? ' is-active' : ''}`),
                                 onclick: () => {
                                     selected.value = String(lbl ?? '');
-                                    close();
+                                    panel.close();
                                     if (onselect) onselect(item);
                                 }
                             },
@@ -870,7 +968,6 @@ export class Dropdown extends Component {
                 );
             })
         );
-        dismissal = panelDismissal(root, close);
         return root;
     }
 }
@@ -894,12 +991,22 @@ export class ContextMenu extends Component {
             }
             observer?.disconnect();
             observer = null;
-            portal?.remove();
+            const leaving = portal;
             portal = null;
+            if (!leaving) return;
+            // Plain DOM outside the Jetz tree: give it the exit class and drop the
+            // node once the animation has played, otherwise dismissal is a cut.
+            if (prefersReducedMotion()) {
+                leaving.remove();
+                return;
+            }
+            leaving.classList.add('is-closing');
+            setTimeout(() => leaving.remove(), PANEL_EXIT_MS);
         };
 
         const openMenu = (event, source) => {
             closeMenu();
+            document.querySelectorAll('.aetheria-context-menu-backdrop').forEach(node => node.remove());
 
             const list = Array.isArray(prop(items, [])) ? prop(items, []) : [];
 
@@ -987,9 +1094,9 @@ export class Autocomplete extends Component {
             class: customClass = ''
         } = props;
         const query = stateOf('');
-        const isOpen = stateOf(false);
+        const panel = panelCycle(() => root);
 
-        return div(
+        const root = div(
             {
                 class: computed(() =>
                     `aetheria-autocomplete ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim())
@@ -999,14 +1106,15 @@ export class Autocomplete extends Component {
                 class: 'aetheria-field',
                 placeholder: bind(placeholder, 'Search...'),
                 value: query,
-                'aria-expanded': computed(() => flag(isOpen, 'true', 'false')),
+                'aria-expanded': computed(() => flag(panel.isOpen, 'true', 'false')),
                 oninput: (e) => {
                     query.value = e.target.value;
-                    isOpen.value = query.value.trim().length > 0;
+                    if (query.value.trim().length > 0) panel.open();
+                    else panel.close();
                 }
             }),
             computed(() => {
-                if (!isOpen.value) return div({ class: 'aetheria-hidden' });
+                if (!panel.isOpen.value) return div({ class: 'aetheria-hidden' });
                 const list = Array.isArray(prop(items, [])) ? prop(items, []) : [];
                 const needle = query.value.toLowerCase();
                 const filtered = list.filter(i =>
@@ -1015,7 +1123,11 @@ export class Autocomplete extends Component {
                         .includes(needle)
                 );
                 return div(
-                    { class: 'aetheria-glass aetheria-autocomplete-results' },
+                    {
+                        class: computed(() =>
+                            `aetheria-glass aetheria-autocomplete-results ${flag(panel.isClosing, 'is-closing')}`
+                                .replace(/\s+/g, ' ').trim())
+                    },
                     filtered.length === 0
                         ? div({ class: 'aetheria-autocomplete-item aetheria-text-muted' }, 'No matches found')
                         : filtered.map(item => {
@@ -1025,7 +1137,7 @@ export class Autocomplete extends Component {
                                     class: 'aetheria-autocomplete-item',
                                     onclick: () => {
                                         query.value = String(prop(lbl, ''));
-                                        isOpen.value = false;
+                                        panel.close();
                                         if (onselect) onselect(item);
                                     }
                                 },
@@ -1035,6 +1147,7 @@ export class Autocomplete extends Component {
                 );
             })
         );
+        return root;
     }
 }
 
@@ -1271,20 +1384,7 @@ export class Popover extends Component {
             children = null,
             class: customClass = ''
         } = props;
-        const isOpen = stateOf(false);
-        let dismissal = null;
-
-        const close = () => {
-            isOpen.value = false;
-            dismissal?.close();
-        };
-        const toggle = () => {
-            if (isOpen.value) close();
-            else {
-                isOpen.value = true;
-                dismissal.open();
-            }
-        };
+        const panel = panelCycle(() => root);
 
         const root = div(
             {
@@ -1296,23 +1396,26 @@ export class Popover extends Component {
                 {
                     type: 'button',
                     class: 'aetheria-btn aetheria-btn-secondary',
-                    'aria-expanded': computed(() => flag(isOpen, 'true', 'false')),
-                    onclick: toggle
+                    'aria-expanded': computed(() => flag(panel.isOpen, 'true', 'false')),
+                    onclick: panel.toggle
                 },
                 bind(trigger, 'Toggle Popover')
             ),
             computed(() => {
-                if (!isOpen.value) return div({ class: 'aetheria-hidden' });
+                if (!panel.isOpen.value) return div({ class: 'aetheria-hidden' });
                 const body = content === null || content === undefined
                     ? (children === null || children === undefined ? 'Popover Content' : children)
                     : content;
                 return div(
-                    { class: 'aetheria-glass aetheria-popover-panel' },
+                    {
+                        class: computed(() =>
+                            `aetheria-glass aetheria-popover-panel ${flag(panel.isClosing, 'is-closing')}`
+                                .replace(/\s+/g, ' ').trim())
+                    },
                     bind(body, 'Popover Content')
                 );
             })
         );
-        dismissal = panelDismissal(root, close);
         return root;
     }
 }
@@ -2709,6 +2812,7 @@ export class SortableList extends Component {
                     'data-sortable-id': entry.id,
                     ondragstart: (event) => {
                         draggingId = entry.id;
+                        event.currentTarget.classList.add('is-dragging');
                         if (event.dataTransfer) {
                             event.dataTransfer.setData('text/plain', String(entry.id));
                             event.dataTransfer.effectAllowed = 'move';
@@ -2717,12 +2821,23 @@ export class SortableList extends Component {
                     ondragover: (event) => {
                         event.preventDefault();
                         if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+                        event.currentTarget.classList.add('is-over');
+                    },
+                    ondragleave: (event) => {
+                        // dragleave also fires when the pointer crosses a child.
+                        if (!event.currentTarget.contains(event.relatedTarget)) {
+                            event.currentTarget.classList.remove('is-over');
+                        }
                     },
                     ondrop: (event) => {
                         event.preventDefault();
+                        event.currentTarget.classList.remove('is-over');
                         reorder(entry, event);
                     },
-                    ondragend: () => { draggingId = null; }
+                    ondragend: (event) => {
+                        draggingId = null;
+                        event.currentTarget.classList.remove('is-dragging', 'is-over');
+                    }
                 },
                 span({ class: 'aetheria-grow' }, computed(() => aetheriaText(entry.value, ''))),
                 span({ class: 'aetheria-sortable-handle', 'aria-hidden': 'true' }, icon('grip'))

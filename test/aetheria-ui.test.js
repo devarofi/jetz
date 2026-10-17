@@ -3,6 +3,9 @@ import * as Aetheria from '../src/aetheria-ui/aetheria-ui.js';
 import { Jetz, stateOf } from '../src/lib/jetz.js';
 import { div, span } from '../src/lib/jetz-ui.js';
 
+/** Dismissed panels stay mounted while their exit animation plays; wait it out. */
+const settled = () => new Promise(resolve => setTimeout(resolve, 200));
+
 describe('Aetheria UI in Jetz', () => {
     it('exports all roadmap components', () => {
         expect(Aetheria.Button).toBeDefined();
@@ -463,7 +466,8 @@ describe('Aetheria UI in Jetz', () => {
         expect(styles).toContain('.aetheria-file-item:hover');
         expect(styles).toContain('.aetheria-sortable-item:hover');
         expect(styles).toContain('.aetheria-list-item:hover');
-        expect(styles).toContain('--aetheria-text-muted: #c1bbcf');
+        expect(styles).toContain('--aetheria-text-muted: #bac9e0');
+        expect(styles).toContain('--aetheria-accent: #8ab4ff');
         expect(styles).toContain('color: var(--aetheria-text-muted)');
         expect(styles).toContain('.aetheria-btn-muted:hover:not(:disabled)');
     });
@@ -584,9 +588,14 @@ describe('Aetheria UI in Jetz', () => {
 
         const [first, , third] = sortableItems();
         dispatchDrag(first, 'dragstart');
+        expect(first.classList.contains('is-dragging')).toBe(true);
         expect(transfer.value).toBe(first.dataset.sortableId);
         dispatchDrag(third, 'dragover');
+        expect(third.classList.contains('is-over')).toBe(true);
         dispatchDrag(third, 'drop');
+        expect(third.classList.contains('is-over')).toBe(false);
+        dispatchDrag(first, 'dragend');
+        expect(first.classList.contains('is-dragging')).toBe(false);
         expect(labels()).toEqual(['Second', 'First', 'Third']);
         expect(changes[0]).toEqual(['Second', 'First', 'Third']);
 
@@ -597,7 +606,7 @@ describe('Aetheria UI in Jetz', () => {
         expect(labels()).toEqual(['First', 'Third', 'Second']);
     });
 
-    it('opens ContextMenu on right-click and calls the selected action', () => {
+    it('opens ContextMenu on right-click and calls the selected action', async () => {
         const target = document.createElement('div');
         document.body.append(target);
         const selected = [];
@@ -646,6 +655,10 @@ describe('Aetheria UI in Jetz', () => {
         expect(firstAction.classList.contains('is-active')).toBe(false);
         firstAction.click();
         expect(selected).toEqual(['Open']);
+        // The portal is plain DOM, so it plays its exit animation before removal.
+        const closing = document.body.querySelector('.aetheria-context-menu-backdrop');
+        expect(closing?.classList.contains('is-closing')).toBe(true);
+        await settled();
         expect(document.body.querySelector('.aetheria-context-menu-backdrop')).toBeNull();
         target.remove();
     });
@@ -671,11 +684,15 @@ describe('Aetheria UI in Jetz', () => {
 
         expect(openMenu()).not.toBeNull();
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(document.body.querySelector('.aetheria-context-menu-backdrop.is-closing')).not.toBeNull();
+        await settled();
         expect(document.body.querySelector('.aetheria-context-menu-backdrop')).toBeNull();
 
         expect(openMenu()).not.toBeNull();
         target.remove();
         await Promise.resolve();
+        expect(document.body.querySelector('.aetheria-context-menu-backdrop.is-closing')).not.toBeNull();
+        await settled();
         expect(document.body.querySelector('.aetheria-context-menu-backdrop')).toBeNull();
     });
 
@@ -719,7 +736,7 @@ describe('Aetheria UI in Jetz', () => {
         expect(docsTarget.textContent).toContain('"region": "South America"');
     });
 
-    it('keeps the chosen item in the dropdown trigger and dismisses on outside click', () => {
+    it('keeps the chosen item in the dropdown trigger and dismisses on outside click', async () => {
         Aetheria.injectAetheriaStyles();
         const target = document.createElement('div');
         const picked = [];
@@ -737,22 +754,29 @@ describe('Aetheria UI in Jetz', () => {
         expect(panel()).not.toBeNull();
         panel().querySelectorAll('.aetheria-dropdown-item')[1].click();
         expect(picked).toEqual(['Restart Engine']);
-        expect(panel()).toBeNull();
+        expect(panel().classList.contains('is-closing')).toBe(true);
         expect(trigger.textContent).toContain('Restart Engine');
+        await settled();
+        expect(panel()).toBeNull();
 
         trigger.click();
         expect(panel()).not.toBeNull();
+        expect(panel().classList.contains('is-closing')).toBe(false);
         expect(panel().querySelectorAll('.aetheria-dropdown-item')[1].classList.contains('is-active')).toBe(true);
         document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        expect(panel().classList.contains('is-closing')).toBe(true);
+        await settled();
         expect(panel()).toBeNull();
 
         trigger.click();
         expect(panel()).not.toBeNull();
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(panel().classList.contains('is-closing')).toBe(true);
+        await settled();
         expect(panel()).toBeNull();
     });
 
-    it('dismisses an open popover on outside click and Escape', () => {
+    it('dismisses an open popover on outside click and Escape', async () => {
         const target = document.createElement('div');
         Jetz.mount(new Aetheria.Popover().render({ trigger: 'Details', content: 'Popover body' }), target);
 
@@ -763,11 +787,77 @@ describe('Aetheria UI in Jetz', () => {
         panel().click();
         expect(panel()).not.toBeNull();
         document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        expect(panel().classList.contains('is-closing')).toBe(true);
+        await settled();
         expect(panel()).toBeNull();
         trigger.click();
         expect(panel()).not.toBeNull();
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(panel().classList.contains('is-closing')).toBe(true);
+        await settled();
         expect(panel()).toBeNull();
+    });
+
+    it('closes the autocomplete results on outside click after their exit animation', async () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        Jetz.mount(new Aetheria.Autocomplete().render({ items: ['Deploy', 'Destroy'] }), target);
+
+        const field = target.querySelector('input');
+        field.value = 'Dep';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        const results = () => target.querySelector('.aetheria-autocomplete-results');
+        expect(results()).not.toBeNull();
+
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        expect(results().classList.contains('is-closing')).toBe(true);
+        await settled();
+        expect(results()).toBeNull();
+
+        field.value = 'De';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(results()).not.toBeNull();
+        expect(results().classList.contains('is-closing')).toBe(false);
+        target.remove();
+    });
+
+    it('bursts a ripple from a pressed control and cleans it up', async () => {
+        Aetheria.injectAetheriaStyles();
+        // The ripple is delegated from document, so the tree has to be attached.
+        const target = document.createElement('div');
+        document.body.append(target);
+        Jetz.mount(new Aetheria.Button().render({ label: 'Deploy' }), target);
+
+        const host = target.querySelector('.aetheria-btn');
+        host.getBoundingClientRect = () => ({ width: 120, height: 44, left: 10, top: 5 });
+        host.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 40, clientY: 20 }));
+
+        const dot = host.querySelector('.aetheria-ripple');
+        expect(dot).not.toBeNull();
+        expect(host.classList.contains('aetheria-rippling')).toBe(true);
+        expect(dot.style.width).toBe('240px');
+        expect(dot.style.left).toBe('-90px');
+        // jsdom never fires animationend, so only the fallback cleanup can end it.
+        await new Promise(resolve => setTimeout(resolve, 700));
+        expect(host.querySelector('.aetheria-ripple')).toBeNull();
+        expect(host.classList.contains('aetheria-rippling')).toBe(false);
+        target.remove();
+    });
+
+    it('carries the cornflower palette through the motion layer', () => {
+        const styles = document.querySelector('#aetheria-styles').textContent;
+        expect(styles).toContain('--aetheria-spring');
+        expect(styles).toContain('@keyframes aetheria-panel-in');
+        expect(styles).toContain('@keyframes aetheria-panel-out');
+        expect(styles).toContain('@keyframes aetheria-ripple-burst');
+        expect(styles).toMatch(/\.aetheria-dropdown-panel, \.aetheria-popover-panel/);
+        expect(styles).toMatch(/\.aetheria-dropdown-panel[\s\S]{0,120}\.is-closing/);
+        expect(styles).toMatch(/\.aetheria-sortable-item\.is-dragging\s*\{[^}]*rotate\(-\.5deg\)/);
+        expect(styles).toMatch(/\.aetheria-range:active::-webkit-slider-thumb\s*\{\s*transform: scale\(1\.3\)/);
+        expect(styles).toMatch(/\.aetheria-check:checked::after,\s*\.aetheria-radio:checked::after\s*\{\s*animation: aetheria-pop-in/);
+        expect(styles).toMatch(/\.aetheria-gantt-bar\s*\{[^}]*animation: aetheria-grow-in/);
+        // Nothing from the old violet palette survives.
+        expect(styles).not.toMatch(/#6d44e0|#b9a5ff|#c4b5fd|--aetheria-lav|--aetheria-pink/);
     });
 
     it('paints the selected length of the slider tracks through range custom properties', () => {

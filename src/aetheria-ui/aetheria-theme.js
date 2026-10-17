@@ -1,6 +1,8 @@
 /**
  * Aetheria design tokens and component stylesheet.
- * Dark is the default; `data-aetheria-theme="light"` on the mounted root switches tokens.
+ * Cornflower-blue palette: `--aetheria-accent` and the surface/border/text tints
+ * all sit around hue 220. Dark is the default; `data-aetheria-theme="light"` on
+ * the mounted root switches tokens.
  */
 
 export const AETHERIA_CSS = `
@@ -40,6 +42,12 @@ export const AETHERIA_CSS = `
     --aetheria-fast: 140ms;
     --aetheria-slow: 320ms;
     --aetheria-ease: cubic-bezier(.2, .8, .2, 1);
+    /* Panels arrive on the overshooting spring curve and leave faster than they
+       come: the JS exit timer (PANEL_EXIT_MS) is kept in step with --aetheria-exit. */
+    --aetheria-enter: 180ms;
+    --aetheria-exit: 120ms;
+    --aetheria-spring: cubic-bezier(.34, 1.4, .64, 1);
+    --aetheria-ripple: 520ms;
 
     --aetheria-z-menu: 60;
     --aetheria-z-overlay: 80;
@@ -53,92 +61,90 @@ export const AETHERIA_CSS = `
 [data-aetheria-theme="dark"] {
     color-scheme: dark;
 
-    --aetheria-bg: #0c0a17;
-    --aetheria-bg-soft: #141024;
-    --aetheria-surface: linear-gradient(135deg, rgba(255, 255, 255, .11), rgba(255, 255, 255, .04) 55%, rgba(177, 160, 255, .07));
-    --aetheria-surface-solid: #191329;
-    --aetheria-surface-raised: #211a35;
+    --aetheria-bg: #070b16;
+    --aetheria-bg-soft: #0d1524;
+    --aetheria-surface: linear-gradient(135deg, rgba(255, 255, 255, .11), rgba(255, 255, 255, .04) 55%, rgba(138, 180, 255, .09));
+    --aetheria-surface-solid: #101a2d;
+    --aetheria-surface-raised: #16233a;
     --aetheria-surface-input: rgba(255, 255, 255, .06);
     --aetheria-surface-hover: rgba(255, 255, 255, .1);
 
-    --aetheria-border: rgba(229, 224, 255, .22);
-    --aetheria-border-strong: rgba(220, 210, 255, .46);
+    --aetheria-border: rgba(214, 232, 255, .22);
+    --aetheria-border-strong: rgba(196, 220, 255, .46);
     --aetheria-border-quiet: rgba(255, 255, 255, .1);
 
     /* Code panels keep the dark surface in both themes so the Prism palette
        (written for dark backgrounds) stays legible in light mode. */
-    --aetheria-code-bg: #141024;
-    --aetheria-code-fg: #e9e5f7;
+    --aetheria-code-bg: #0d1524;
+    --aetheria-code-fg: #e5eefb;
     --aetheria-code-border: rgba(255, 255, 255, .09);
-    --aetheria-code-accent: #b9a5ff;
+    --aetheria-code-accent: #9cc3ff;
 
-    --aetheria-text: #f3f0ff;
+    --aetheria-text: #eef4ff;
     --aetheria-text-strong: #ffffff;
-    --aetheria-text-muted: #c1bbcf;
-    --aetheria-text-faint: #9b94ad;
+    --aetheria-text-muted: #bac9e0;
+    --aetheria-text-faint: #93a3bd;
 
-    --aetheria-accent: #b9a5ff;
-    --aetheria-accent-hover: #d1aaff;
-    --aetheria-accent-ink: #17132c;
-    --aetheria-accent-soft: rgba(185, 165, 255, .16);
-    --aetheria-accent-glow: rgba(192, 167, 255, .42);
-    --aetheria-lav: #c4b5fd;
-    --aetheria-ice: #c8d9ff;
-    --aetheria-pink: #efb8ec;
+    --aetheria-accent: #8ab4ff;
+    --aetheria-accent-hover: #aecfff;
+    --aetheria-accent-ink: #071228;
+    --aetheria-accent-soft: rgba(138, 180, 255, .16);
+    --aetheria-accent-glow: rgba(130, 175, 255, .42);
+    --aetheria-ice: #cfe2ff;
+    --aetheria-sky: #7fd6ff;
 
     --aetheria-success: #6ee7b7;
     --aetheria-warning: #fcd34d;
-    --aetheria-danger: #f472b6;
-    --aetheria-ring: #d8c6ff;
+    --aetheria-danger: #ff8da8;
+    --aetheria-ring: #b7d3ff;
 
     --aetheria-shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
-    --aetheria-shadow-2: 0 12px 35px rgba(0, 0, 0, .34);
-    --aetheria-shadow-3: 0 24px 60px rgba(4, 3, 20, .5);
+    --aetheria-shadow-2: 0 12px 35px rgba(2, 8, 24, .38);
+    --aetheria-shadow-3: 0 24px 60px rgba(2, 8, 24, .55);
     --aetheria-inset-hi: inset 0 1px 0 rgba(255, 255, 255, .14);
-    --aetheria-overlay: rgba(7, 5, 16, .66);
+    --aetheria-overlay: rgba(4, 8, 20, .66);
     --aetheria-scrim: rgba(255, 255, 255, .08);
 }
 
 [data-aetheria-theme="light"] {
     color-scheme: light;
 
-    --aetheria-bg: #f6f4fb;
+    --aetheria-bg: #f1f5fd;
     --aetheria-bg-soft: #ffffff;
-    --aetheria-surface: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(243, 240, 252, .82) 55%, rgba(226, 217, 250, .78));
+    --aetheria-surface: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(239, 245, 254, .82) 55%, rgba(216, 230, 251, .78));
     --aetheria-surface-solid: #ffffff;
-    --aetheria-surface-raised: #f2eefc;
-    --aetheria-surface-input: rgba(23, 19, 44, .04);
-    --aetheria-surface-hover: rgba(23, 19, 44, .06);
+    --aetheria-surface-raised: #eaf1fc;
+    --aetheria-surface-input: rgba(17, 38, 72, .04);
+    --aetheria-surface-hover: rgba(17, 38, 72, .07);
 
-    --aetheria-border: rgba(60, 40, 110, .16);
-    --aetheria-border-strong: rgba(58, 38, 108, .55);
-    --aetheria-border-quiet: rgba(60, 40, 110, .1);
+    --aetheria-border: rgba(36, 70, 130, .16);
+    --aetheria-border-strong: rgba(30, 62, 118, .5);
+    --aetheria-border-quiet: rgba(36, 70, 130, .1);
 
-    --aetheria-text: #241d38;
-    --aetheria-text-strong: #150f26;
-    --aetheria-text-muted: #5c5474;
-    --aetheria-text-faint: #7d7593;
+    --aetheria-text: #16243c;
+    --aetheria-text-strong: #0a1526;
+    --aetheria-text-muted: #465a78;
+    --aetheria-text-faint: #66789a;
 
-    --aetheria-accent: #6d44e0;
-    --aetheria-accent-hover: #5a34c4;
+    --aetheria-accent: #2f6fd6;
+    --aetheria-accent-hover: #1f59bd;
     --aetheria-accent-ink: #ffffff;
-    --aetheria-accent-soft: rgba(109, 68, 224, .12);
-    --aetheria-accent-glow: rgba(109, 68, 224, .24);
-    --aetheria-lav: #6d44e0;
-    --aetheria-ice: #2f5fb3;
-    --aetheria-pink: #b23a8f;
+    --aetheria-accent-soft: rgba(47, 111, 214, .13);
+    --aetheria-accent-glow: rgba(47, 111, 214, .26);
+    --aetheria-ice: #1e6fb8;
+    --aetheria-sky: #0f8ec4;
 
     --aetheria-success: #0f7a55;
-    --aetheria-warning: #94651a;
-    --aetheria-danger: #c0246c;
-    --aetheria-ring: #6d44e0;
+    --aetheria-warning: #8a5d15;
+    --aetheria-danger: #c02450;
+    --aetheria-ring: #2f6fd6;
 
-    --aetheria-shadow-1: 0 1px 2px rgba(40, 24, 82, .1);
-    --aetheria-shadow-2: 0 12px 30px rgba(40, 24, 82, .12);
-    --aetheria-shadow-3: 0 24px 56px rgba(40, 24, 82, .18);
+    --aetheria-shadow-1: 0 1px 2px rgba(23, 48, 96, .1);
+    --aetheria-shadow-2: 0 12px 30px rgba(23, 48, 96, .12);
+    --aetheria-shadow-3: 0 24px 56px rgba(23, 48, 96, .18);
     --aetheria-inset-hi: inset 0 1px 0 rgba(255, 255, 255, .8);
-    --aetheria-overlay: rgba(30, 20, 58, .32);
-    --aetheria-scrim: rgba(23, 19, 44, .07);
+    --aetheria-overlay: rgba(12, 26, 52, .34);
+    --aetheria-scrim: rgba(17, 38, 72, .07);
 }
 
 /* ------------------------------------------------------------------- base */
@@ -370,7 +376,6 @@ export const AETHERIA_CSS = `
     border-radius: var(--aetheria-radius-sm);
 }
 
-.aetheria-btn:active { transform: translateY(1px); }
 .aetheria-btn:disabled,
 .aetheria-icon-btn:disabled {
     opacity: .5;
@@ -1729,7 +1734,7 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     font-weight: 500;
     line-height: 1.1;
     letter-spacing: -0.02em;
-    background: linear-gradient(105deg, var(--aetheria-text-strong) 0%, var(--aetheria-ice) 52%, var(--aetheria-pink) 100%);
+    background: linear-gradient(105deg, var(--aetheria-text-strong) 0%, var(--aetheria-ice) 52%, var(--aetheria-sky) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1812,6 +1817,179 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
     .aetheria-docs-section { padding: var(--aetheria-space-4); }
 }
 
+/* ------------------------------------------------------------------ motion */
+
+@keyframes aetheria-panel-in {
+    from { opacity: 0; transform: translateY(-6px) scale(.96); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes aetheria-panel-out {
+    from { opacity: 1; }
+    to { opacity: 0; transform: translateY(-4px) scale(.97); }
+}
+@keyframes aetheria-fade-in { from { opacity: 0; } to { opacity: 1; } }
+/* Animates the standalone scale property, not transform, so it can grow the
+   checkbox tick without erasing its rotate() transform. */
+@keyframes aetheria-pop-in { from { scale: .4; } to { scale: 1; } }
+@keyframes aetheria-ripple-burst {
+    from { transform: scale(0); opacity: .3; }
+    to { transform: scale(1); opacity: 0; }
+}
+@keyframes aetheria-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes aetheria-grow-in { from { scale: 0 1; } to { scale: 1 1; } }
+
+/* One transition list for every interactive surface. It is written as a single
+   rule so press, hover and focus feedback all move on the same curve. */
+:is(.aetheria-btn, .aetheria-icon-btn, .aetheria-icon-close, .aetheria-select-trigger,
+    .aetheria-datepicker-trigger, .aetheria-tab-btn, .aetheria-accordion-trigger,
+    .aetheria-dropdown-item, .aetheria-select-option, .aetheria-autocomplete-item,
+    .aetheria-pagination-btn, .aetheria-datagrid-page-btn, .aetheria-datagrid-sort,
+    .aetheria-datagrid-expand, .aetheria-calendar-day, .aetheria-calendar-month,
+    .aetheria-calendar-heading, .aetheria-list-item, .aetheria-tree-trigger,
+    .aetheria-file-item, .aetheria-sortable-item, .aetheria-editor-toolbar button,
+    .aetheria-context-menu-backdrop [role="menuitem"]) {
+    transition: transform var(--aetheria-fast) var(--aetheria-ease),
+        background var(--aetheria-fast), color var(--aetheria-fast),
+        border-color var(--aetheria-fast), box-shadow var(--aetheria-fast),
+        opacity var(--aetheria-fast);
+}
+
+/* Click feedback: lift on hover, settle on press. */
+:is(.aetheria-btn, .aetheria-icon-btn, .aetheria-icon-close, .aetheria-pagination-btn,
+    .aetheria-datagrid-page-btn, .aetheria-tab-btn, .aetheria-calendar-day,
+    .aetheria-calendar-month, .aetheria-calendar-heading, .aetheria-editor-toolbar button):hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+:is(.aetheria-dropdown-item, .aetheria-select-option, .aetheria-autocomplete-item,
+    .aetheria-tree-trigger, .aetheria-file-item, .aetheria-list-item):hover:not(:disabled) {
+    transform: translateX(2px);
+}
+:is(.aetheria-btn, .aetheria-icon-btn, .aetheria-icon-close, .aetheria-select-trigger,
+    .aetheria-datepicker-trigger, .aetheria-tab-btn, .aetheria-accordion-trigger,
+    .aetheria-dropdown-item, .aetheria-select-option, .aetheria-autocomplete-item,
+    .aetheria-pagination-btn, .aetheria-datagrid-page-btn, .aetheria-datagrid-sort,
+    .aetheria-datagrid-expand, .aetheria-calendar-day, .aetheria-calendar-month,
+    .aetheria-calendar-heading, .aetheria-tree-trigger, .aetheria-file-item,
+    .aetheria-editor-toolbar button, .aetheria-context-menu-backdrop [role="menuitem"]):active:not(:disabled) {
+    transform: scale(.96);
+}
+
+/* Ripple: .aetheria-rippling is added by the delegated pointerdown handler for
+   the length of the burst, so overflow:hidden never outlives the animation. */
+.aetheria-rippling { position: relative; overflow: hidden; }
+.aetheria-ripple {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    background: currentColor;
+    opacity: 0;
+    transform: scale(0);
+    animation: aetheria-ripple-burst var(--aetheria-ripple) var(--aetheria-ease);
+}
+
+/* Overlay panels animate in when mounted and out while the exit timer keeps
+   them mounted, so dismissal reads as motion instead of a cut. */
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results) {
+    transform-origin: top left;
+    animation: aetheria-panel-in var(--aetheria-enter) var(--aetheria-spring);
+}
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results).is-closing {
+    animation: aetheria-panel-out var(--aetheria-exit) var(--aetheria-ease) forwards;
+    pointer-events: none;
+}
+/* Rows fade only — animating their transform would out-rank hover and press. */
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results) > * {
+    animation: aetheria-fade-in var(--aetheria-enter) var(--aetheria-ease) both;
+}
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results) > :nth-child(2) { animation-delay: 26ms; }
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results) > :nth-child(3) { animation-delay: 52ms; }
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results) > :nth-child(4) { animation-delay: 78ms; }
+:is(.aetheria-dropdown-panel, .aetheria-popover-panel, .aetheria-autocomplete-results) > :nth-child(n+5) { animation-delay: 104ms; }
+
+.aetheria-context-menu-backdrop.is-closing { pointer-events: none; }
+.aetheria-context-menu-backdrop.is-closing [role="menu"] {
+    animation: aetheria-panel-out var(--aetheria-exit) var(--aetheria-ease) forwards;
+}
+
+.aetheria-select-menu,
+.aetheria-tooltip { transform-origin: top center; }
+
+/* Layers and dialogs overshoot slightly on the spring curve. */
+.aetheria-modal-dialog {
+    transition: transform var(--aetheria-slow) var(--aetheria-spring),
+        opacity var(--aetheria-fast) var(--aetheria-ease);
+}
+.aetheria-drawer { transition: transform var(--aetheria-slow) var(--aetheria-spring); }
+.aetheria-calendar-dialog {
+    transition: transform var(--aetheria-slow) var(--aetheria-spring),
+        opacity var(--aetheria-fast) var(--aetheria-ease);
+}
+
+.aetheria-switch::before { transition: transform var(--aetheria-slow) var(--aetheria-spring), background var(--aetheria-fast); }
+.aetheria-check:checked::after,
+.aetheria-radio:checked::after { animation: aetheria-pop-in var(--aetheria-enter) var(--aetheria-spring); }
+.aetheria-badge-primary { animation: aetheria-pop-in var(--aetheria-enter) var(--aetheria-spring); }
+
+.aetheria-range::-webkit-slider-thumb {
+    transition: transform var(--aetheria-fast) var(--aetheria-spring), box-shadow var(--aetheria-fast);
+}
+.aetheria-range::-moz-range-thumb {
+    transition: transform var(--aetheria-fast) var(--aetheria-spring), box-shadow var(--aetheria-fast);
+}
+.aetheria-range:hover::-webkit-slider-thumb { transform: scale(1.18); }
+.aetheria-range:hover::-moz-range-thumb { transform: scale(1.18); }
+.aetheria-range:active::-webkit-slider-thumb { transform: scale(1.3); box-shadow: 0 0 0 8px var(--aetheria-accent-soft); }
+.aetheria-range:active::-moz-range-thumb { transform: scale(1.3); box-shadow: 0 0 0 8px var(--aetheria-accent-soft); }
+
+/* Rebuilt tab panels and dropdown bodies fade instead of popping. */
+.aetheria-tab-panel { animation: aetheria-fade-in var(--aetheria-enter) var(--aetheria-ease); }
+
+/* Dragging: the row lifts and tilts, the drop target slides aside for it. */
+.aetheria-sortable-item { cursor: grab; }
+.aetheria-sortable-item.is-dragging {
+    opacity: .55;
+    transform: scale(.98) rotate(-.5deg);
+    border-style: dashed;
+    box-shadow: var(--aetheria-shadow-2);
+    cursor: grabbing;
+}
+.aetheria-sortable-item.is-over { transform: translateX(3px); }
+.aetheria-sortable-item:active { cursor: grabbing; }
+
+/* Resizing a column widens its guide and freezes cell transitions. */
+.aetheria-spreadsheet-resizer::after {
+    transition: opacity var(--aetheria-fast), width var(--aetheria-fast), box-shadow var(--aetheria-fast);
+}
+.aetheria-spreadsheet-resizer.is-dragging { width: 10px; }
+.aetheria-spreadsheet-resizer.is-dragging::after {
+    width: 3px;
+    box-shadow: 0 0 12px var(--aetheria-accent-glow);
+}
+.aetheria-spreadsheet-table.is-resizing :is(th, td) { transition: none; }
+
+/* Timeline bars draw themselves in from their start date. */
+.aetheria-gantt-bar {
+    transform-origin: left center;
+    animation: aetheria-grow-in var(--aetheria-slow) var(--aetheria-spring);
+}
+.aetheria-scheduler-event {
+    transition: border-color var(--aetheria-fast), box-shadow var(--aetheria-fast), transform var(--aetheria-fast) var(--aetheria-ease);
+}
+.aetheria-scheduler-event:hover {
+    border-color: var(--aetheria-border-strong);
+    box-shadow: var(--aetheria-shadow-1);
+    transform: translateY(-1px);
+}
+
+.aetheria-progressbar-fill { position: relative; overflow: hidden; }
+.aetheria-progressbar-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .38), transparent);
+    animation: aetheria-sweep 1.6s var(--aetheria-ease) infinite;
+}
+
 /* ------------------------------------------------------------- responsive */
 
 .aetheria-showcase-overflow-visible,
@@ -1839,16 +2017,36 @@ button.aetheria-datagrid-sort:hover { color: var(--aetheria-accent-hover); }
 
 @media (prefers-reduced-motion: reduce) {
     .aetheria-root *,
+    .aetheria-root *::before,
+    .aetheria-root *::after,
     .aetheria-glass,
     .aetheria-modal-dialog,
     .aetheria-drawer,
     .aetheria-calendar-view {
         animation-duration: .01ms !important;
+        animation-delay: 0ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: .01ms !important;
     }
     .aetheria-card:hover,
-    .aetheria-btn:active { transform: none; }
+    :is(.aetheria-btn, .aetheria-icon-btn, .aetheria-icon-close, .aetheria-select-trigger,
+        .aetheria-datepicker-trigger, .aetheria-tab-btn, .aetheria-accordion-trigger,
+        .aetheria-dropdown-item, .aetheria-select-option, .aetheria-autocomplete-item,
+        .aetheria-pagination-btn, .aetheria-datagrid-page-btn, .aetheria-datagrid-sort,
+        .aetheria-datagrid-expand, .aetheria-calendar-day, .aetheria-calendar-month,
+        .aetheria-calendar-heading, .aetheria-tree-trigger, .aetheria-file-item,
+        .aetheria-list-item, .aetheria-sortable-item, .aetheria-editor-toolbar button):hover,
+    :is(.aetheria-btn, .aetheria-icon-btn, .aetheria-icon-close, .aetheria-select-trigger,
+        .aetheria-datepicker-trigger, .aetheria-tab-btn, .aetheria-accordion-trigger,
+        .aetheria-dropdown-item, .aetheria-select-option, .aetheria-autocomplete-item,
+        .aetheria-pagination-btn, .aetheria-datagrid-page-btn, .aetheria-datagrid-sort,
+        .aetheria-datagrid-expand, .aetheria-calendar-day, .aetheria-calendar-month,
+        .aetheria-calendar-heading, .aetheria-tree-trigger, .aetheria-file-item,
+        .aetheria-editor-toolbar button):active {
+        transform: none;
+    }
+    .aetheria-ripple { display: none; }
+    .aetheria-progressbar-fill::after { animation: none; }
 }
 
 @media (forced-colors: active) {
