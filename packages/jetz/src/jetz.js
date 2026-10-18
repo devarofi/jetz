@@ -253,19 +253,25 @@ let _activeLifecycle = null;
  */
 let _trackingEffect = null;
 /**
- * Disposal scope used while one item of a `loop()` is rendered.
+ * Disposal scope for one render: a `loop()` item, an `ifElse()` branch or a
+ * component.
  *
  * Anything created in that window - an `effect()`, a `computed()`, an attribute
  * subscription, a DOM listener, a bound state container - registers its teardown
- * here, so the reconciler can release the whole item at once when it drops the
- * view. Outside a scope nothing is registered and every API behaves exactly as
+ * here, so the owner can release everything at once when its view is dropped.
+ * Outside a scope nothing is registered and every API behaves exactly as
  * before; a scope nested in another one is owned by it and disposed with it.
  */
 class ReactiveScope {
 	#disposers = new Set();
 	#disposed = false;
+	/** True when an enclosing scope already releases this one. */
+	owned = false;
 	constructor(parent = null) {
-		if (parent) parent.add(() => this.dispose());
+		if (parent) {
+			parent.add(() => this.dispose());
+			this.owned = true;
+		}
 	}
 	get disposed() {
 		return this.#disposed;
@@ -308,6 +314,33 @@ function disposeViewScope(view) {
 	if (!scope) return;
 	view.__scope = null;
 	scope.dispose();
+}
+/**
+ * Attaches a scope to the view that owns it, without dropping a scope the view
+ * already carries: a component's own render scope and the `loop()` item or
+ * `ifElse()` branch it was built in are both owners, so they are chained and
+ * released together whichever one is dropped first.
+ */
+function adoptScope(view, scope) {
+	if (view == null || typeof view !== 'object' || !scope) return;
+	const current = view.__scope;
+	if (!current || current === scope || current.disposed) view.__scope = scope;
+	else current.add(() => scope.dispose());
+}
+/**
+ * Names an owner for the scope a component rendered in, so its `effect()` and
+ * `computed()` resources are released with it.
+ *
+ * A scope built while a `loop()` item or an `ifElse()` branch was rendering is
+ * already chained to that render and needs no second owner; everything else -
+ * a page, a widget mounted directly, a component in a plain tree - is owned by
+ * its entry element, whose teardown runs when the subtree is dropped. The
+ * lifecycle context releases it too, which covers a component destroyed without
+ * its element ever being rendered.
+ */
+function ownComponentScope(entry, scope) {
+	if (!scope || scope.owned) return;
+	if (entry instanceof JetzElement) adoptScope(entry, scope);
 }
 /**
  * Structural diagnostics.
@@ -763,6 +796,11 @@ class LifecycleContext {
 		if (component && component.constructor.prototype.hasOwnProperty('onDestroy')) {
 			component.onDestroy();
 		}
+		// A destroyed context can never fire again: onMount, onUpdate and
+		// onDestroy are all guarded by this flag. Dropping it from the sweep
+		// registry releases the component, its closures and its detached nodes
+		// instead of pinning them until the next pass finds them disconnected.
+		Jetz.releaseLifecycle(this);
 	}
 }
 /**
@@ -779,22 +817,27 @@ export function renderComponent(component, params = null) {
 		const context = new LifecycleContext();
 		context.component = component;
 		component.$lifecycle = context;
-		const previous = _activeLifecycle;
-		_activeLifecycle = context;
-		let result;
-		try {
-			if (component.constructor.prototype.hasOwnProperty('onCreate')) {
-				component.onCreate();
+		// the render window is a disposal scope: an `effect()` or `computed()` the
+		// component creates is its own resource, released with it instead of
+		// staying subscribed to whatever state it read
+		const { value: result, scope } = withReactiveScope(() => {
+			const previous = _activeLifecycle;
+			_activeLifecycle = context;
+			try {
+				if (component.constructor.prototype.hasOwnProperty('onCreate')) {
+					component.onCreate();
+				}
+				context.runCreate();
+				return component.render();
+			} finally {
+				_activeLifecycle = previous;
 			}
-			context.runCreate();
-			result = component.render();
-		} finally {
-			_activeLifecycle = previous;
-		}
+		});
 		if (result instanceof JetzElement && component.constructor.prototype.hasOwnProperty('onRendered')) {
 			result.onRendered(component.onRendered.bind(component));
 		}
 		const entry = Array.isArray(result) ? result[0] : result;
+		ownComponentScope(entry, scope);
 		if (entry instanceof JetzElement && !entry.lifecycle) {
 			entry.attachLifecycle(context);
 		}
@@ -802,14 +845,15 @@ export function renderComponent(component, params = null) {
 	}
 	if (typeof component !== 'function') return component;
 	const context = new LifecycleContext();
-	const previous = _activeLifecycle;
-	_activeLifecycle = context;
-	let result;
-	try {
-		result = params == null ? component.call() : component(params);
-	} finally {
-		_activeLifecycle = previous;
-	}
+	const { value: result, scope } = withReactiveScope(() => {
+		const previous = _activeLifecycle;
+		_activeLifecycle = context;
+		try {
+			return params == null ? component.call() : component(params);
+		} finally {
+			_activeLifecycle = previous;
+		}
+	});
 	const entry = Array.isArray(result) ? result[0] : result;
 	if (entry instanceof JetzElement) {
 		Jetz.emitDevtoolsEvent({
@@ -817,6 +861,7 @@ export function renderComponent(component, params = null) {
 			element: entry,
 			name: component.displayName || component.name || 'Anonymous component'
 		});
+		ownComponentScope(entry, scope);
 		if (context.hooks.onCreate.length + context.hooks.onMount.length +
 			context.hooks.onUpdate.length + context.hooks.onDestroy.length > 0) {
 			context.component = component;
@@ -1731,6 +1776,17 @@ class Jetz {
 	static registerLifecycle(context) {
 		Jetz.#lifecycles.add(context);
 	}
+	/** Drops a context the sweep can never fire again (already destroyed). */
+	static releaseLifecycle(context) {
+		Jetz.#lifecycles.delete(context);
+	}
+	/**
+	 * How many component lifecycles the sweep still tracks. A diagnostic with no
+	 * references of its own: a number, so reading it cannot retain a component.
+	 */
+	static get liveLifecycles() {
+		return Jetz.#lifecycles.size;
+	}
 	static triggerByState() {
 		// Walk by index, not forEach(): forEach() visits a range fixed before the
 		// first callback, but a trigger can build new UI whose _if/_elseif children
@@ -1792,8 +1848,13 @@ class Jetz {
 					if (element != null) {
 						if (typeof element === 'function') {
 							const component = element;
-							element = component();
+							// the root is called plainly (no lifecycle context), but it still
+							// renders a scope: `effect()`/`computed()` it creates belong to the
+							// tree mounted here, so `Jetz.unmount()` releases them with it
+							const scoped = withReactiveScope(() => component());
+							element = scoped.value;
 							if (element instanceof JetzElement) {
+								adoptScope(element, scoped.scope);
 								Jetz.emitDevtoolsEvent({
 									type: 'component',
 									element,
@@ -1932,6 +1993,13 @@ class State {
 	unsubscribe(listener) {
 		this.#subscribers = this.#subscribers.filter(fn => fn !== listener);
 		return this;
+	}
+	/**
+	 * How many subscribers this state still holds. Diagnostic only: it reads a
+	 * length, so a test that observes retention cannot retain anything itself.
+	 */
+	get subscriberCount() {
+		return this.#subscribers.length;
 	}
 	setState(newValue) {
 		const oldValue = this.#value;
@@ -2295,7 +2363,7 @@ export class ListState extends Array {
 				_renderContext = previousContext;
 			}
 		});
-		if (view != null && typeof view === 'object') view.__scope = scope;
+		if (view != null && typeof view === 'object') adoptScope(view, scope);
 		return view;
 	}
 	#buildItemView(parent, item, index) {
@@ -3569,8 +3637,10 @@ const derivedState = new State(initialValue, {
 	};
 
 	// Scope teardown: drop every dependency subscription this computed holds.
-	// Only registered while a `loop()` item is being rendered, so a computed
-	// created outside a loop keeps living until it is garbage collected.
+	// Registered whenever the computed is created inside a managed render - a
+	// `loop()` item, an `ifElse()` branch, a component - so that render's owner
+	// releases it. Created outside any managed render it keeps living until its
+	// source goes away, which is what makes it readable on demand.
 	registerDisposable(() => {
 		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
 		_deps = new Set();

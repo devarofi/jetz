@@ -581,27 +581,63 @@ section('B. cleanup and retained references');
 }
 
 {
-	// Documented boundary, asserted by behaviour: a `computed()` or `effect()`
-	// created outside a `loop()` view registers no scope teardown, so it stays
-	// subscribed to its source for as long as the source lives.
+	// The retention path this suite used to document as expected behaviour, now
+	// asserted as released: a component's `effect()` and `computed()` belong to
+	// the component, so a source state that outlives the view must not keep them
+	// subscribed - and must not keep the view's detached DOM alive through them.
 	const store = stateOf(0);
 	let computes = 0, runs = 0;
+	let orphanNode = null;
 	const Panel = () => {
-		effect(() => { runs++; store.value; });
-		return div(p(computed(() => { computes++; return `count ${store.value}`; })));
+		// the closure below captures `orphanNode`, so if the effect survived the
+		// unmount the state holds a strong path to a detached node
+		const orphan = span('orphan');
+		effect(() => {
+			runs++;
+			store.value;
+			if (store.value > 0 && orphan.o) {
+				orphanNode = orphan.o;
+				orphan.o.textContent = `tick ${store.value}`;
+			}
+		});
+		return div(p(computed(() => { computes++; return `count ${store.value}`; })), orphan);
 	};
 	const target = mount(div(() => Panel()));
 	await settle();
 	const afterMount = { computes, runs };
+	const whileMounted = store.subscriberCount;
+	assertTrue('B12 a mounted component subscribes through its source state', whileMounted > 0,
+		`${whileMounted} subscriber(s) on the store`);
 	unmount(target);
+	check('B12 unmount drops the source subscriptions of its component', store.subscriberCount, 0);
 	store.setState(1);
 	await settle();
-	check('B12 a detached effect keeps reacting to a surviving source', runs, afterMount.runs + 1);
-	check('B12 a detached computed keeps recomputing', computes, afterMount.computes + 1);
+	store.setState(2);
+	await settle();
+	check('B12 a component effect stops with its component', runs, afterMount.runs);
+	check('B12 a component computed stops with its component', computes, afterMount.computes);
+	check('B12 no detached node is still driven by the store', orphanNode === null, true);
 	check('B12 neither writes into the removed DOM', target.childNodes.length, 0);
-	observe('B12 known retention path', false,
-		'effect()/computed() created outside a loop() view have no owning scope, so a state that outlives the view pins them and their closures. ' +
-		'Remedies: bind derived values inside a loop() row, hold the disposer `effect()` returns and call it from onDestroy, or keep the source and the view the same lifetime.');
+	check('B12 the destroyed component left the lifecycle registry', Jetz.liveLifecycles, 0);
+}
+
+{
+	// The other half of the contract, unchanged: a reactive resource created
+	// outside any owner - in test code, in a module, in a callback that outlives
+	// the tree - has no teardown to run, so its source keeps it alive until an
+	// explicit disposer or the source itself goes away.
+	const store = stateOf(0);
+	let computes = 0;
+	const orphan = computed(() => { computes++; return store.value + 1; });
+	const target = mount(div(p(orphan)));
+	const afterMount = computes;
+	unmount(target);
+	store.setState(2);
+	check('B13 an unowned computed is still read on demand', orphan.value, 3);
+	assertTrue('B13 known retention path for unowned resources', computes > afterMount,
+		`${afterMount} compute(s) at unmount, ${computes} after a later write: nothing owns this computed, so the source keeps it. ` +
+		'That is the documented boundary - create it in a component or a loop() row, or keep the source short-lived.');
+	check('B13 the detached DOM is not written by an unowned computed', target.childNodes.length, 0);
 }
 
 {
@@ -917,6 +953,92 @@ section('E. long-running create / update / dispose');
 		skip('E growth rule', `not enough stabilized rounds (${verdict.steps})`);
 	} else {
 		assertTrue(`E no unexplained heap growth over ${LONG_CYCLES} rounds`,
+			verdict.verdict !== 'sustained growth',
+			`verdict ${verdict.verdict}: ${verdict.growth.toFixed(2)} MiB, budget ${GROWTH_LIMIT_MIB} MiB, ${verdict.increases}/${verdict.steps} steps up`);
+	}
+	unmountAll();
+}
+
+// ===========================================================================
+// F. Component churn against a surviving store — the shape that used to retain.
+//    Pages are built from components, they read application-level state that
+//    outlives them, and they are mounted and discarded over and over. Every
+//    round must leave the store exactly as it found it: no subscriber of a
+//    destroyed component, no lifecycle context in the sweep registry, no DOM.
+// ===========================================================================
+section('F. component churn against a surviving store');
+
+{
+	const rounds = Math.max(30, LONG_CYCLES);
+	const widgets = size(20);
+	const store = stateOf(0);              // application state: outlives every page
+	const counts = { builds: 0, mounts: 0, destroys: 0, effectRuns: 0, computeRuns: 0 };
+	const residuals = [];
+	let reactingAfterRelease = 0;
+	let subscribersAfterRelease = 0;
+	let lifecyclesAfterRelease = 0;
+
+	const Card = (item) => {
+		counts.builds++;
+		onMount(() => counts.mounts++);
+		onDestroy(() => counts.destroys++);
+		effect(() => { counts.effectRuns++; item.label.value; store.value; });
+		return div({ 'data-widget': item.id }, span(computed(() => { counts.computeRuns++; return `${item.label.value}@${store.value}`; })));
+	};
+	// A page reads the surviving store twice: once through an effect of its own,
+	// once through each widget it renders. Both are the component's resources.
+	const Page = () => {
+		const items = Array.from({ length: widgets }, (_, i) => stateOf({ id: `${roundTag}-${i}`, label: `w${roundTag}-${i}` }));
+		const list = listOf(...items);
+		effect(() => { counts.effectRuns++; store.value; });
+		return div(p(computed(() => { counts.computeRuns++; return `store ${store.value}`; })),
+			loop(list, item => item.id, item => div({ 'data-row': item.id }, () => Card(item))));
+	};
+
+	let roundTag = 'r0';
+	for (let round = 1; round <= rounds; round++) {
+		roundTag = `r${round}`;
+		const before = { subscribers: store.subscriberCount, lifecycles: Jetz.liveLifecycles };
+		const target = mount(div(() => Page()));
+		await settle();
+		// reactive traffic through the surviving source and through each widget
+		store.setState(round);
+		await settle();
+		unmount(target);
+		await settle();
+
+		const frozen = counts.effectRuns;
+		store.setState(rounds + round);       // the store outlives the page: nothing may react
+		await settle();
+		if (counts.effectRuns !== frozen) reactingAfterRelease = round;
+		if (store.subscriberCount > before.subscribers) subscribersAfterRelease = round;
+		if (Jetz.liveLifecycles > before.lifecycles) lifecyclesAfterRelease = round;
+
+		collect();
+		residuals.push(heapMiB());
+		if (round === 1 || round % 10 === 0 || round === rounds) {
+			metric(`F round ${round}`, `builds=${counts.builds} destroys=${counts.destroys} store subscribers=${store.subscriberCount} live lifecycles=${Jetz.liveLifecycles} heap=${heapMiB().toFixed(2)} MiB`);
+		}
+	}
+
+	const totalBuilds = counts.builds;
+	check(`F every widget built was destroyed once (${rounds} rounds x ${widgets})`, counts.destroys, totalBuilds);
+	check('F onMount fired for every mounted widget', counts.mounts, totalBuilds);
+	check('F the surviving store keeps no subscriber of a destroyed page', store.subscriberCount, 0);
+	check('F the lifecycle registry is empty after the churn', Jetz.liveLifecycles, 0);
+	check('F no round left a destroyed page reacting to the store', reactingAfterRelease, 0);
+	check('F no round left subscribers behind', subscribersAfterRelease, 0);
+	check('F no round left a lifecycle context behind', lifecyclesAfterRelease, 0);
+	check('F nothing left mounted', document.body.children.length, 0);
+	assertTrue('F the churn really computed and ran effects', counts.computeRuns > rounds && counts.effectRuns > rounds,
+		`${counts.effectRuns} effect runs, ${counts.computeRuns} computes over ${rounds} rounds`);
+
+	const verdict = growthVerdict(residuals, GROWTH_LIMIT_MIB);
+	metric('F heap per round', `${residuals[0].toFixed(2)} -> ${residuals[residuals.length - 1].toFixed(2)} MiB, spread ${verdict.spread?.toFixed(2) ?? 'n/a'} MiB`);
+	if (verdict.verdict === 'inconclusive') {
+		skip('F growth rule', `not enough stabilized rounds (${verdict.steps})`);
+	} else {
+		assertTrue(`F no unexplained heap growth over ${rounds} page rounds`,
 			verdict.verdict !== 'sustained growth',
 			`verdict ${verdict.verdict}: ${verdict.growth.toFixed(2)} MiB, budget ${GROWTH_LIMIT_MIB} MiB, ${verdict.increases}/${verdict.steps} steps up`);
 	}

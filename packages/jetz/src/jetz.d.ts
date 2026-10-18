@@ -43,6 +43,12 @@ export declare class State<T = any> {
     /** DOM nodes and subscribers attached to this state. */
     container: any[];
 
+    /**
+     * How many subscribers are currently attached. A diagnostic for teardown
+     * tests: a released view must leave none behind. Reading it retains nothing.
+     */
+    readonly subscriberCount: number;
+
     /** The reactive value. Reading tracks dependencies in `computed` and `effect`; writing notifies subscribers. */
     value: T;
 
