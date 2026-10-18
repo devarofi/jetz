@@ -109,8 +109,24 @@ export function setAetheriaTheme(mode) {
     else document.documentElement.removeAttribute('data-aetheria-theme');
 }
 
-export class Button extends Component {
-    render(props = {}) {
+/**
+ * Base for Aetheria components that are placed in the tree as instances.
+ *
+ * Jetz calls `renderComponent()` with no arguments, so `render()` on an adopted
+ * component receives nothing: props therefore enter through the constructor and
+ * each render defaults its argument to them. Keeping the argument, rather than
+ * reading `this` directly inside the body, leaves `new X().render({...})` working
+ * for call sites that build a node eagerly.
+ */
+export class AetheriaComponent extends Component {
+    constructor(props = {}) {
+        super();
+        this._initialProps = props;
+    }
+}
+
+export class Button extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             variant = 'primary',
             onclick = null,
@@ -965,6 +981,11 @@ function panelCycle(hostOf) {
         isClosing,
         open,
         close,
+        dispose: () => {
+            cancel();
+            dismissal?.close();
+            settle();
+        },
         toggle: () => (isOpen.value && !isClosing.value ? close() : open())
     };
 }
@@ -1431,15 +1452,24 @@ export class Tooltip extends Component {
     }
 }
 
-export class Popover extends Component {
-    render(props = {}) {
+export class Popover extends AetheriaComponent {
+    /**
+     * Reached through `this` so Jetz's lifecycle can run it when the host leaves
+     * the page: an open panel holds document listeners and lift marks on ancestor
+     * cards, both of which a detached component would otherwise orphan.
+     */
+    onDestroy() {
+        this._panel?.dispose();
+    }
+
+    render(props = this._initialProps) {
         const {
             trigger = 'Toggle Popover',
             content = null,
             children = null,
             class: customClass = ''
         } = props;
-        const panel = panelCycle(() => root);
+        const panel = this._panel = panelCycle(() => root);
 
         const root = div(
             {
@@ -3348,4 +3378,18 @@ export class PdfViewer extends Component {
         );
     }
 }
+
+/**
+ * Instance factories: `Ae.Button({ label: 'Save' })` placed directly in a parent
+ * element. Handing Jetz the component instead of a built node is what gives it a
+ * lifecycle — it runs onCreate, calls render() with no arguments so the
+ * constructor props are used, and fires onDestroy when the host detaches.
+ *
+ * Only components built on AetheriaComponent appear here. An unmigrated class
+ * ignores constructor props, so exposing it would silently render defaults.
+ */
+export const Ae = {
+    Button: (props) => new Button(props),
+    Popover: (props) => new Popover(props)
+};
 

@@ -858,6 +858,52 @@ describe('Aetheria UI in Jetz', () => {
         expect(card.classList.contains('aetheria-layer-host')).toBe(false);
     });
 
+    it('renders an Ae factory component that Jetz adopts as an instance', () => {
+        const clicks = [];
+        const target = document.createElement('div');
+        document.body.append(target);
+        Jetz.mount(div(Aetheria.Ae.Button({
+            label: 'Save',
+            variant: 'secondary',
+            onclick: (event) => clicks.push(event.target.textContent)
+        })), target);
+
+        const node = target.querySelector('.aetheria-btn');
+        expect(node.textContent).toBe('Save');
+        expect(node.classList.contains('aetheria-btn-secondary')).toBe(true);
+        node.click();
+        expect(clicks).toEqual(['Save']);
+    });
+
+    it('keeps the eager new X().render(props) form working', () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        Jetz.mount(new Aetheria.Button().render({ label: 'Legacy', variant: 'border' }), target);
+
+        const node = target.querySelector('.aetheria-btn');
+        expect(node.textContent).toBe('Legacy');
+        expect(node.classList.contains('aetheria-btn-border')).toBe(true);
+    });
+
+    it('releases the ancestor lift when a popover host is unmounted mid-open', async () => {
+        const card = document.createElement('div');
+        card.className = 'aetheria-glass';
+        card.style.position = 'relative';
+        const target = document.createElement('div');
+        card.append(target);
+        document.body.append(card);
+        Jetz.mount(div(Aetheria.Ae.Popover({ trigger: 'Details', content: 'Popover body' })), target);
+
+        target.querySelector('button').click();
+        expect(card.classList.contains('aetheria-layer-host')).toBe(true);
+
+        // No close click: the host simply leaves the page while the panel is up.
+        Jetz.unmount(target);
+        await settled();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        expect(document.querySelectorAll('.aetheria-layer-host')).toHaveLength(0);
+    });
+
     it('closes the autocomplete results on outside click after their exit animation', async () => {
         const target = document.createElement('div');
         document.body.append(target);

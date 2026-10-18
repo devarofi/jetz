@@ -205,11 +205,11 @@ export class AetheriaDocs extends Component {
                 showcase(
                     "Button & IconButton",
                     "Interactive buttons with glassmorphic styles, ripple sheen, and icon circle actions.",
-                    `import { Button, IconButton } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
 const btnState = stateOf("Click Me");
 
-new Button().render({
+Ae.Button({
     variant: "primary",
     label: btnState,
     onclick: () => { btnState.value = "Clicked!"; }
@@ -217,13 +217,13 @@ new Button().render({
 new IconButton().render({ icon: "star", active: true });`,
                     div(
                         { class: "aetheria-row" },
-                        new Aetheria.Button().render({
+                        Aetheria.Ae.Button({
                             variant: "primary",
                             label: btnState,
                             onclick: () => { btnState.value = "Clicked!"; }
                         }),
-                        new Aetheria.Button().render({ variant: "secondary", label: "Secondary" }),
-                        new Aetheria.Button().render({ variant: "border", label: "Bordered" }),
+                        Aetheria.Ae.Button({ variant: "secondary", label: "Secondary" }),
+                        Aetheria.Ae.Button({ variant: "border", label: "Bordered" }),
                         new Aetheria.IconButton().render({ icon: "star", active: true }),
                         new Aetheria.IconButton().render({ icon: "settings" })
                     )
@@ -443,17 +443,17 @@ new Drawer().render({ open: drawerOpen, title: "Drawer Menu" });`,
                 showcase(
                     "Tooltip & Popover",
                     "Contextual micro-help bubbles and rich click-triggered popovers.",
-                    `import { Tooltip, Popover } from "./aetheria-ui.js";
+                    `import { Ae, Tooltip } from "./aetheria-ui.js";
 
 new Tooltip().render({ text: "Hover here", content: "Helper info" });
-new Popover().render({ trigger: "Details", content: "Rich content" });`,
+Ae.Popover({ trigger: "Details", content: "Rich content" });`,
                     div(
                         { class: "aetheria-row" },
                         new Aetheria.Tooltip().render({
                             text: "Hover over this tooltip",
                             content: "Aetheria glass tooltip active!"
                         }),
-                        new Aetheria.Popover().render({
+                        Aetheria.Ae.Popover({
                             trigger: "Click for details",
                             content: div(
                                 h3({ class: "aetheria-panel-title" }, "Popover Heading"),
