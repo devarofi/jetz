@@ -106,6 +106,21 @@ export declare class ListState<T = any, TInput = T> extends Array<T> {
     /** Number of items currently in the list. */
     readonly size: number;
 
+    /**
+     * Version signal behind the read-side bindings: reading `.value` inside a
+     * `computed` or `effect` re-runs it on any mutation.
+     */
+    readonly version: State<number>;
+
+    /** Tracked snapshot of the items; assigning an array replaces the list. */
+    value: T[];
+
+    /** Called as `listener(version, previousVersion)` after every mutation. */
+    subscribe(listener: (value: number, previous: number) => void): this;
+
+    /** Removes a listener previously passed to `subscribe`. */
+    unsubscribe(listener: (value: number, previous: number) => void): this;
+
     /** Appends items to the end of the collection and updates DOM. */
     push(...items: Array<T | TInput>): number;
 

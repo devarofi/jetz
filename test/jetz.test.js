@@ -1218,6 +1218,50 @@ describe('listOf / ListState', () => {
 		items.push('c');
 		expect([...target.querySelectorAll('li')].map(el => el.textContent)).toEqual(['a', 'b', 'c']);
 	});
+	it('reads a list as a value: .value snapshots and re-runs dependents', () => {
+		const items = listOf('a', 'b');
+		expect(items.value).toEqual(['a', 'b']);
+		const joined = computed(() => items.value.join('/'));
+		expect(joined.value).toBe('a/b');
+		items.push('c');
+		expect(joined.value).toBe('a/b/c');
+		items.removeAt(0);
+		expect(joined.value).toBe('b/c');
+		items.set(['x']);
+		expect(joined.value).toBe('x');
+		items.sort();
+		items.push('y');
+		expect(joined.value).toBe('x/y');
+	});
+	it('renders a derived text binding from a list mutation', () => {
+		const items = listOf('a', 'b');
+		const target = mount(div(computed(() => items.value.length)));
+		expect(target.textContent).toBe('2');
+		items.push('c');
+		expect(target.textContent).toBe('3');
+	});
+	it('list.value = array replaces the list, single values become one-item lists', () => {
+		const items = listOf('a');
+		items.value = ['m', 'n'];
+		expect(items.value).toEqual(['m', 'n']);
+		items.value = 'solo';
+		expect(items.value).toEqual(['solo']);
+		items.value = null;
+		expect(items.value).toEqual([]);
+	});
+	it('subscribe/unsubscribe fire only for the list that changed', () => {
+		const left = listOf('a');
+		const right = listOf('b');
+		const seen = [];
+		const handler = () => seen.push(left.value.join(','));
+		left.subscribe(handler);
+		left.push('c');
+		right.push('d');
+		expect(seen).toEqual(['a,c']);
+		left.unsubscribe(handler);
+		left.push('e');
+		expect(seen).toEqual(['a,c']);
+	});
 	it('removes every node of a multi-node view', () => {
 		const items = listOf('a', 'b');
 		mount(ul(loop(items, item => [li(`t-${item}`), li(`b-${item}`)])));

@@ -1013,6 +1013,10 @@ export class Dropdown extends AetheriaComponent {
 }
 
 export class ContextMenu extends AetheriaComponent {
+    onDestroy() {
+        this._closeMenu?.();
+    }
+
     render(props = this._initialProps) {
         const {
             items = [],
@@ -1023,8 +1027,16 @@ export class ContextMenu extends AetheriaComponent {
         let portal = null;
         let observer = null;
         let keydownHandler = null;
+        let itemsHandler = null;
+
+        const detachItems = () => {
+            if (!itemsHandler) return;
+            items.unsubscribe?.(itemsHandler);
+            itemsHandler = null;
+        };
 
         const closeMenu = () => {
+            detachItems();
             if (keydownHandler) {
                 document.removeEventListener('keydown', keydownHandler);
                 keydownHandler = null;
@@ -1043,30 +1055,15 @@ export class ContextMenu extends AetheriaComponent {
             leaving.classList.add('is-closing');
             setTimeout(() => leaving.remove(), PANEL_EXIT_MS);
         };
+        this._closeMenu = closeMenu;
 
-        const openMenu = (event, source) => {
-            closeMenu();
-            document.querySelectorAll('.aetheria-context-menu-backdrop').forEach(node => node.remove());
-
+        const buildItems = menu => {
             const list = Array.isArray(prop(items, [])) ? prop(items, []) : [];
-
-            const overlay = document.createElement('div');
-            // The portal sits outside the mounted tree, so it carries the theme
-            // root class itself: host pages scope their resets under .aetheria-root.
-            overlay.className = 'aetheria-root aetheria-context-menu-backdrop';
-            overlay.addEventListener('click', closeMenu);
-            overlay.addEventListener('contextmenu', menuEvent => menuEvent.preventDefault());
-
-            const menu = document.createElement('div');
-            menu.className = 'aetheria-context-menu';
-            menu.setAttribute('role', 'menu');
-            menu.addEventListener('click', menuEvent => menuEvent.stopPropagation());
-
+            menu.replaceChildren();
             list.forEach(item => {
                 if (item?.separator) {
                     const separator = document.createElement('div');
                     separator.setAttribute('role', 'separator');
-                    separator.className = 'aetheria-command-sep';
                     separator.className = 'aetheria-menu-sep';
                     menu.append(separator);
                     return;
@@ -1092,6 +1089,30 @@ export class ContextMenu extends AetheriaComponent {
                 });
                 menu.append(action);
             });
+        };
+
+        const openMenu = (event, source) => {
+            closeMenu();
+            document.querySelectorAll('.aetheria-context-menu-backdrop').forEach(node => node.remove());
+
+            const overlay = document.createElement('div');
+            // The portal sits outside the mounted tree, so it carries the theme
+            // root class itself: host pages scope their resets under .aetheria-root.
+            overlay.className = 'aetheria-root aetheria-context-menu-backdrop';
+            overlay.addEventListener('click', closeMenu);
+            overlay.addEventListener('contextmenu', menuEvent => menuEvent.preventDefault());
+
+            const menu = document.createElement('div');
+            menu.className = 'aetheria-context-menu';
+            menu.setAttribute('role', 'menu');
+            menu.addEventListener('click', menuEvent => menuEvent.stopPropagation());
+            buildItems(menu);
+            // The menu is plain DOM, so an items change only reaches it through
+            // this subscription; it is released with the portal in closeMenu.
+            if (isReactive(items)) {
+                itemsHandler = () => buildItems(menu);
+                items.subscribe(itemsHandler);
+            }
 
             overlay.append(menu);
             document.body.append(overlay);
@@ -2043,63 +2064,251 @@ export class DateRangePicker extends AetheriaComponent {
     }
 }
 
-export class FormValidation extends AetheriaComponent {
-    render(props = this._initialProps) {
-        const { onsubmit = null, class: customClass = '' } = props;
-        const nameVal = stateOf('');
-        const emailVal = stateOf('');
-        const nameError = stateOf('');
-        const emailError = stateOf('');
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const URL_PATTERN = /^https?:\/\/[^\s/?#]+\.[^\s/?#]{2,}/i;
 
-        return form(
+function isEmptyValue(value) {
+    if (value === null || value === undefined || value === '' || value === false) return true;
+    return Array.isArray(value) && value.length === 0;
+}
+
+function toRegExp(spec) {
+    const text = String(spec);
+    const delimited = /^\/([\s\S]+)\/([a-z]*)$/.exec(text);
+    return delimited ? new RegExp(delimited[1], delimited[2]) : new RegExp(text);
+}
+
+/**
+ * Rule kinds usable in a 'required|email|max:30' string. Each test receives the
+ * field value, the `:args` split on commas, and `{ values, field }` so a rule can
+ * compare against the rest of the form. Every rule except `required` is skipped
+ * while the field is empty, so optional fields only fail on what they hold.
+ */
+const RULES = {
+    required: { message: () => 'This field is required', test: value => !isEmptyValue(value) },
+    email: { message: () => 'A valid email is required', test: value => EMAIL_PATTERN.test(String(value)) },
+    url: { message: () => 'A valid URL is required', test: value => URL_PATTERN.test(String(value)) },
+    numeric: { message: () => 'Must be a number', test: value => Number.isFinite(Number(value)) },
+    integer: { message: () => 'Must be a whole number', test: value => Number.isInteger(Number(value)) },
+    min: { message: ([n]) => `Must be at least ${n} characters`, test: (value, [n]) => String(value).length >= Number(n) },
+    max: { message: ([n]) => `Must be at most ${n} characters`, test: (value, [n]) => String(value).length <= Number(n) },
+    len: { message: ([n]) => `Must be exactly ${n} characters`, test: (value, [n]) => String(value).length === Number(n) },
+    regex: { message: () => 'Format is invalid', test: (value, [pattern]) => toRegExp(pattern).test(String(value)) },
+    in: {
+        message: (args) => `Must be one of: ${args.join(',')}`,
+        test: (value, args) => args.map(item => item.trim()).includes(String(value))
+    },
+    same: {
+        message: ([other]) => `Must match ${other}`,
+        test: (value, [other], { values }) => value === values[other]
+    },
+    confirmed: {
+        message: (_args, field) => `${field} confirmation does not match`,
+        test: (value, _args, { values, field }) => value === values[`${field}_confirm`]
+    },
+    accepted: { message: () => 'Must be accepted', test: value => value === true || value === 'yes' || value === 'on' }
+};
+
+/** A regex rule carries its own pipes, so the split cannot be a plain `|` split. */
+function splitPipes(spec) {
+    const parts = [];
+    let current = '';
+    let insidePattern = false;
+    for (const character of String(spec)) {
+        if (character === '/') insidePattern = !insidePattern;
+        if (character === '|' && !insidePattern) {
+            parts.push(current);
+            current = '';
+            continue;
+        }
+        current += character;
+    }
+    parts.push(current);
+    return parts.map(part => part.trim()).filter(Boolean);
+}
+
+function parseRules(spec) {
+    if (typeof spec === 'function') return [{ fn: spec }];
+    return (Array.isArray(spec) ? spec : [spec]).flatMap(item => {
+        if (typeof item === 'function') return [{ fn: item }];
+        return splitPipes(item).map(token => {
+            const separator = token.indexOf(':');
+            return separator === -1
+                ? { name: token, args: [] }
+                : { name: token.slice(0, separator), args: token.slice(separator + 1).split(',') };
+        });
+    });
+}
+
+/**
+ * Run a rule set against a values snapshot and return one message per field,
+ * `''` when the field passes. A spec is a `|`-separated string, an array of
+ * those, or a `(value, values) => message` function; `options.checks` adds a
+ * function per field on top of the string rules and `options.messages` overrides
+ * a rule's text per field (`{ email: { required: 'We need your address' } }`).
+ * A field stops at its first failing rule, like a Laravel validator.
+ */
+export function validate(values, rules, options = {}) {
+    const overrides = options.messages || {};
+    const checks = options.checks || {};
+    const errors = {};
+    for (const [field, spec] of Object.entries(rules)) {
+        const value = values[field];
+        const texts = overrides[field] || {};
+        errors[field] = '';
+        for (const token of parseRules(spec)) {
+            if (token.fn) {
+                const message = token.fn(value, values, field);
+                if (message) { errors[field] = message; break; }
+                continue;
+            }
+            const rule = RULES[token.name];
+            if (!rule) {
+                console.warn(`Aetheria validate: unknown rule "${token.name}" on "${field}"`);
+                continue;
+            }
+            if (token.name !== 'required' && isEmptyValue(value)) continue;
+            if (!rule.test(value, token.args, { values, field })) {
+                errors[field] = texts[token.name] || rule.message(token.args, field);
+                break;
+            }
+        }
+        if (!errors[field] && checks[field]) errors[field] = checks[field](value, values) || '';
+    }
+    return errors;
+}
+
+/**
+ * Wrapper that owns a form's values, validation and submit gate while the caller
+ * renders the fields. `children(form)` runs inside this component's own render,
+ * so the computeds it creates belong to this lifecycle.
+ *
+ * Everything the handle hands back is a State or a computed: read one eagerly
+ * (`form.error('email').value`) and it freezes at that value.
+ */
+export class FormValidation extends AetheriaComponent {
+    onDestroy() {
+        this._subscriptions?.forEach(([state, handler]) => state.unsubscribe(handler));
+    }
+
+    render(props = this._initialProps) {
+        const {
+            rules = { name: 'required', email: 'required|email' },
+            values: initial = {},
+            children = null,
+            labels = {},
+            types = {},
+            placeholders = {},
+            messages = null,
+            checks = null,
+            onsubmit = null,
+            oninvalid = null,
+            submitLabel = 'Submit Form',
+            class: customClass = ''
+        } = props;
+        const fields = Object.keys(prop(rules, {}));
+        // Without an explicit `messages`, the zero-children demo keeps its own
+        // wording; a wrapper form gets none and uses the rule registry defaults.
+        const demoMessages = typeof children === 'function' ? null : {
+            name: { required: 'Name is required' },
+            email: { required: 'Valid email is required', email: 'Valid email is required' }
+        };
+        const seed = () => prop(initial, {});
+        const values = stateOf(Object.fromEntries(fields.map(field => [field, seed()[field] ?? ''])));
+        const touched = stateOf(Object.fromEntries(fields.map(field => [field, false])));
+        const submitted = stateOf(false);
+        const errors = {};
+        const shown = {};
+        const subscriptions = [];
+        // Reset writes values programmatically; without this the fields would
+        // mark themselves dirty again and re-show every error.
+        let silent = false;
+
+        for (const field of fields) {
+            const live = computed(() => validate(
+                values.toObject(),
+                { [field]: prop(rules, {})[field] },
+                { messages: prop(messages, demoMessages), checks: prop(checks, null) }
+            )[field]);
+            const mark = () => { if (!silent) touched[field].value = true; };
+            values[field].subscribe(mark);
+            subscriptions.push([values[field], mark]);
+            errors[field] = live;
+            shown[field] = computed(() => (submitted.value || touched[field].value) ? live.value : '');
+        }
+        this._subscriptions = subscriptions;
+
+        const formHandle = {
+            value: field => values[field],
+            error: field => shown[field],
+            touch: field => { touched[field].value = true; },
+            values: () => values.toObject(),
+            valid: computed(() => fields.every(field => !errors[field].value)),
+            message: field => p(
+                {
+                    class: computed(() =>
+                        `aetheria-field-error ${flag(shown[field], '', 'aetheria-hidden')}`.replace(/\s+/g, ' ').trim()),
+                    role: 'alert'
+                },
+                shown[field]
+            ),
+            field: (field, factory = Ae.TextInput, controlProps = {}) => factory({
+                value: values[field],
+                invalid: shown[field],
+                type: computed(() => prop(types, {})[field] ?? 'text'),
+                placeholder: computed(() =>
+                    prop(placeholders, {})[field] ?? prop(labels, {})[field] ?? ''),
+                ...controlProps
+            }),
+            reset: () => {
+                silent = true;
+                const next = seed();
+                fields.forEach(field => {
+                    values[field].value = next[field] ?? '';
+                    touched[field].value = false;
+                });
+                silent = false;
+                submitted.value = false;
+            }
+        };
+
+        const body = typeof children === 'function' ? children(formHandle) : [
+            ...fields.map(field => div(
+                { class: 'aetheria-stack' },
+                formHandle.field(field, Ae.TextInput, {
+                    type: computed(() =>
+                        prop(types, {})[field] ?? (field === 'email' ? 'email' : 'text')),
+                    oninput: () => formHandle.touch(field)
+                }),
+                formHandle.message(field)
+            )),
+            button(
+                { type: 'submit', class: 'aetheria-btn aetheria-btn-primary' },
+                bind(submitLabel, 'Submit Form')
+            )
+        ];
+
+        const root = form(
             {
                 class: computed(() =>
                     `aetheria-col ${prop(customClass, '')}`.replace(/\s+/g, ' ').trim()),
-                onsubmit: (e) => {
-                    e.preventDefault();
-                    const nameMessage = nameVal.value.trim() ? '' : 'Name is required';
-                    const emailMessage = emailVal.value.includes('@') ? '' : 'Valid email is required';
-                    nameError.value = nameMessage;
-                    emailError.value = emailMessage;
-                    if (!nameMessage && !emailMessage && onsubmit) {
-                        onsubmit({ name: nameVal.value, email: emailVal.value });
+                novalidate: true,
+                onsubmit: (event) => {
+                    event.preventDefault();
+                    submitted.value = true;
+                    if (formHandle.valid.value) {
+                        if (onsubmit) onsubmit(values.toObject());
+                        return;
                     }
+                    if (oninvalid) {
+                        oninvalid(Object.fromEntries(fields.map(field => [field, shown[field].value])));
+                    }
+                    root.o?.querySelector('[aria-invalid="true"]')?.focus();
                 }
             },
-            div(
-                { class: 'aetheria-stack' },
-                input({
-                    type: 'text',
-                    class: computed(() =>
-                        `aetheria-field ${flag(nameError, 'is-invalid')}`.replace(/\s+/g, ' ').trim()),
-                    placeholder: 'Full name',
-                    'aria-invalid': computed(() => flag(nameError, 'true', 'false')),
-                    bind: nameVal
-                }),
-                p({
-                    class: computed(() =>
-                        `aetheria-field-error ${flag(nameError, '', 'aetheria-hidden')}`.replace(/\s+/g, ' ').trim()),
-                    role: 'alert'
-                }, nameError)
-            ),
-            div(
-                { class: 'aetheria-stack' },
-                input({
-                    type: 'email',
-                    class: computed(() =>
-                        `aetheria-field ${flag(emailError, 'is-invalid')}`.replace(/\s+/g, ' ').trim()),
-                    placeholder: 'Email address',
-                    'aria-invalid': computed(() => flag(emailError, 'true', 'false')),
-                    bind: emailVal
-                }),
-                p({
-                    class: computed(() =>
-                        `aetheria-field-error ${flag(emailError, '', 'aetheria-hidden')}`.replace(/\s+/g, ' ').trim()),
-                    role: 'alert'
-                }, emailError)
-            ),
-            button({ type: 'submit', class: 'aetheria-btn aetheria-btn-primary' }, 'Submit Form')
+            ...(Array.isArray(body) ? body : [body])
         );
+        return root;
     }
 }
 

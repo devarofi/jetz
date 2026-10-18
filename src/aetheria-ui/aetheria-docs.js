@@ -2,7 +2,7 @@ import Prism from "prismjs/components/prism-core.js";
 import "prismjs/components/prism-clike.js";
 import "prismjs/components/prism-javascript.js";
 
-import { Component, html, stateOf, computed } from "../lib/jetz.js";
+import { Component, html, stateOf, computed, listOf } from "../lib/jetz.js";
 import {
     a, button, code, div, h1, h2, h3, header, hr, main, p, pre, section, span
 } from "../lib/jetz-ui.js";
@@ -152,6 +152,9 @@ export class AetheriaDocs extends Component {
         const drawerOpen = stateOf(false);
         const contextAction = stateOf("No action selected");
         const themeMode = stateOf("dark");
+        const liveLabel = stateOf("Ready");
+        const liveOptions = listOf("alpha", "beta");
+        const liveChoice = stateOf("alpha");
         const modalDrawerOverlays = div(
             Aetheria.Ae.Modal({
                 open: modalOpen,
@@ -202,6 +205,43 @@ export class AetheriaDocs extends Component {
                     )
                 ),
                 main({ class: "aetheria-col" },
+                showcase(
+                    "Reactive props",
+                    "Every prop is a live binding: pass a stateOf, a computed, a getter function, or a listOf and the component repaints when it changes. Collection props (options, items, rows, columns, tabs, data, nodes, events) read a listOf as a tracked snapshot, so push, removeAt and set update the control in place. A component also works with plain literals, which are then just static. Only seeds stay one-shot: RichTextEditor initialContent, FormValidation values, and the field list FormValidation derives from its rules.",
+                    `import { stateOf, listOf } from "../lib/jetz.js";
+import { Ae } from "./aetheria-ui.js";
+
+const label = stateOf("Ready");
+const options = listOf("alpha", "beta");
+const choice = stateOf("alpha");
+
+Ae.Badge({ text: label, variant: "primary" });
+Ae.Select({ value: choice, options });
+
+// any of these repaints the components, no remount needed
+label.value = "Saved";
+options.push("gamma");
+choice.value = "beta";
+
+// derived props work the same way
+const doubled = computed(() => options.value.map(name => name.toUpperCase()));
+Ae.ListView({ items: doubled });`,
+                    div(
+                        { class: "aetheria-row" },
+                        Aetheria.Ae.Badge({ text: liveLabel, variant: "primary" }),
+                        Aetheria.Ae.Select({ value: liveChoice, options: liveOptions }),
+                        Aetheria.Ae.Button({
+                            variant: "secondary",
+                            label: "Add option",
+                            onclick: () => liveOptions.push(`option ${liveOptions.value.length + 1}`)
+                        }),
+                        Aetheria.Ae.Button({
+                            variant: "border",
+                            label: "Toggle label",
+                            onclick: () => { liveLabel.value = liveLabel.value === "Ready" ? "Saved" : "Ready"; }
+                        })
+                    )
+                ),
                 showcase(
                     "Button & IconButton",
                     "Interactive buttons with glassmorphic styles, ripple sheen, and icon circle actions.",
@@ -514,13 +554,70 @@ Ae.DateRangePicker({
                 ),
                 showcase(
                     "Form Validation",
-                    "Reactive form with inline validation feedback and submit prevention.",
+                    "FormValidation owns the values, the rules and the submit gate; children(form) renders the fields you want. Rules read like Laravel: required, email, url, numeric, integer, min, max, len, regex, in, same, confirmed, accepted. A field stops at its first failing rule, and only required runs while the field is empty. Errors stay hidden until the field is touched or the form is submitted.",
                     `import { Ae } from "./aetheria-ui.js";
 
 Ae.FormValidation({
-    onsubmit: (data) => console.log(data)
-});`,
-                    Aetheria.Ae.FormValidation()
+    rules: {
+        email: "required|email",
+        password: "required|min:8",
+        terms: "accepted"
+    },
+    // Per-field text overrides and one-off checks on top of the string rules.
+    messages: { email: { required: "We need your address" } },
+    checks: { email: value => value.endsWith(".io") ? "" : "Use a .io address" },
+    onsubmit: data => console.log(data),
+    oninvalid: errors => console.log(errors),
+    // Everything the handle returns is a State or computed: pass it on as-is,
+    // never read .value while building the tree.
+    children: form => div(
+        form.field("email"),                                  // Ae.TextInput by default
+        form.message("email"),
+        form.field("password", Ae.TextInput, { type: "password" }),
+        form.message("password"),
+        form.field("terms", Ae.Checkbox, {
+            checked: form.value("terms"),
+            label: "Accept terms"
+        }),
+        form.message("terms"),
+        button({ type: "submit", class: "aetheria-btn aetheria-btn-primary" }, "Sign up")
+    )
+});
+
+// valid is a computed, so read it inside a callback: p(() => form.valid.value).
+// form.values(), form.error(name), form.touch(name) and form.reset() round out
+// the handle.
+
+// With no children it renders a ready-made demo form.
+Ae.FormValidation({ onsubmit: data => console.log(data) });`,
+                    div(
+                        { class: "aetheria-col" },
+                        Aetheria.Ae.FormValidation({
+                            rules: {
+                                email: "required|email",
+                                password: "required|min:6"
+                            },
+                            messages: { email: { required: "We need your address" } },
+                            onsubmit: data => console.log("signed up", data),
+                            children: form => div(
+                                { class: "aetheria-col" },
+                                form.field("email", Aetheria.Ae.TextInput, { placeholder: "you@company.io" }),
+                                form.message("email"),
+                                form.field("password", Aetheria.Ae.TextInput, {
+                                    type: "password",
+                                    placeholder: "at least 6 characters"
+                                }),
+                                form.message("password"),
+                                button(
+                                    { type: "submit", class: "aetheria-btn aetheria-btn-primary" },
+                                    "Sign up"
+                                )
+                            )
+                        }),
+                        Aetheria.Ae.FormValidation({
+                            onsubmit: data => console.log("submitted", data)
+                        })
+                    )
                 ),
                 showcase(
                     "Pagination & Breadcrumb",

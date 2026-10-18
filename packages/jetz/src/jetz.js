@@ -2116,6 +2116,36 @@ export class ListState extends Array {
 	_useKeyedReconciliation = false;
 	/** @internal maps key -> { item, view (JetzElement) } per parent */
 	_keyMaps = [];
+	/** @internal lazy version signal, created on first reactive read */
+	#version = null;
+	/**
+	 * A list pushes its views on mutation, which makes it renderable but not
+	 * readable: a `computed` that samples a list had no signal to re-run on.
+	 * This version State is that signal, so a list can also be passed as a
+	 * component prop or read inside a derived value.
+	 */
+	get version() {
+		if (this.#version === null) this.#version = new State(0);
+		return this.#version;
+	}
+	/** Tracked snapshot of the items; writing replaces the whole list. */
+	get value() {
+		return this.version.value, this.values;
+	}
+	set value(next) {
+		this.set(Array.isArray(next) ? next : (next === null || next === undefined || next === '' ? [] : [next]));
+	}
+	subscribe(listener) {
+		return this.version.subscribe(listener);
+	}
+	unsubscribe(listener) {
+		return this.version.unsubscribe(listener);
+	}
+	#bump() {
+		// Lists nobody reads reactively never allocate the signal.
+		if (this.#version === null) return;
+		this.#version.setState(this.#version.peek() + 1);
+	}
 	#syncArray() {
 		super.splice(0, this.length, ...this.values);
 		this.length = this.values.length;
@@ -2124,6 +2154,7 @@ export class ListState extends Array {
 		this.values = values;
 		this.#syncArray();
 		this.renderView(true);
+		this.#bump();
 		if (this.isRemember) this.#persistRemembered();
 		return this;
 	}
@@ -2289,6 +2320,7 @@ export class ListState extends Array {
 				this.#persistRemembered();
 			}
 		}
+		this.#bump();
 	}
 	renderView(refresh = false) {
 		// Keyed reconciliation path
@@ -2425,6 +2457,7 @@ export class ListState extends Array {
 			this._keyMaps.forEach(keyMap => keyMap?.delete(removedKey));
 		}
 		if (this.isRemember) this.#persistRemembered();
+		this.#bump();
 		// trigger state
 		Jetz.triggerByState();
 	}

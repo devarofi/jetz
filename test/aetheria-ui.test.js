@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import * as Aetheria from '../src/aetheria-ui/aetheria-ui.js';
-import { Jetz, stateOf } from '../src/lib/jetz.js';
+import { Jetz, stateOf, computed, listOf } from '../src/lib/jetz.js';
 import { div, span } from '../src/lib/jetz-ui.js';
 
 /** Dismissed panels stay mounted while their exit animation plays; wait it out. */
@@ -1153,6 +1153,234 @@ describe('Aetheria UI in Jetz', () => {
         const section = heading.closest('.aetheria-docs-section');
         expect(section.querySelector('.aetheria-datepicker-range')).not.toBeNull();
         expect(section.textContent).toContain('YYYY-MM-DD/YYYY-MM-DD');
+    });
+
+    it('runs string rules through validate()', () => {
+        const { validate } = Aetheria;
+        expect(validate({ email: 'nope' }, { email: 'required|email' }).email).toBe('A valid email is required');
+        // Only `required` fires on an empty field, so optional rules stay quiet.
+        expect(validate({ email: '' }, { email: 'email|max:30' }).email).toBe('');
+        expect(validate({ name: 'ab' }, { name: 'required|min:3|max:30' }).name).toBe('Must be at least 3 characters');
+        expect(validate({ code: 'a|b' }, { code: 'regex:/^a|b$/' }).code).toBe('');
+        expect(validate({ code: 'c' }, { code: 'in:a,b,c' }).code).toBe('');
+        expect(validate({ role: 'operator' }, { role: 'in:root,admin,guest' }).role).toBe('Must be one of: root,admin,guest');
+        expect(validate({ age: '4x' }, { age: 'numeric' }).age).toBe('Must be a number');
+        expect(validate({ a: 'x', b: 'y' }, { a: 'same:b' }).a).toBe('Must match b');
+        expect(validate({ pin: '1234', pin_confirm: '1234' }, { pin: 'confirmed' }).pin).toBe('');
+        expect(validate({ nick: 'thelongestname' }, { nick: 'len:5' }).nick).toBe('Must be exactly 5 characters');
+    });
+
+    it('takes custom rules, checks and message overrides', () => {
+        const { validate } = Aetheria;
+        expect(validate({ name: 'x' }, { name: value => value.length > 1 ? '' : 'Too short' }).name).toBe('Too short');
+        expect(validate({ coupon: 'nope' }, { coupon: 'required' }, {
+            checks: { coupon: value => value === 'SAVE' ? '' : 'Unknown coupon' }
+        }).coupon).toBe('Unknown coupon');
+        expect(validate({ email: '' }, { email: 'required' }, {
+            messages: { email: { required: 'We need your address' } }
+        }).email).toBe('We need your address');
+        expect(validate({ email: 'nope' }, { email: 'required|email' }, {
+            messages: { email: { email: 'Not an address' } }
+        }).email).toBe('Not an address');
+    });
+
+    it('warns about an unknown rule instead of failing the field', () => {
+        const warnings = [];
+        const original = console.warn;
+        console.warn = message => warnings.push(message);
+        const result = Aetheria.validate({ name: 'anything' }, { name: 'required|telepathic' });
+        console.warn = original;
+        expect(result.name).toBe('');
+        expect(warnings).toEqual(['Aetheria validate: unknown rule "telepathic" on "name"']);
+    });
+
+    it('validates through the form handle and only submits a clean form', () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const submitted = [];
+        const rejected = [];
+        Jetz.mount(div(Aetheria.Ae.FormValidation({
+            rules: { email: 'required|email' },
+            onsubmit: data => submitted.push(data),
+            oninvalid: errors => rejected.push(errors.email),
+            children: form => div(
+                Aetheria.Ae.TextInput({ value: form.value('email'), invalid: form.error('email') }),
+                form.message('email')
+            )
+        })), target);
+
+        const node = target.querySelector('.aetheria-field');
+        const message = target.querySelector('.aetheria-field-error');
+        const submit = () => target.querySelector('form').dispatchEvent(new Event('submit'));
+        expect(message.className).toContain('aetheria-hidden');
+
+        submit();
+        expect(submitted).toEqual([]);
+        expect(rejected).toEqual(['This field is required']);
+        expect(message.className).not.toContain('aetheria-hidden');
+        expect(message.textContent).toBe('This field is required');
+        expect(node.classList.contains('is-invalid')).toBe(true);
+        expect(node.getAttribute('aria-invalid')).toBe('true');
+
+        // Only `required` fires on an empty field; the format rule takes over once
+        // the field holds something, and keeps re-running live after the submit.
+        node.value = 'nope';
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(message.textContent).toBe('A valid email is required');
+        node.value = 'dev@jetz.io';
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(message.textContent).toBe('');
+        expect(node.classList.contains('is-invalid')).toBe(false);
+
+        submit();
+        expect(submitted).toEqual([{ email: 'dev@jetz.io' }]);
+    });
+
+    it('hides untouched errors until submit and clears them on reset', () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        let handle = null;
+        Jetz.mount(div(Aetheria.Ae.FormValidation({
+            rules: { name: 'required', nick: 'required' },
+            children: form => {
+                handle = form;
+                return div(form.field('name'), form.message('name'), form.field('nick'), form.message('nick'));
+            }
+        })), target);
+
+        const messages = () => [...target.querySelectorAll('.aetheria-field-error')];
+        expect(messages().every(node => node.className.includes('aetheria-hidden'))).toBe(true);
+        target.querySelector('form').dispatchEvent(new Event('submit'));
+        expect(target.querySelectorAll('.aetheria-field.is-invalid')).toHaveLength(2);
+
+        handle.reset();
+        expect(target.querySelectorAll('.aetheria-field.is-invalid')).toHaveLength(0);
+        expect(handle.values()).toEqual({ name: '', nick: '' });
+        expect(handle.valid.value).toBe(false);
+    });
+
+    it('keeps the default two-field demo messaging', () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const submitted = [];
+        Jetz.mount(div(Aetheria.Ae.FormValidation({ onsubmit: data => submitted.push(data) })), target);
+
+        const fields = target.querySelectorAll('.aetheria-field');
+        expect(fields).toHaveLength(2);
+        expect(fields[1].getAttribute('type')).toBe('email');
+        target.querySelector('form').dispatchEvent(new Event('submit'));
+        expect(submitted).toEqual([]);
+        expect([...target.querySelectorAll('.aetheria-field-error')].map(node => node.textContent))
+            .toEqual(['Name is required', 'Valid email is required']);
+    });
+
+    it('renders a listOf into every collection prop it is given', async () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const options = listOf('one', 'two');
+        const rows = listOf({ name: 'Ada' }, { name: 'Alan' });
+        const tabs = listOf({ label: 'First', content: 'a' }, { label: 'Second', content: 'b' });
+        Jetz.mount(div(
+            Aetheria.Ae.Select({ value: stateOf('one'), options }),
+            Aetheria.Ae.DataGrid({ columns: [{ key: 'name', label: 'Name' }], rows }),
+            Aetheria.Ae.Tabs({ tabs })
+        ), target);
+        await settled();
+
+        target.querySelector('.aetheria-select-trigger').click();
+        await settled();
+        expect(target.querySelectorAll('.aetheria-select-option')).toHaveLength(2);
+        expect(target.querySelectorAll('tbody tr')).toHaveLength(2);
+        expect(target.querySelectorAll('.aetheria-tab-btn')).toHaveLength(2);
+
+        options.push('three');
+        rows.push({ name: 'Grace' });
+        tabs.push({ label: 'Third', content: 'c' });
+        await settled();
+        expect(target.querySelectorAll('.aetheria-select-option')).toHaveLength(3);
+        expect(target.querySelectorAll('tbody tr')).toHaveLength(3);
+        expect(target.querySelectorAll('.aetheria-tab-btn')).toHaveLength(3);
+    });
+
+    it('binds a listOf back as a multi-value prop', async () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const picked = listOf();
+        Jetz.mount(div(Aetheria.Ae.MultiSelect({ options: ['a', 'b'], value: picked })), target);
+        await settled();
+
+        const boxes = [...target.querySelectorAll('input')];
+        boxes[0].checked = true;
+        boxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+        await settled();
+        expect(picked.value).toEqual(['a']);
+        expect([...target.querySelectorAll('input')].map(box => box.checked)).toEqual([true, false]);
+
+        picked.set([]);
+        await settled();
+        expect([...target.querySelectorAll('input')].map(box => box.checked)).toEqual([false, false]);
+    });
+
+    it('rebuilds an open ContextMenu when its items change', async () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const items = listOf('Open', 'Rename');
+        Jetz.mount(div(Aetheria.Ae.ContextMenu({
+            items,
+            children: div('Right-click target')
+        })), target);
+        await settled();
+        target.querySelector('.aetheria-context-menu-area').dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 })
+        );
+        await settled();
+
+        const labels = () => [...document.querySelectorAll('.aetheria-context-menu .aetheria-dropdown-item')]
+            .map(entry => entry.textContent);
+        expect(labels()).toEqual(['Open', 'Rename']);
+
+        items.removeAt(0);
+        items.push('Delete');
+        await settled();
+        expect(labels()).toEqual(['Rename', 'Delete']);
+
+        document.querySelector('.aetheria-context-menu-backdrop').click();
+        await settled();
+        items.push('Archive');
+        await settled();
+        expect(document.querySelector('.aetheria-context-menu')).toBeNull();
+    });
+
+    it('follows a reactive rules, placeholder and label config in FormValidation', async () => {
+        const target = document.createElement('div');
+        document.body.append(target);
+        const strict = stateOf(false);
+        const rules = computed(() => ({ email: strict.value ? 'required|email' : 'required' }));
+        const placeholders = computed(() => ({ email: strict.value ? 'Work address' : 'Any address' }));
+        const types = computed(() => ({ email: strict.value ? 'email' : 'text' }));
+        const submitLabel = stateOf('Save');
+        Jetz.mount(div(Aetheria.Ae.FormValidation({
+            rules, placeholders, types, submitLabel
+        })), target);
+        await settled();
+
+        const input = target.querySelector('input');
+        const message = target.querySelector('.aetheria-field-error');
+        expect(input.placeholder).toBe('Any address');
+        expect(input.getAttribute('type')).toBe('text');
+        expect(target.querySelector('button[type="submit"]').textContent).toBe('Save');
+
+        input.value = 'nope';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await settled();
+        expect(message.textContent).toBe('');
+
+        strict.value = true;
+        await settled();
+        expect(input.placeholder).toBe('Work address');
+        expect(input.getAttribute('type')).toBe('email');
+        expect(message.textContent).toBe('Valid email is required');
+        expect(target.querySelector('.aetheria-field.is-invalid')).not.toBeNull();
     });
 
     it('can render AetheriaDocs documentation page', async () => {

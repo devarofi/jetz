@@ -875,9 +875,13 @@ recentSearches.push("Jetz"); // saved to localStorage
 | `list.asRemember(key?)` | Restore and persist the list using an optional stable key; chainable |
 | `list.size` | Returns item count |
 | `list.values` | Direct reference to underlying array |
+| `list.value` | Tracked snapshot of the items; assigning an array replaces the list |
+| `list.subscribe(fn)` / `list.unsubscribe(fn)` | Run `fn` after every mutation (it receives the version counter, so read `list.value` inside it) |
 | `list.first()` / `list.last()` | Convenience accessors for boundary items |
 
 `ListState.map()` follows the standard array behavior and returns a new array. Use `transform()` when you want to replace list items and update rendered views. Avoid editing `list.values` directly when you need the rendered list and array slots to stay synchronized. Remembered lists persist changes made through their mutation methods and reactive child states; direct edits to the `values` array bypass that synchronization. `asRemember()` stores JSON-serialized values, so prefer plain serializable records over reactive `State` instances.
+
+A list is readable, not only renderable: because `.value` is tracked, a `computed()` or `effect()` that reads it re-runs whenever the list changes, and a `listOf()` can be passed straight to a component as a collection prop.
 
 ---
 
