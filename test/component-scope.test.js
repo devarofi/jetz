@@ -53,11 +53,9 @@ describe('A. a component owns the effects it creates', () => {
 		expect(runs).toBe(1);
 		expect(store.subscriberCount).toBeGreaterThan(0);
 
-		const mounted = store.subscriberCount;
 		Jetz.unmount(target);
 		await settle();
 		expect(store.subscriberCount).toBe(0);
-		expect(mounted).toBeGreaterThan(store.subscriberCount);
 
 		store.setState(1);
 		await settle();

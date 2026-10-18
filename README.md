@@ -172,7 +172,7 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Shallow Row State** | `shallowStateOf()`, `rowOf()` | Row-level reactivity for tables: one signal per record instead of one per cell. |
 | **Lazy Signals** | `lazy(fn)` | Deferred initialization: initializer runs only on first `.value` read (like SolidJS). |
 | **Deferred Tasks** | `defer(taskFn, { loadingState })` | Run heavy mutations after the browser paints, with an optional loading indicator. |
-| **Auto Cleanup Lifecycle** | `loop()` + `disposeBindings()` | Drops subscriptions, computed values and listeners when a row leaves the DOM. |
+| **Auto Cleanup Lifecycle** | `loop()`, components + `disposeBindings()` | Drops a row's or a component's subscriptions, computed values and listeners when its view leaves the DOM. |
 | **Conditional UI** | `_if`, `_elseif`, `_else`, `ifElse` | Declarative, reactive conditional rendering without wrapper divs. |
 | **Component Lifecycle** | `onCreate`, `onMount`, `onUpdate`, `onDestroy` | Deterministic setup and teardown for function and class components. |
 | **Two-Way Binding** | `{ bind: state }` | Instant two-way synchronization between input elements and state. |
@@ -1469,8 +1469,9 @@ listeners. If a row is removed while those stay subscribed, the state keeps the
 whole detached `<tr>` subtree reachable — the classic "the grid scrolls for ten
 minutes and the heap keeps climbing" leak.
 
-Jetz gives every `loop()` item its own **disposal scope**. Everything created
-while that item renders registers its teardown there:
+Jetz opens a **disposal scope** for every managed render: a `loop()` item, an
+`ifElse()` branch, and a component (class or function). Everything created while
+that render runs registers its teardown there:
 
 ```javascript
 import { computed, effect, listOf, loop, rowOf } from "jetz";
@@ -1504,8 +1505,15 @@ employees.set(nextPage);
 
 The scope is opened by `loop()` itself, so no extra code is needed for keyed
 removal, item swap under the same key, a full classic refresh, or `removeAt()`.
-Nothing changes for state created outside a `loop()` — it is never registered in
-a scope and keeps living exactly as before.
+A component's scope is owned by the element it returns, so the `effect()` and
+`computed()` a component creates are released together with its view — a
+long-lived store keeps no subscription of a page that is already gone. A nested
+component inherits the scope of the render that created it.
+
+Nothing changes for a reactive resource created outside any managed render — in
+a module, an event handler, or a test: it is registered in no scope, so its
+source keeps it alive and correct until you call the `dispose()` that `effect()`
+returns.
 
 The same teardown runs wherever a subtree is genuinely dropped: `empty()`,
 `ifElse()` branch swaps, and `Jetz.unmount(container)`.

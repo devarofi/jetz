@@ -334,9 +334,7 @@ function adoptScope(view, scope) {
  * A scope built while a `loop()` item or an `ifElse()` branch was rendering is
  * already chained to that render and needs no second owner; everything else -
  * a page, a widget mounted directly, a component in a plain tree - is owned by
- * its entry element, whose teardown runs when the subtree is dropped. The
- * lifecycle context releases it too, which covers a component destroyed without
- * its element ever being rendered.
+ * its entry element, whose teardown runs when the subtree is dropped.
  */
 function ownComponentScope(entry, scope) {
 	if (!scope || scope.owned) return;
