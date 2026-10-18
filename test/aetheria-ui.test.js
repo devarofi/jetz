@@ -875,6 +875,33 @@ describe('Aetheria UI in Jetz', () => {
         expect(clicks).toEqual(['Save']);
     });
 
+    // The whole namespace goes through the instance path, so a class that still
+    // reads a dropped argument instead of its constructor props fails here.
+    it('renders every Ae factory with the props given to it', () => {
+        const props = {
+            items: ['Alpha', 'Beta'],
+            columns: [{ key: 'alpha', label: 'Alpha' }],
+            rows: [{ alpha: 1 }],
+            label: 'Aetheria',
+            value: '2025-04-15',
+            text: 'Hint',
+            content: 'Body',
+            trigger: 'Toggle'
+        };
+        const target = document.createElement('div');
+        document.body.append(target);
+        const built = Object.entries(Aetheria.Ae).map(([name, create]) => {
+            Jetz.mount(div(create(props)), target);
+            const node = target.querySelector('[class*="aetheria-"]');
+            const rendered = { name, ok: !!node, classes: node ? node.className.toString().slice(0, 40) : '' };
+            Jetz.unmount(target);
+            target.innerHTML = '';
+            return rendered;
+        });
+        expect(built.filter(row => !row.ok)).toEqual([]);
+        expect(built).toHaveLength(46);
+    });
+
     it('keeps the eager new X().render(props) form working', () => {
         const target = document.createElement('div');
         document.body.append(target);

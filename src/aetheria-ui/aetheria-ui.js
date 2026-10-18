@@ -150,8 +150,8 @@ export class Button extends AetheriaComponent {
     }
 }
 
-export class IconButton extends Component {
-    render(props = {}) {
+export class IconButton extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             onclick = null,
             title = '',
@@ -179,8 +179,8 @@ export class IconButton extends Component {
     }
 }
 
-export class TextInput extends Component {
-    render(props = {}) {
+export class TextInput extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             value = '',
             placeholder = '',
@@ -208,8 +208,8 @@ export class TextInput extends Component {
     }
 }
 
-export class TextArea extends Component {
-    render(props = {}) {
+export class TextArea extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             value = '',
             placeholder = '',
@@ -235,8 +235,8 @@ export class TextArea extends Component {
     }
 }
 
-export class Checkbox extends Component {
-    render(props = {}) {
+export class Checkbox extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             checked = false,
             label: labelText = '',
@@ -267,12 +267,7 @@ export class Checkbox extends Component {
     }
 }
 
-export class Radio extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class Radio extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             name = '',
@@ -305,12 +300,7 @@ export class Radio extends Component {
     }
 }
 
-export class Select extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class Select extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             value = '',
@@ -456,12 +446,7 @@ export class Select extends Component {
     }
 }
 
-export class MultiSelect extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class MultiSelect extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             value = [],
@@ -519,12 +504,7 @@ export class MultiSelect extends Component {
     }
 }
 
-export class Switch extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class Switch extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             checked = false,
@@ -556,12 +536,7 @@ export class Switch extends Component {
     }
 }
 
-export class Slider extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class Slider extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             min = 0,
@@ -603,12 +578,7 @@ export class Slider extends Component {
     }
 }
 
-export class RangeSlider extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class RangeSlider extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             min = 0,
@@ -667,12 +637,7 @@ export class RangeSlider extends Component {
     }
 }
 
-export class Badge extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class Badge extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             text = 'Badge',
@@ -691,12 +656,7 @@ export class Badge extends Component {
     }
 }
 
-export class Avatar extends Component {
-    constructor(props = {}) {
-        super();
-        this._initialProps = props;
-    }
-
+export class Avatar extends AetheriaComponent {
     render(props = this._initialProps) {
         const {
             name = 'A',
@@ -729,8 +689,8 @@ export class Avatar extends Component {
     }
 }
 
-export class Card extends Component {
-    render(props = {}) {
+export class Card extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             title: titleText = '',
             children = null,
@@ -751,8 +711,8 @@ export class Card extends Component {
     }
 }
 
-export class Spinner extends Component {
-    render(props = {}) {
+export class Spinner extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { class: customClass = '' } = props;
         return div({
             class: computed(() =>
@@ -761,8 +721,8 @@ export class Spinner extends Component {
     }
 }
 
-export class ProgressBar extends Component {
-    render(props = {}) {
+export class ProgressBar extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             value = 0,
             max = 100,
@@ -990,8 +950,12 @@ function panelCycle(hostOf) {
     };
 }
 
-export class Dropdown extends Component {
-    render(props = {}) {
+export class Dropdown extends AetheriaComponent {
+    onDestroy() {
+        this._panel?.dispose();
+    }
+
+    render(props = this._initialProps) {
         const {
             trigger: triggerLabel = 'Open Dropdown',
             items = [],
@@ -999,7 +963,7 @@ export class Dropdown extends Component {
             class: customClass = ''
         } = props;
         const selected = stateOf('');
-        const panel = panelCycle(() => root);
+        const panel = this._panel = panelCycle(() => root);
 
         const root = div(
             {
@@ -1048,8 +1012,8 @@ export class Dropdown extends Component {
     }
 }
 
-export class ContextMenu extends Component {
-    render(props = {}) {
+export class ContextMenu extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             items = [],
             onselect = null,
@@ -1161,8 +1125,12 @@ export class ContextMenu extends Component {
     }
 }
 
-export class Autocomplete extends Component {
-    render(props = {}) {
+export class Autocomplete extends AetheriaComponent {
+    onDestroy() {
+        this._panel?.dispose();
+    }
+
+    render(props = this._initialProps) {
         const {
             items = [],
             placeholder = 'Search...',
@@ -1170,7 +1138,7 @@ export class Autocomplete extends Component {
             class: customClass = ''
         } = props;
         const query = stateOf('');
-        const panel = panelCycle(() => root);
+        const panel = this._panel = panelCycle(() => root);
 
         const root = div(
             {
@@ -1227,8 +1195,8 @@ export class Autocomplete extends Component {
     }
 }
 
-export class Tabs extends Component {
-    render(props = {}) {
+export class Tabs extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             tabs = [],
             defaultTab = 0,
@@ -1282,8 +1250,8 @@ export class Tabs extends Component {
     }
 }
 
-export class Accordion extends Component {
-    render(props = {}) {
+export class Accordion extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { items = [], class: customClass = '' } = props;
         const openStates = [];
 
@@ -1327,8 +1295,8 @@ export class Accordion extends Component {
     }
 }
 
-export class Modal extends Component {
-    render(props = {}) {
+export class Modal extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             open = false,
             title: titleText = 'Dialog',
@@ -1376,8 +1344,8 @@ export class Modal extends Component {
     }
 }
 
-export class Drawer extends Component {
-    render(props = {}) {
+export class Drawer extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             open = false,
             title: titleText = 'Drawer Menu',
@@ -1422,8 +1390,8 @@ export class Drawer extends Component {
     }
 }
 
-export class Tooltip extends Component {
-    render(props = {}) {
+export class Tooltip extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             content = '',
             text = '',
@@ -1684,8 +1652,8 @@ function createCalendarView({ cursor, selected, level, direction, locale, min, m
     );
 }
 
-export class DatePicker extends Component {
-    render(props = {}) {
+export class DatePicker extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             value = '',
             onchange = null,
@@ -1804,8 +1772,8 @@ export class DatePicker extends Component {
     }
 }
 
-export class Calendar extends Component {
-    render(props = {}) {
+export class Calendar extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             value = null,
             onchange = null,
@@ -1895,8 +1863,8 @@ function formatCalendarSpan(locale, from, to) {
     return `${from.toLocaleDateString(locale, options)} → ${to.toLocaleDateString(locale, options)}`;
 }
 
-export class DateRangePicker extends Component {
-    render(props = {}) {
+export class DateRangePicker extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             value = '',
             onchange = null,
@@ -2075,8 +2043,8 @@ export class DateRangePicker extends Component {
     }
 }
 
-export class FormValidation extends Component {
-    render(props = {}) {
+export class FormValidation extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { onsubmit = null, class: customClass = '' } = props;
         const nameVal = stateOf('');
         const emailVal = stateOf('');
@@ -2135,8 +2103,8 @@ export class FormValidation extends Component {
     }
 }
 
-export class Pagination extends Component {
-    render(props = {}) {
+export class Pagination extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             totalPages = 5,
             currentPage = 1,
@@ -2204,8 +2172,8 @@ export class Pagination extends Component {
     }
 }
 
-export class Breadcrumb extends Component {
-    render(props = {}) {
+export class Breadcrumb extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             items = [],
             label = 'Breadcrumb',
@@ -2247,8 +2215,8 @@ export class Breadcrumb extends Component {
     }
 }
 
-export class DataGrid extends Component {
-    render(props = {}) {
+export class DataGrid extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             columns = [],
             rows = [],
@@ -2610,8 +2578,8 @@ function aetheriaGlyph(value, extraClass = 'aetheria-shrink') {
     return current;
 }
 
-export class TreeView extends Component {
-    render(props = {}) {
+export class TreeView extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { nodes = [], class: customClass = '' } = props;
         const renderNode = (node) => {
             const children = Array.isArray(prop(node?.children, [])) ? prop(node.children, []) : [];
@@ -2656,8 +2624,8 @@ export class TreeView extends Component {
     }
 }
 
-export class TreeGrid extends Component {
-    render(props = {}) {
+export class TreeGrid extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { columns = [], data = [], class: customClass = '' } = props;
         const expanded = listHolder([]);
 
@@ -2749,8 +2717,8 @@ export class TreeGrid extends Component {
     }
 }
 
-export class ListView extends Component {
-    render(props = {}) {
+export class ListView extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { items = [], itemHeight = 40, visibleCount = 5, class: customClass = '' } = props;
         const source = () => prop(items, []) ?? [];
         const step = () => Math.max(1, Number(prop(itemHeight, 40)) || 40);
@@ -2807,8 +2775,8 @@ export class ListView extends Component {
     }
 }
 
-export class CommandToolbar extends Component {
-    render(props = {}) {
+export class CommandToolbar extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { commands = [], class: customClass = '' } = props;
         return div(
             {
@@ -2832,8 +2800,8 @@ export class CommandToolbar extends Component {
     }
 }
 
-export class FileManager extends Component {
-    render(props = {}) {
+export class FileManager extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { files = [], class: customClass = '' } = props;
         const selectedFile = stateOf(null);
 
@@ -2875,8 +2843,8 @@ export class FileManager extends Component {
     }
 }
 
-export class SortableList extends Component {
-    render(props = {}) {
+export class SortableList extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { items = [], onchange = null, class: customClass = '' } = props;
         const entriesOf = (list) => (list ?? []).map((value, id) => ({ id, value }));
         const list = listOf(...entriesOf(prop(items, [])));
@@ -2978,8 +2946,8 @@ function createLineSvg(data, width, height, stroke, strokeWidth, className = '')
     );
 }
 
-export class Chart extends Component {
-    render(props = {}) {
+export class Chart extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             data = [10, 40, 25, 60, 45, 80],
             width = 300,
@@ -3007,8 +2975,8 @@ export class Chart extends Component {
     }
 }
 
-export class Sparkline extends Component {
-    render(props = {}) {
+export class Sparkline extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             data = [5, 12, 8, 16, 22],
             width = 90,
@@ -3036,8 +3004,8 @@ export class Sparkline extends Component {
     }
 }
 
-export class Scheduler extends Component {
-    render(props = {}) {
+export class Scheduler extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { events = [], class: customClass = '' } = props;
         const listOfEvents = () => prop(events, []) ?? [];
         const timeOf = (event) => aetheriaText(event?.time, '');
@@ -3073,8 +3041,8 @@ export class Scheduler extends Component {
     }
 }
 
-export class Gantt extends Component {
-    render(props = {}) {
+export class Gantt extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { tasks = [], class: customClass = '' } = props;
         const listOfTasks = () => prop(tasks, []) ?? [];
         const startOf = (task) => Number(prop(task?.start, 0)) || 0;
@@ -3124,8 +3092,8 @@ export class Gantt extends Component {
     }
 }
 
-export class Spreadsheet extends Component {
-    render(props = {}) {
+export class Spreadsheet extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { rows = 5, cols = 4, class: customClass = '' } = props;
         const cellData = {};
         const rowCount = () => Math.max(0, Math.min(26, Math.floor(Number(prop(rows, 5)) || 0)));
@@ -3232,8 +3200,8 @@ export class Spreadsheet extends Component {
     }
 }
 
-export class RichTextEditor extends Component {
-    render(props = {}) {
+export class RichTextEditor extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { initialContent = '<p>Start typing rich text here...</p>', class: customClass = '' } = props;
         const content = stateOf(aetheriaText(initialContent, ''));
         const run = (command) => () => {
@@ -3273,8 +3241,8 @@ export class RichTextEditor extends Component {
     }
 }
 
-export class PivotGrid extends Component {
-    render(props = {}) {
+export class PivotGrid extends AetheriaComponent {
+    render(props = this._initialProps) {
         const {
             data = [
                 { category: 'Design', region: 'North', sales: 120 },
@@ -3346,8 +3314,8 @@ export class PivotGrid extends Component {
     }
 }
 
-export class PdfViewer extends Component {
-    render(props = {}) {
+export class PdfViewer extends AetheriaComponent {
+    render(props = this._initialProps) {
         const { title = 'Document.pdf', onexport = null, class: customClass = '' } = props;
         return div(
             {
@@ -3384,12 +3352,53 @@ export class PdfViewer extends Component {
  * element. Handing Jetz the component instead of a built node is what gives it a
  * lifecycle — it runs onCreate, calls render() with no arguments so the
  * constructor props are used, and fires onDestroy when the host detaches.
- *
- * Only components built on AetheriaComponent appear here. An unmigrated class
- * ignores constructor props, so exposing it would silently render defaults.
  */
 export const Ae = {
     Button: (props) => new Button(props),
-    Popover: (props) => new Popover(props)
+    IconButton: (props) => new IconButton(props),
+    TextInput: (props) => new TextInput(props),
+    TextArea: (props) => new TextArea(props),
+    Checkbox: (props) => new Checkbox(props),
+    Radio: (props) => new Radio(props),
+    Select: (props) => new Select(props),
+    MultiSelect: (props) => new MultiSelect(props),
+    Switch: (props) => new Switch(props),
+    Slider: (props) => new Slider(props),
+    RangeSlider: (props) => new RangeSlider(props),
+    Badge: (props) => new Badge(props),
+    Avatar: (props) => new Avatar(props),
+    Card: (props) => new Card(props),
+    Spinner: (props) => new Spinner(props),
+    ProgressBar: (props) => new ProgressBar(props),
+    Dropdown: (props) => new Dropdown(props),
+    ContextMenu: (props) => new ContextMenu(props),
+    Autocomplete: (props) => new Autocomplete(props),
+    Tabs: (props) => new Tabs(props),
+    Accordion: (props) => new Accordion(props),
+    Modal: (props) => new Modal(props),
+    Drawer: (props) => new Drawer(props),
+    Tooltip: (props) => new Tooltip(props),
+    Popover: (props) => new Popover(props),
+    DatePicker: (props) => new DatePicker(props),
+    Calendar: (props) => new Calendar(props),
+    DateRangePicker: (props) => new DateRangePicker(props),
+    FormValidation: (props) => new FormValidation(props),
+    Pagination: (props) => new Pagination(props),
+    Breadcrumb: (props) => new Breadcrumb(props),
+    DataGrid: (props) => new DataGrid(props),
+    TreeView: (props) => new TreeView(props),
+    TreeGrid: (props) => new TreeGrid(props),
+    ListView: (props) => new ListView(props),
+    CommandToolbar: (props) => new CommandToolbar(props),
+    FileManager: (props) => new FileManager(props),
+    SortableList: (props) => new SortableList(props),
+    Chart: (props) => new Chart(props),
+    Sparkline: (props) => new Sparkline(props),
+    Scheduler: (props) => new Scheduler(props),
+    Gantt: (props) => new Gantt(props),
+    Spreadsheet: (props) => new Spreadsheet(props),
+    RichTextEditor: (props) => new RichTextEditor(props),
+    PivotGrid: (props) => new PivotGrid(props),
+    PdfViewer: (props) => new PdfViewer(props)
 };
 

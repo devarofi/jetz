@@ -153,19 +153,19 @@ export class AetheriaDocs extends Component {
         const contextAction = stateOf("No action selected");
         const themeMode = stateOf("dark");
         const modalDrawerOverlays = div(
-            new Aetheria.Modal().render({
+            Aetheria.Ae.Modal({
                 open: modalOpen,
                 title: "Glass Confirmation",
                 onclose: () => { modalOpen.value = false; },
                 children: p("This is a modal dialog rendered inside the Aetheria glassmorphic theme.")
             }),
-            new Aetheria.Drawer().render({
+            Aetheria.Ae.Drawer({
                 open: drawerOpen,
                 title: "Navigation Drawer",
                 onclose: () => { drawerOpen.value = false; },
                 children: div(
                     p("Drawer content pane with vector glass styling."),
-                    new Aetheria.Button().render({
+                    Aetheria.Ae.Button({
                         variant: "muted",
                         label: "Close Drawer",
                         onclick: () => { drawerOpen.value = false; }
@@ -214,7 +214,7 @@ Ae.Button({
     label: btnState,
     onclick: () => { btnState.value = "Clicked!"; }
 });
-new IconButton().render({ icon: "star", active: true });`,
+Ae.IconButton({ icon: "star", active: true });`,
                     div(
                         { class: "aetheria-row" },
                         Aetheria.Ae.Button({
@@ -224,56 +224,56 @@ new IconButton().render({ icon: "star", active: true });`,
                         }),
                         Aetheria.Ae.Button({ variant: "secondary", label: "Secondary" }),
                         Aetheria.Ae.Button({ variant: "border", label: "Bordered" }),
-                        new Aetheria.IconButton().render({ icon: "star", active: true }),
-                        new Aetheria.IconButton().render({ icon: "settings" })
+                        Aetheria.Ae.IconButton({ icon: "star", active: true }),
+                        Aetheria.Ae.IconButton({ icon: "settings" })
                     )
                 ),
                 showcase(
                     "TextInput & TextArea",
                     "Glass input elements with glow outlines, placeholder styling, and reactive two-way binding.",
-                    `import { TextInput, TextArea } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new TextInput().render({ placeholder: "Enter text..." });
-new TextArea().render({ placeholder: "Write message...", rows: 2 });`,
+Ae.TextInput({ placeholder: "Enter text..." });
+Ae.TextArea({ placeholder: "Write message...", rows: 2 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.TextInput().render({ placeholder: "Enter your name..." }),
-                        new Aetheria.TextArea().render({ placeholder: "Write detailed feedback...", rows: 2 })
+                        Aetheria.Ae.TextInput({ placeholder: "Enter your name..." }),
+                        Aetheria.Ae.TextArea({ placeholder: "Write detailed feedback...", rows: 2 })
                     )
                 ),
                 showcase(
                     "Checkbox, Radio & Switch",
                     "Custom styled toggles and binary selection controls.",
-                    `import { Checkbox, Radio, Switch } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Checkbox().render({ label: "Glass Checkbox", checked: checkState });
-new Radio().render({ name: "demo", label: "Radio 1", checked: true });
-new Switch().render({ label: "Glass Switch", checked: switchState });`,
+Ae.Checkbox({ label: "Glass Checkbox", checked: checkState });
+Ae.Radio({ name: "demo", label: "Radio 1", checked: true });
+Ae.Switch({ label: "Glass Switch", checked: switchState });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Checkbox().render({ label: "Enable Notifications", checked: checkState }),
+                        Aetheria.Ae.Checkbox({ label: "Enable Notifications", checked: checkState }),
                         div(
                             { class: "aetheria-row" },
-                            new Aetheria.Radio().render({ name: "rad1", label: "Option A", checked: true }),
-                            new Aetheria.Radio().render({ name: "rad1", label: "Option B" })
+                            Aetheria.Ae.Radio({ name: "rad1", label: "Option A", checked: true }),
+                            Aetheria.Ae.Radio({ name: "rad1", label: "Option B" })
                         ),
-                        new Aetheria.Switch().render({ label: "Dark Aura Mode", checked: switchState })
+                        Aetheria.Ae.Switch({ label: "Dark Aura Mode", checked: switchState })
                     )
                 ),
                 showcase(
                     "Select & MultiSelect",
                     "Custom glass select menu with styled descriptions, active/selected states, keyboard navigation, and a checkbox-based multiselect.",
-                    `import { Select, MultiSelect } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Select().render({
+Ae.Select({
     options: ["Design", "Development", "Marketing"]
 });
-new MultiSelect().render({
+Ae.MultiSelect({
     options: ["Vue", "React", "Jetz", "Svelte"]
 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Select().render({
+                        Aetheria.Ae.Select({
                             placeholder: "Choose a team",
                             value: "engineering",
                             options: [
@@ -282,7 +282,7 @@ new MultiSelect().render({
                                 { label: "Product Strategy", value: "product", description: "Research, roadmap, and delivery" }
                             ]
                         }),
-                        new Aetheria.MultiSelect().render({
+                        Aetheria.Ae.MultiSelect({
                             options: ["Jetz Core", "Aetheria UI", "Router", "DevTools"]
                         })
                     ),
@@ -291,33 +291,33 @@ new MultiSelect().render({
                 showcase(
                     "Slider & RangeSlider",
                     "Range controls for single-value intensity or dual range intervals.",
-                    `import { Slider, RangeSlider } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Slider().render({ min: 0, max: 100, value: sliderVal });
-new RangeSlider().render({ min: 0, max: 100, low: 20, high: 80 });`,
+Ae.Slider({ min: 0, max: 100, value: sliderVal });
+Ae.RangeSlider({ min: 0, max: 100, low: 20, high: 80 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Slider().render({ min: 0, max: 100, value: sliderVal }),
-                        new Aetheria.RangeSlider().render({ min: 0, max: 100, low: 25, high: 75 })
+                        Aetheria.Ae.Slider({ min: 0, max: 100, value: sliderVal }),
+                        Aetheria.Ae.RangeSlider({ min: 0, max: 100, low: 25, high: 75 })
                     )
                 ),
                 showcase(
                     "Badge, Avatar & Card",
                     "Informational badges, user avatars, and glassmorphic card containers.",
-                    `import { Badge, Avatar, Card } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Badge().render({ text: "PRO", variant: "primary" });
-new Avatar().render({ name: "Alex Ross" });
-new Card().render({ title: "Glass Panel" });`,
+Ae.Badge({ text: "PRO", variant: "primary" });
+Ae.Avatar({ name: "Alex Ross" });
+Ae.Card({ title: "Glass Panel" });`,
                     div(
                         { class: "aetheria-col" },
                         div(
                             { class: "aetheria-row aetheria-row-tight" },
-                            new Aetheria.Avatar({ name: "Aetheria" }),
-                            new Aetheria.Badge().render({ text: "SYSTEM V1.0", variant: "primary" }),
-                            new Aetheria.Badge().render({ text: "ONLINE" })
+                            Aetheria.Ae.Avatar({ name: "Aetheria" }),
+                            Aetheria.Ae.Badge({ text: "SYSTEM V1.0", variant: "primary" }),
+                            Aetheria.Ae.Badge({ text: "ONLINE" })
                         ),
-                        new Aetheria.Card().render({
+                        Aetheria.Ae.Card({
                             title: "Interactive Telemetry",
                             children: p({ class: "aetheria-text-sm" }, "Live glass surface with subtle borders and shadows.")
                         })
@@ -326,36 +326,36 @@ new Card().render({ title: "Glass Panel" });`,
                 showcase(
                     "Spinner & ProgressBar",
                     "Activity indicators and gradient-filled loading bars.",
-                    `import { Spinner, ProgressBar } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Spinner().render();
-new ProgressBar().render({ value: 68, max: 100 });`,
+Ae.Spinner();
+Ae.ProgressBar({ value: 68, max: 100 });`,
                     div(
                         { class: "aetheria-col" },
-                        div({ class: "aetheria-row" }, new Aetheria.Spinner().render(), span("Synchronizing state...")),
-                        new Aetheria.ProgressBar().render({ value: 72, max: 100 })
+                        div({ class: "aetheria-row" }, Aetheria.Ae.Spinner(), span("Synchronizing state...")),
+                        Aetheria.Ae.ProgressBar({ value: 72, max: 100 })
                     )
                 ),
                 showcase(
                     "Dropdown & Autocomplete",
                     "Action menus and filterable search inputs.",
-                    `import { Dropdown, Autocomplete } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Dropdown().render({
+Ae.Dropdown({
     trigger: "Actions",
     items: ["Edit", "Duplicate", "Delete"]
 });
-new Autocomplete().render({
+Ae.Autocomplete({
     items: ["Apple", "Banana", "Cherry"],
     placeholder: "Search fruits..."
 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Dropdown().render({
+                        Aetheria.Ae.Dropdown({
                             trigger: "Select Operation",
                             items: ["Deploy Container", "Restart Engine", "View Audit Log"]
                         }),
-                        new Aetheria.Autocomplete().render({
+                        Aetheria.Ae.Autocomplete({
                             items: ["Jetz Framework", "Aetheria Glass", "TypeScript", "Vite", "Tailwind CSS"],
                             placeholder: "Type to autocomplete..."
                         })
@@ -364,15 +364,15 @@ new Autocomplete().render({
                 showcase(
                     "Context Menu",
                     "Right-click the preview area to open a positioned menu; select an action or click outside to dismiss it.",
-                    `import { ContextMenu } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new ContextMenu().render({
+Ae.ContextMenu({
     items: ["Open", "Rename", "Delete"],
     onselect: (item) => console.log("Selected:", item)
 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.ContextMenu().render({
+                        Aetheria.Ae.ContextMenu({
                             items: ["Open", "Rename", "Delete"],
                             onselect: item => { contextAction.value = `Selected: ${item}`; },
                             children: div(
@@ -391,26 +391,26 @@ new ContextMenu().render({
                 showcase(
                     "Tabs & Accordion",
                     "Content grouping and collapsible disclosure panels.",
-                    `import { Tabs, Accordion } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Tabs().render({
+Ae.Tabs({
     tabs: [
         { label: "Overview", content: "Overview text" },
         { label: "Metrics", content: "Metrics text" }
     ]
 });
-new Accordion().render({
+Ae.Accordion({
     items: [{ title: "FAQ 1", content: "Answer 1" }]
 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Tabs().render({
+                        Aetheria.Ae.Tabs({
                             tabs: [
                                 { label: "General", content: p("Core configuration parameters.") },
                                 { label: "Security", content: p("Two-factor authentication and keys.") }
                             ]
                         }),
-                        new Aetheria.Accordion().render({
+                        Aetheria.Ae.Accordion({
                             items: [
                                 { title: "What is Jetz?", content: "A composable, reactive JavaScript framework." },
                                 { title: "Does it need build steps?", content: "No custom syntax or JSX compilation needed." }
@@ -421,19 +421,19 @@ new Accordion().render({
                 showcase(
                     "Modal & Drawer",
                     "Floating modal dialogs and slide-out side drawers.",
-                    `import { Modal, Drawer, Button } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Button().render({ label: "Open Modal", onclick: () => { modalOpen.value = true; } });
-new Modal().render({ open: modalOpen, title: "Dialog Title" });
-new Drawer().render({ open: drawerOpen, title: "Drawer Menu" });`,
+Ae.Button({ label: "Open Modal", onclick: () => { modalOpen.value = true; } });
+Ae.Modal({ open: modalOpen, title: "Dialog Title" });
+Ae.Drawer({ open: drawerOpen, title: "Drawer Menu" });`,
                     div(
                         { class: "aetheria-row" },
-                        new Aetheria.Button().render({
+                        Aetheria.Ae.Button({
                             variant: "primary",
                             label: "Open Dialog",
                             onclick: () => { modalOpen.value = true; }
                         }),
-                        new Aetheria.Button().render({
+                        Aetheria.Ae.Button({
                             variant: "secondary",
                             label: "Open Drawer",
                             onclick: () => { drawerOpen.value = true; }
@@ -443,13 +443,13 @@ new Drawer().render({ open: drawerOpen, title: "Drawer Menu" });`,
                 showcase(
                     "Tooltip & Popover",
                     "Contextual micro-help bubbles and rich click-triggered popovers.",
-                    `import { Ae, Tooltip } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Tooltip().render({ text: "Hover here", content: "Helper info" });
+Ae.Tooltip({ text: "Hover here", content: "Helper info" });
 Ae.Popover({ trigger: "Details", content: "Rich content" });`,
                     div(
                         { class: "aetheria-row" },
-                        new Aetheria.Tooltip().render({
+                        Aetheria.Ae.Tooltip({
                             text: "Hover over this tooltip",
                             content: "Aetheria glass tooltip active!"
                         }),
@@ -466,28 +466,28 @@ Ae.Popover({ trigger: "Details", content: "Rich content" });`,
                     "DatePicker & Calendar",
                     "Open a compact custom date dialog with draft, cancel, and apply controls. Click the month or year at the top of the calendar to jump between dates, months, and years.",
                     `import { stateOf } from "../lib/jetz.js";
-import { DatePicker, Calendar } from "./aetheria-ui.js";
+import { Ae } from "./aetheria-ui.js";
 
 const selectedDate = stateOf("2025-04-15");
-new DatePicker().render({
+Ae.DatePicker({
     value: selectedDate,
     min: "2025-01-01",
     max: "2025-12-31",
     onchange: date => console.log(date)
 });
-new Calendar().render({
+Ae.Calendar({
     value: selectedDate,
     onchange: date => console.log(date)
 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.DatePicker().render({
+                        Aetheria.Ae.DatePicker({
                             value: stateOf("2025-04-15"),
                             min: "2025-01-01",
                             max: "2025-12-31",
                             onchange: date => console.log("Selected date:", date)
                         }),
-                        new Aetheria.Calendar().render({
+                        Aetheria.Ae.Calendar({
                             value: "2025-04-15"
                         })
                     )
@@ -496,16 +496,16 @@ new Calendar().render({
                     "DateRangePicker",
                     "Two clicks pick the start and end of a span; the days between stay highlighted. The value is an ISO interval: \u0022YYYY-MM-DD/YYYY-MM-DD\u0022.",
                     `import { stateOf } from "../lib/jetz.js";
-import { DateRangePicker } from "./aetheria-ui.js";
+import { Ae } from "./aetheria-ui.js";
 
 const reportRange = stateOf("2025-04-10/2025-04-18");
-new DateRangePicker().render({
+Ae.DateRangePicker({
     value: reportRange,
     min: "2025-01-01",
     max: "2025-12-31",
     onchange: (interval, span) => console.log(interval, span)
 });`,
-                    new Aetheria.DateRangePicker().render({
+                    Aetheria.Ae.DateRangePicker({
                         value: stateOf("2025-04-10/2025-04-18"),
                         min: "2025-01-01",
                         max: "2025-12-31",
@@ -515,34 +515,34 @@ new DateRangePicker().render({
                 showcase(
                     "Form Validation",
                     "Reactive form with inline validation feedback and submit prevention.",
-                    `import { FormValidation } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new FormValidation().render({
+Ae.FormValidation({
     onsubmit: (data) => console.log(data)
 });`,
-                    new Aetheria.FormValidation().render()
+                    Aetheria.Ae.FormValidation()
                 ),
                 showcase(
                     "Pagination & Breadcrumb",
                     "Page navigation controls and hierarchical location trails.",
-                    `import { Pagination, Breadcrumb } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Pagination().render({ totalPages: 5, currentPage: 1 });
-new Breadcrumb().render({ items: ["Home", "Products", "Aetheria"] });`,
+Ae.Pagination({ totalPages: 5, currentPage: 1 });
+Ae.Breadcrumb({ items: ["Home", "Products", "Aetheria"] });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Breadcrumb().render({ items: ["Workspace", "Analytics", "Live Stream"] }),
-                        new Aetheria.Pagination().render({ totalPages: 5, currentPage: 2 })
+                        Aetheria.Ae.Breadcrumb({ items: ["Workspace", "Analytics", "Live Stream"] }),
+                        Aetheria.Ae.Pagination({ totalPages: 5, currentPage: 2 })
                     )
                 ),
                 showcase(
                     "DataGrid with Sorting & Filtering",
                     "Search and sort records, page locally or request remote pages, select rows, render custom cells, and expand detail content.",
                     `import { stateOf } from "../lib/jetz.js";
-import { DataGrid } from "./aetheria-ui.js";
+import { Ae } from "./aetheria-ui.js";
 import { span, div } from "../lib/jetz-ui.js";
 
-new DataGrid().render({
+Ae.DataGrid({
     columns: [
         { key: "name", label: "User Name", render: value => span(value) },
         { key: "role", label: "Title" },
@@ -561,7 +561,7 @@ new DataGrid().render({
     onselectionchange: rows => console.log(rows)
 });
 
-new DataGrid().render({
+Ae.DataGrid({
     columns: ["name", "role"],
     rows: [{ name: "Ada", role: "Engineer" }],
     pageable: true,
@@ -572,7 +572,7 @@ new DataGrid().render({
     onpagechange: (page, pageSize) => console.log("Fetch remote page:", page, pageSize)
 });`,
 
-                    new Aetheria.DataGrid().render({
+                    Aetheria.Ae.DataGrid({
                         columns: [
                             { key: "id", label: "ID" },
                             { key: "name", label: "User Name" },
@@ -597,14 +597,14 @@ new DataGrid().render({
                 showcase(
                     "TreeView & TreeGrid",
                     "Hierarchical tree view and multi-column tree tables with expanding nodes.",
-                    `import { TreeView, TreeGrid } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new TreeView().render({
+Ae.TreeView({
     nodes: [{ label: "Root", children: [{ label: "Child" }] }]
 });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.TreeView().render({
+                        Aetheria.Ae.TreeView({
                             nodes: [
                                 {
                                     label: "Source Directory",
@@ -619,7 +619,7 @@ new TreeView().render({
                                 }
                             ]
                         }),
-                        new Aetheria.TreeGrid().render({
+                        Aetheria.Ae.TreeGrid({
                             columns: ["File / Directory", "Kind", "Size"],
                             data: [
                                 {
@@ -637,14 +637,14 @@ new TreeView().render({
                 showcase(
                     "ListView with Virtual Scrolling",
                     "High-performance list container rendering only visible viewport items.",
-                    `import { ListView } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new ListView().render({
+Ae.ListView({
     items: Array.from({ length: 50 }, (_, i) => \`Item #\${i + 1}\`),
     itemHeight: 40,
     visibleCount: 4
 });`,
-                    new Aetheria.ListView().render({
+                    Aetheria.Ae.ListView({
                         items: Array.from({ length: 60 }, (_, i) => `Server Instance #${i + 1} [Active]`),
                         itemHeight: 40,
                         visibleCount: 4
@@ -653,15 +653,15 @@ new ListView().render({
                 showcase(
                     "Command Toolbar",
                     "Pill toolbar with quick action triggers.",
-                    `import { CommandToolbar } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new CommandToolbar().render({
+Ae.CommandToolbar({
     commands: [
         { label: "Save", icon: "save" },
         { label: "Export", icon: "upload" }
     ]
 });`,
-                    new Aetheria.CommandToolbar().render({
+                    Aetheria.Ae.CommandToolbar({
                         commands: [
                             { label: "Commit", icon: "check" },
                             { label: "Branch", icon: "gitBranch" },
@@ -672,15 +672,15 @@ new CommandToolbar().render({
                 showcase(
                     "FileManager",
                     "Grid browser for exploring documents and folders.",
-                    `import { FileManager } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new FileManager().render({
+Ae.FileManager({
     files: [
         { name: "Documents", type: "folder" },
         { name: "manifest.json", type: "file" }
     ]
 });`,
-                    new Aetheria.FileManager().render({
+                    Aetheria.Ae.FileManager({
                         files: [
                             { name: "Assets", type: "folder" },
                             { name: "Styles", type: "folder" },
@@ -692,44 +692,44 @@ new FileManager().render({
                 showcase(
                     "Drag-and-Drop Sortable",
                     "Interactive reorderable item list with drag-and-drop feedback.",
-                    `import { SortableList } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new SortableList().render({
+Ae.SortableList({
     items: ["High Priority Task", "Medium Priority Task", "Low Priority Task"]
 });`,
-                    new Aetheria.SortableList().render({
+                    Aetheria.Ae.SortableList({
                         items: ["1. Review Architecture", "2. Deploy Production Build", "3. Update Documentation"]
                     })
                 ),
                 showcase(
                     "Chart & Sparkline",
                     "Vector SVG trendlines and inline miniature sparklines.",
-                    `import { Chart, Sparkline } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Chart().render({ data: [10, 45, 30, 70, 50, 95] });
-new Sparkline().render({ data: [4, 8, 15, 12, 24] });`,
+Ae.Chart({ data: [10, 45, 30, 70, 50, 95] });
+Ae.Sparkline({ data: [4, 8, 15, 12, 24] });`,
                     div(
                         { class: "aetheria-col" },
-                        div({ class: "aetheria-row" }, span("Realtime Throughput:"), new Aetheria.Sparkline().render({ data: [12, 28, 14, 45, 32, 60] })),
-                        new Aetheria.Chart().render({ data: [15, 38, 25, 65, 48, 88], width: 340, height: 120 })
+                        div({ class: "aetheria-row" }, span("Realtime Throughput:"), Aetheria.Ae.Sparkline({ data: [12, 28, 14, 45, 32, 60] })),
+                        Aetheria.Ae.Chart({ data: [15, 38, 25, 65, 48, 88], width: 340, height: 120 })
                     )
                 ),
                 showcase(
                     "Scheduler & Gantt",
                     "Time-based event schedulers and project timeline Gantt bars.",
-                    `import { Scheduler, Gantt } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Scheduler().render({ events: [{ time: "10:00", title: "Standup" }] });
-new Gantt().render({ tasks: [{ name: "Design", start: 0, duration: 40 }] });`,
+Ae.Scheduler({ events: [{ time: "10:00", title: "Standup" }] });
+Ae.Gantt({ tasks: [{ name: "Design", start: 0, duration: 40 }] });`,
                     div(
                         { class: "aetheria-col" },
-                        new Aetheria.Scheduler().render({
+                        Aetheria.Ae.Scheduler({
                             events: [
                                 { time: "09:00", title: "Morning Triage" },
                                 { time: "11:00", title: "Architecture Sync" }
                             ]
                         }),
-                        new Aetheria.Gantt().render({
+                        Aetheria.Ae.Gantt({
                             tasks: [
                                 { name: "Planning", start: 0, duration: 30 },
                                 { name: "Implementation", start: 25, duration: 55 },
@@ -741,36 +741,36 @@ new Gantt().render({ tasks: [{ name: "Design", start: 0, duration: 40 }] });`,
                 showcase(
                     "Spreadsheet",
                     "Interactive matrix spreadsheet with formula/cell inputs.",
-                    `import { Spreadsheet } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new Spreadsheet().render({ rows: 4, cols: 3 });`,
-                    new Aetheria.Spreadsheet().render({ rows: 4, cols: 4 })
+Ae.Spreadsheet({ rows: 4, cols: 3 });`,
+                    Aetheria.Ae.Spreadsheet({ rows: 4, cols: 4 })
                 ),
                 showcase(
                     "RichTextEditor",
                     "WYSIWYG formatting editor with bold, italic, and underline controls.",
-                    `import { RichTextEditor } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new RichTextEditor().render({ initialContent: "Welcome to Aetheria UI" });`,
-                    new Aetheria.RichTextEditor().render({ initialContent: "Aetheria UI written in Jetz." })
+Ae.RichTextEditor({ initialContent: "Welcome to Aetheria UI" });`,
+                    Aetheria.Ae.RichTextEditor({ initialContent: "Aetheria UI written in Jetz." })
                 ),
                 showcase(
                     "PivotGrid",
                     "Sales are summarized by product category and region, with subtotals and a grand total.",
-                    `import { PivotGrid } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new PivotGrid().render({
+Ae.PivotGrid({
     data: ${JSON.stringify(pivotGridData, null, 8)}
 });`,
-                    new Aetheria.PivotGrid().render({ data: pivotGridData })
+                    Aetheria.Ae.PivotGrid({ data: pivotGridData })
                 ),
                 showcase(
                     "PDF Viewer & Export",
                     "Vector document preview container with instant print/export trigger.",
-                    `import { PdfViewer } from "./aetheria-ui.js";
+                    `import { Ae } from "./aetheria-ui.js";
 
-new PdfViewer().render({ title: "Annual_Summary.pdf" });`,
-                    new Aetheria.PdfViewer().render({ title: "Aetheria_Design_System.pdf" })
+Ae.PdfViewer({ title: "Annual_Summary.pdf" });`,
+                    Aetheria.Ae.PdfViewer({ title: "Aetheria_Design_System.pdf" })
                 )
                 )
             ),
