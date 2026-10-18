@@ -55,7 +55,8 @@
     "test": "pnpm test:unit && pnpm test:smoke && pnpm test:pages",
     "test:unit": "vitest run",
     "test:smoke": "rspack build --config test/smoke/rspack.smoke.config.js && node test/smoke/run.mjs",
-    "test:pages": "rspack build --mode production && node test/pages.mjs"
+    "test:pages": "rspack build --mode production && node test/pages.mjs",
+    "test:memory": "node --expose-gc test/memory/run.mjs"
   },
   "repository": {
     "type": "git",
