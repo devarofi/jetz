@@ -1275,6 +1275,29 @@ class JetzElement {
 
 		return this;
 	}
+	/**
+	 * Attaches a child that `append()` would otherwise re-render. `append()`
+	 * always renders its child first, so feeding it a view the reconciler has
+	 * already built discards the node that render produced and runs the child
+	 * body a second time — doubling construction and leaving the lifecycle of
+	 * the discarded pass registered against a detached node. This path only
+	 * places the existing node and completes what `append()` does after it.
+	 */
+	attachRendered(child) {
+		if (!(child instanceof JetzElement) || !child.o) {
+			return this.append(child);
+		}
+		if (typeof this.o === 'undefined') {
+			// same carrier `append()` uses before this element is rendered: the
+			// node is replayed by assignChildren() once `this.o` exists
+			this.children.push(child.o);
+			return this;
+		}
+		this.o.append(child.o);
+		child.#notifyMounted();
+		child.lifecycles.onRendered?.();
+		return this;
+	}
 	/** Registers a reactive listener child - it renders nothing, its callback is triggered instead. */
 	#appendStateListener(listener) {
 		listener.attachParent(this);
@@ -2081,6 +2104,34 @@ class RememberState extends State {
 }
 
 /**
+ * Indexes of the longest strictly increasing subsequence of `values`, which are
+ * already in list order. Patience sorting: `tails[k]` holds the index of the
+ * smallest value an increasing run of length k+1 can end with, so each element
+ * is placed by binary search and the whole pass costs O(n log n) — the run is
+ * what a keyed refresh can leave untouched while it moves the rest.
+ */
+function longestIncreasingRun(values) {
+	const tails = [];
+	const previous = new Array(values.length).fill(-1);
+	for (let i = 0; i < values.length; i++) {
+		let low = 0;
+		let high = tails.length;
+		while (low < high) {
+			const mid = (low + high) >> 1;
+			if (values[tails[mid]] < values[i]) low = mid + 1;
+			else high = mid;
+		}
+		if (low > 0) previous[i] = tails[low - 1];
+		tails[low] = i;
+	}
+	const kept = new Set();
+	// the run ends at the index stored in the last tail, not at the last position
+	// of the tails array
+	for (let i = tails.length ? tails[tails.length - 1] : -1; i !== -1; i = previous[i]) kept.add(i);
+	return kept;
+}
+
+/**
  * A list view that owns several sibling elements rendered by one item, e.g.
  * `loop(list, item => [li(item.title), li(item.body)])`. It quacks like a single
  * JetzElement for the view bookkeeping (remove/replace), but keeps the render
@@ -2276,19 +2327,115 @@ export class ListState extends Array {
 	}
 	/** Removes a stored view whatever shape it has. */
 	#removeView(view) {
+		this.#releaseView(view);
+		if (view instanceof JetzElement) { view.o?.remove(); return; }
+		if (view instanceof ListViewGroup) { view.remove(); return; }
+		view?.remove?.();
+	}
+	/**
+	 * Releases a view's scope, bindings and lifecycle but leaves its nodes in the
+	 * DOM. `#removeView` couples the two; a bulk path needs them apart, so every
+	 * `onDestroy` still runs while its node is connected exactly as it would be
+	 * one node at a time.
+	 */
+	#releaseView(view) {
 		// release the item's reactive scope before detaching its nodes
 		disposeViewScope(view);
-		if (view instanceof JetzElement) { view.disposeBindings?.(); view.remove(); return; }
-		if (view instanceof ListViewGroup) { view.elements.forEach(element => element?.disposeBindings?.()); view.remove(); return; }
-		view?.remove?.();
+		if (view instanceof JetzElement) { view.disposeBindings?.(); view.destroyLifecycle(); return; }
+		if (view instanceof ListViewGroup) {
+			view.elements.forEach(element => element?.disposeBindings?.());
+			view.elements.forEach(element => element?.destroyLifecycle?.());
+		}
 	}
 	/** Attaches a freshly created view to its parent element. */
 	#appendView(parent, view) {
 		if (view instanceof ListViewGroup) {
-			parent.append(...view.elements);
+			view.elements.forEach((element, position) => {
+				if (element instanceof JetzElement) parent.addPreviousElement(element, view.elements, position);
+				parent.attachRendered(element);
+			});
 			return;
 		}
-		parent.append(view);
+		parent.attachRendered(view);
+	}
+	/**
+	 * Resolves every item of a keyed refresh to the view that must represent it,
+	 * in list order, and marks the rows that can stay where they are: the longest
+	 * increasing run of previous DOM positions. Returns null when the sequence
+	 * cannot be trusted — duplicate keys, or a reused view whose node is not in
+	 * this parent — and the caller then falls back to the position-by-position
+	 * walk, so those cases keep their previous behaviour.
+	 */
+	#planOrder(parent, keyMap, newKeys) {
+		const plan = [];
+		const reused = [];
+		const seen = new Set();
+		for (let j = 0; j < newKeys.length; j++) {
+			const key = newKeys[j];
+			if (seen.has(key)) return null;
+			seen.add(key);
+			const item = this.values[j];
+			let entry = keyMap.get(key);
+			let retained = false;
+			if (entry && entry.item !== item) {
+				this.#removeView(entry.view);
+				keyMap.delete(key);
+				entry = undefined;
+			}
+			if (!entry) {
+				entry = { item, view: this.createItemView(parent, item, j) };
+				keyMap.set(key, entry);
+			} else {
+				entry.item = item;
+				retained = true;
+			}
+			const nodes = this.#viewNodes(entry.view);
+			if (nodes.length === 0) return null;
+			plan.push({ view: entry.view, nodes, retained });
+			if (retained) reused.push(plan.length - 1);
+		}
+
+		// Previous positions come from the DOM, not from keyMap insertion order:
+		// a mid-list insert leaves the map ordered by creation, not by placement.
+		const positionOf = new Map();
+		const body = parent.o.childNodes;
+		for (let i = 0; i < body.length; i++) {
+			if (!positionOf.has(body[i])) positionOf.set(body[i], i);
+		}
+		const positions = [];
+		for (const index of reused) {
+			const at = positionOf.get(plan[index].nodes[0]);
+			if (at === undefined) return null;
+			positions.push(at);
+		}
+		const kept = longestIncreasingRun(positions);
+		reused.forEach((index, position) => {
+			if (kept.has(position)) plan[index].keep = true;
+		});
+		return plan;
+	}
+	/**
+	 * Places a plan into its parent, walking from the last row to the first so
+	 * each placement only needs the node that follows it. Rows marked `keep` are
+	 * already correct relative to one another and are never touched.
+	 */
+	#relocate(parent, plan) {
+		let anchor = null;
+		for (let j = plan.length - 1; j >= 0; j--) {
+			const { nodes, keep } = plan[j];
+			if (!keep) {
+				const last = nodes[nodes.length - 1];
+				// a single row already sitting where it belongs costs no mutation
+				const ready = nodes.length === 1 && last.parentNode === parent.o && last.nextSibling === anchor;
+				if (!ready) {
+					for (let d = 0; d < nodes.length; d++) {
+						if (anchor) parent.o.insertBefore(nodes[d], anchor);
+						else parent.o.appendChild(nodes[d]);
+					}
+				}
+			}
+			anchor = nodes[0];
+		}
 	}
 	push(...items) {
 		for (let _i = 0; _i < items.length; _i++) {
@@ -2338,12 +2485,15 @@ export class ListState extends Array {
 				}
 
 				// 2. Full-swap fast path: every old key is gone, every new key is
-				//    fresh. Remove all old views, render into a DocumentFragment,
-				//    then append once — 1 DOM operation instead of N.
+				//    fresh. Release the old views, render the new ones into a
+				//    DocumentFragment, then change the DOM once — disposal runs while
+				//    the old nodes are still connected, and the detach is batched with
+				//    the insert instead of one removal per row.
 				if (retainedCount === 0) {
-					// Remove old views
-					for (const [key, entry] of keyMap) {
-						this.#removeView(entry.view);
+					const stale = [];
+					for (const [, entry] of keyMap) {
+						this.#releaseView(entry.view);
+						stale.push(...this.#viewNodes(entry.view));
 					}
 					keyMap.clear();
 					// Render all new items and collect DOM nodes
@@ -2357,7 +2507,16 @@ export class ListState extends Array {
 						const domNodes = this.#viewNodes(rendered);
 						for (let d = 0; d < domNodes.length; d++) frag.appendChild(domNodes[d]);
 					}
-					parent.o.appendChild(frag);
+					// replaceChildren() also drops anything else in the parent, so it is
+					// only allowed when this list owns the whole body; otherwise the old
+					// nodes are detached individually and the rest of the host survives.
+					const inPlace = stale.every(node => node?.parentNode === parent.o);
+					if (inPlace && parent.o.childNodes.length === stale.length) {
+						parent.o.replaceChildren(frag);
+					} else {
+						stale.forEach(node => node?.remove?.());
+						parent.o.appendChild(frag);
+					}
 					this.views[parentIdx] = newViews;
 					return;
 				}
@@ -2369,6 +2528,14 @@ export class ListState extends Array {
 						this.#removeView(entry.view);
 						keyMap.delete(key);
 					}
+				}
+				// Minimal moves: keep the longest run of rows that is already in the
+				// right relative order and relocate only the rest.
+				const plan = this.#planOrder(parent, keyMap, newKeys);
+				if (plan) {
+					this.#relocate(parent, plan);
+					this.views[parentIdx] = plan.map(part => part.view);
+					return;
 				}
 				// Add/reorder items
 				let prevNode = null;
