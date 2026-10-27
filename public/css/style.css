@@ -12,7 +12,6 @@ div#app {
     justify-content: center;
     align-items: center;
 
-    height: 90vh;
 
     text-align: center;
 
@@ -23,6 +22,7 @@ div#app {
 div#app:has(#landing-page),
 div#app:has(#calculator-page),
 div#app:has(#todo-page),
+div#app:has(#kanban-page),
 div#app:has(.aetheria-root),
 div#app:has(.playground-shell),
 div#app:has(#jetz-docs) {
@@ -41,6 +41,7 @@ div#app:has(#jetz-docs) {
 div#app:has(#landing-page)>main>footer,
 div#app:has(#calculator-page)>main>footer,
 div#app:has(#todo-page)>main>footer,
+div#app:has(#kanban-page)>main>footer,
 div#app:has(.aetheria-root)>main>footer,
 div#app:has(.playground-shell)>main>footer {
     display: none;
@@ -61,6 +62,7 @@ body {
     #landing-page, #landing-page *,
     #calculator-page, #calculator-page *,
     #todo-page, #todo-page *,
+    #kanban-page, #kanban-page *,
     #welcome-page, #welcome-page *,
     .playground-shell, .playground-shell *,
     .aetheria-root, .aetheria-root *,
@@ -71,7 +73,7 @@ body {
 }
 
 
-h1:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+h1:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     margin-bottom: 24px;
 
     font-size: 42px;
@@ -79,8 +81,7 @@ h1:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome
 }
 
 
-footer:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
-    position: absolute;
+footer:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
 
     bottom: 20px;
     left: 0;
@@ -92,12 +93,12 @@ footer:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #wel
 }
 
 
-p:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+p:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     margin-bottom: 50px;
 }
 
 
-button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     margin: 12px;
     padding: 8px 12px;
 
@@ -110,22 +111,22 @@ button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #wel
 }
 
 
-button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
+button:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
     background: #e5e5e5;
 }
 
 
-a:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
+a:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
     color: #166aad;
 }
 
 
-pre:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+pre:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     text-align: left;
 }
 
 
-input[type="text"]:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+input[type="text"]:not(#jetz-docs *, #landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     padding: 8px 12px;
 
     border: 1px solid grey;
@@ -2549,7 +2550,7 @@ html.jetz-theme-dark .jetz-code-explorer .jetz-code-pane .jetz-code {
     padding-bottom: 0;
 }
 
-#benchmark > .jetz-section {
+#benchmark>.jetz-section {
     padding-top: 60px;
     padding-bottom: 60px;
 }
@@ -3628,7 +3629,7 @@ body {
    excluded exactly like the light rules exclude them.
    ---------------------------------------------------------------------------- */
 
-html.jetz-theme-dark body:has(div#app):not(:has(#welcome-page, #landing-page, #calculator-page, #todo-page, .playground-shell, .aetheria-root)) {
+html.jetz-theme-dark body:has(div#app):not(:has(#welcome-page, #landing-page, #calculator-page, #todo-page, #kanban-page, .playground-shell, .aetheria-root)) {
     --jetz-line: #2a4356;
     --jetz-blue: #6cc2f2;
 
@@ -3636,26 +3637,26 @@ html.jetz-theme-dark body:has(div#app):not(:has(#welcome-page, #landing-page, #c
     color: #e6f0f7;
 }
 
-html.jetz-theme-dark footer:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+html.jetz-theme-dark footer:not(#landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     color: #8fa8b9;
 }
 
-html.jetz-theme-dark button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+html.jetz-theme-dark button:not(#landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
     background: #10202c;
     border-color: #2a4356;
     color: #e6f0f7;
 }
 
-html.jetz-theme-dark button:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
+html.jetz-theme-dark button:not(#landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
     background: #16293a;
 }
 
-html.jetz-theme-dark input[type="text"]:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *) {
+html.jetz-theme-dark input[type="text"]:not(#landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *) {
     background: #0c1a25;
     border-color: #2a4356;
     color: #e6f0f7;
 }
 
-html.jetz-theme-dark a:not(#landing-page *, #calculator-page *, #todo-page *, #welcome-page *, .playground-shell *, .aetheria-root *):hover {
+html.jetz-theme-dark a:not(#landing-page *, #calculator-page *, #todo-page *, #kanban-page *, #welcome-page *, .playground-shell *):hover {
     color: #6cc2f2;
 }

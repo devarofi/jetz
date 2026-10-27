@@ -77,18 +77,23 @@ const dashedAttributePrefixes = new Set(['data', 'aria']);
  * like `cssClass` still lands in the DOM verbatim rather than being rerouted.
  */
 const _attrNameCache = new Map();
+const _ATTR_CACHE_LIMIT = 512;
+function _cacheAttrName(key, value) {
+	if (_attrNameCache.size >= _ATTR_CACHE_LIMIT) _attrNameCache.clear();
+	_attrNameCache.set(key, value);
+}
 function normalizeAttributeName(name) {
 	const key = String(name);
 	const cached = _attrNameCache.get(key);
 	if (cached !== undefined) return cached;
 	const alias = attributeNameAliases[key.toLowerCase()];
-	if (alias) return _attrNameCache.set(key, alias), alias;
+	if (alias) return _cacheAttrName(key, alias), alias;
 	const separator = key.indexOf('_');
 	if (separator > 0 && dashedAttributePrefixes.has(key.slice(0, separator))) {
 		const result = key.replace(/_/g, '-');
-		return _attrNameCache.set(key, result), result;
+		return _cacheAttrName(key, result), result;
 	}
-	return _attrNameCache.set(key, key), key;
+	return _cacheAttrName(key, key), key;
 }
 const booleanAttributes = new Set([
 	'allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'controls',
@@ -794,6 +799,13 @@ class LifecycleContext {
 		if (component && component.constructor.prototype.hasOwnProperty('onDestroy')) {
 			component.onDestroy();
 		}
+		// a destroyed context never fires again: release callbacks and back-references
+		this.hooks.onCreate.length = 0;
+		this.hooks.onMount.length = 0;
+		this.hooks.onUpdate.length = 0;
+		this.hooks.onDestroy.length = 0;
+		this.component = null;
+		this.entry = null;
 		// A destroyed context can never fire again: onMount, onUpdate and
 		// onDestroy are all guarded by this flag. Dropping it from the sweep
 		// registry releases the component, its closures and its detached nodes
@@ -961,7 +973,7 @@ class JetzElement {
 	/** Releases only this element's own bindings (not its subtree). */
 	#releaseBindings() {
 		Jetz.emitDevtoolsEvent({ type: 'dispose', element: this });
-		[...this.#disposers].forEach(entry => entry());
+		this.#disposers.forEach(entry => entry());
 		this.#unbindClassParts();
 		disposeViewScope(this);
 		// the static remount registry is a strong root; drop entries owned by a
@@ -1006,7 +1018,7 @@ class JetzElement {
 		// The item scope is untouched: it belongs to the render call that created
 		// this element, not to this element's own node.
 		if (this.o) {
-			[...this.#disposers].forEach(entry => entry());
+			this.#disposers.forEach(entry => entry());
 			this.#unbindClassParts();
 		}
 		this.#atLifecycles(() => {
@@ -1894,9 +1906,7 @@ class Jetz {
 		}
 	}
 	static isAllowToRemount(findElement) {
-		return Jetz.remountByAttr.filter(element => {
-			return element == findElement;
-		}).length == 0
+		return !Jetz.remountByAttr.includes(findElement);
 	}
 	static use(app) {
 		app.install(Jetz);
@@ -3579,7 +3589,7 @@ function computed(computeFn) {
 
 		// Unsubscribe from the previous dependency set
 		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
-		_deps = new Set();
+		_deps.clear();
 
 		// Collect dependencies by tracking State.value reads
 		const prevTracking = _trackingEffect;
@@ -3616,7 +3626,7 @@ const derivedState = new State(initialValue, {
 		_computing = true;
 
 		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
-		_deps = new Set();
+		_deps.clear();
 
 		const prevTracking = _trackingEffect;
 		_trackingEffect = _deps;
@@ -3641,7 +3651,7 @@ const derivedState = new State(initialValue, {
 	// source goes away, which is what makes it readable on demand.
 	registerDisposable(() => {
 		_deps.forEach(dep => dep.unsubscribe(scheduleTrack));
-		_deps = new Set();
+		_deps.clear();
 	});
 
 	return derivedState;
@@ -3678,7 +3688,7 @@ function effect(effectFn) {
 		// Unsubscribe from the previous dependency set (`_deps` holds the State
 		// instances, so no per-dependency teardown closures are needed).
 		_deps.forEach(dep => dep.unsubscribe(scheduleRun));
-		_deps = new Set();
+		_deps.clear();
 
 		// Collect dependencies by tracking State.value reads
 		const prevTracking = _trackingEffect;
