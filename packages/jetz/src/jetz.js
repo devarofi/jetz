@@ -154,10 +154,18 @@ export function range(start, to) {
 	return arr;
 }
 export function flatMap(arr) {
+    // Iterative flattening avoids recursive calls, intermediate arrays and spread.
     const result = [];
-    for (const item of arr) {
+    const stack = [{ array: arr, index: 0 }];
+    while (stack.length) {
+        const frame = stack[stack.length - 1];
+        if (frame.index >= frame.array.length) {
+            stack.pop();
+            continue;
+        }
+        const item = frame.array[frame.index++];
         if (Array.isArray(item) && !(item instanceof ListState)) {
-            result.push(...flatMap(item));
+            stack.push({ array: item, index: 0 });
         } else {
             result.push(item);
         }
@@ -232,19 +240,17 @@ function isSpecialChild(val) {
 }
 
 function createElement(tag, ...args) {
-    let children = flatMap(args);
+    const flattened = flatMap(args);
     let attr = {};
+    const children = [];
 
-    for (let i = 0; i < children.length; i++) {
-        const arg = children[i];
-        if (arg == null) continue;
-        if (isPlainObject(arg) && !isSpecialChild(arg)) {
-            attr = mergeObject(attr, arg);
-            children.splice(i, 1);
-            i--;
-        }
+    // Single linear pass; never shift the remaining array with splice().
+    for (let i = 0; i < flattened.length; i++) {
+        const arg = flattened[i];
+        if (arg == null) { children.push(arg); continue; }
+        if (isPlainObject(arg) && !isSpecialChild(arg)) attr = mergeObject(attr, arg);
+        else children.push(arg);
     }
-
     return new JetzElement(tag, attr, ...children);
 }
 /**
@@ -887,16 +893,43 @@ class JetzElement {
 	attributes;
 	children;
 	oldStyle = {};
-	style = {};
-	// class sources merged onto this element, kept so a reactive part can be
-	// recomposed instead of being frozen at its mount-time value
-	#classParts = [];
-	#classUnsubs = [];
+	_styleTarget = {};
+	_styleProxy = null;
+	get style() {
+		// Most elements never use the imperative style API; pay Proxy cost only on access.
+		if (!this._styleProxy) {
+			const element = this;
+			this._styleProxy = new Proxy(this._styleTarget, {
+				set(target, key, value) {
+					if (element.o) writeStyle(element.o.style, String(key), value);
+					target[key] = value;
+					return true;
+				},
+				deleteProperty(target, key) {
+					if (element.o) {
+						if (String(key).startsWith('--')) element.o.style.removeProperty(String(key));
+						else element.o.style[key] = '';
+					}
+					return delete target[key];
+				}
+			});
+		}
+		return this._styleProxy;
+	}
+	set style(value) {
+		this._styleTarget = value && typeof value === 'object' ? value : {};
+		this._styleProxy = null;
+	}
+	// Allocate these collections only when reactive/class bindings are used.
+	#classParts = null;
+	#classUnsubs = null;
 	/** Reactive bindings created for this element (listeners, subscriptions, containers). */
-	#disposers = new Set();
+	#disposers = null;
 	/** Scope this element was rendered in by a `loop()` item, if any. */
 	__scope = null;
-	listener = [];
+	_listener = null;
+	get listener() { return this._listener ?? (this._listener = []); }
+	set listener(value) { this._listener = value; }
 	parent;
 	position;
 	childPosition = 0;
@@ -904,7 +937,9 @@ class JetzElement {
 		onRendered: null,
 		onStart: null
 	};
-	collectionConditionalChild = [];
+	_collectionConditionalChild = null;
+	get collectionConditionalChild() { return this._collectionConditionalChild ?? (this._collectionConditionalChild = []); }
+	set collectionConditionalChild(value) { this._collectionConditionalChild = value; }
 	renderPosition = 0; // 0 parent, 1 after, 2 before
 	/** Component lifecycle context attached by Component rendering. */
 	lifecycle = null;
@@ -940,8 +975,7 @@ class JetzElement {
 		// Opt-in only: capturing a stack per element is measurable on large lists,
 		// so it happens only when the developer asked for binding diagnostics.
 		if (Jetz.devtools) _elementOrigins.set(this, new Error().stack);
-		// Cache for bound event handlers (callback -> boundCallback)
-		this._boundHandlerCache = new Map();
+		// Bound-handler cache is allocated only if this element registers listeners.
 	}
 
 	/**
@@ -954,7 +988,7 @@ class JetzElement {
 			if (!this.#disposers.delete(entry)) return;
 			try { disposer(); } catch (error) { console.error(error); }
 		};
-		this.#disposers.add(entry);
+		(this.#disposers ??= new Set()).add(entry);
 		registerDisposable(entry);
 	}
 	/**
@@ -973,7 +1007,7 @@ class JetzElement {
 	/** Releases only this element's own bindings (not its subtree). */
 	#releaseBindings() {
 		Jetz.emitDevtoolsEvent({ type: 'dispose', element: this });
-		this.#disposers.forEach(entry => entry());
+		this.#disposers?.forEach(entry => entry());
 		this.#unbindClassParts();
 		disposeViewScope(this);
 		// the static remount registry is a strong root; drop entries owned by a
@@ -985,7 +1019,7 @@ class JetzElement {
 		this.collectionConditionalChild.forEach(child => {
 			if (typeof child?.disposeBindings === 'function') child.disposeBindings();
 		});
-		this.collectionConditionalChild = [];
+		this.collectionConditionalChild = null;
 	}
 	#atLifecycles(main) {
 		if (this.lifecycles.onStart) {
@@ -1018,7 +1052,7 @@ class JetzElement {
 		// The item scope is untouched: it belongs to the render call that created
 		// this element, not to this element's own node.
 		if (this.o) {
-			this.#disposers.forEach(entry => entry());
+				this.#disposers?.forEach(entry => entry());
 			this.#unbindClassParts();
 		}
 		this.#atLifecycles(() => {
@@ -1385,32 +1419,21 @@ class JetzElement {
 	}
 	initStyle() {
 		// check if this.style have a value
-		if (Obj.isNotEmpty(this.style)) {
-			this.#addStyle(this.style);
-		}
-		this.style = new Proxy(this.style, {
-			set: (function (target, symbol, value) {
-				if (typeof symbol === 'string') writeStyle(this.o.style, symbol, value);
-				else this.o.style[symbol] = value;
-				target[symbol] = value;
-				return true;
-			}).bind(this),
-		});
+		if (Obj.isNotEmpty(this._styleTarget)) this.#addStyle(this._styleTarget);
 	}
 	initListener() {
-		this.listener.forEach((_listener) => {
-			this.#attachListener(_listener);
-		});
+		if (!this._listener) return;
+		for (let i = 0; i < this._listener.length; i++) this.#attachListener(this._listener[i]);
 	}
 	/** Binds and attaches a listener entry once, keeping the bound reference for off(). */
 	#attachListener(listener) {
 		if (listener.boundCallback) return;
-		const cached = this._boundHandlerCache.get(listener.callback);
-		if (cached) {
-			listener.boundCallback = cached;
-		} else {
+		const cache = this._boundHandlerCache ?? (this._boundHandlerCache = new Map());
+		const cached = cache.get(listener.callback);
+		if (cached) listener.boundCallback = cached;
+		else {
 			listener.boundCallback = listener.callback.bind(this);
-			this._boundHandlerCache.set(listener.callback, listener.boundCallback);
+			cache.set(listener.callback, listener.boundCallback);
 		}
 		this.#addListener(listener.eventName, listener.boundCallback);
 	}
@@ -1518,8 +1541,8 @@ class JetzElement {
 			.map(part => (typeof part === 'function' ? computed(part) : part));
 		
 		// Reuse subscriptions for unchanged parts (by identity)
-		const oldParts = this.#classParts;
-		const oldUnsubs = this.#classUnsubs;
+		const oldParts = this.#classParts ?? [];
+		const oldUnsubs = this.#classUnsubs ?? [];
 		const newUnsubs = [];
 		
 		newParts.forEach((part, i) => {
@@ -1560,9 +1583,9 @@ class JetzElement {
 		);
 	}
 	#unbindClassParts() {
-		this.#classUnsubs.forEach(off => off?.());
-		this.#classUnsubs = [];
-		this.#classParts = [];
+		this.#classUnsubs?.forEach(off => off?.());
+		this.#classUnsubs = null;
+		this.#classParts = null;
 	}
 	#setClassAttribute(value) {
 		// `value` is already flat (produced by `#classParts.map(...)`), but each
