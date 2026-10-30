@@ -13,9 +13,10 @@ const modules = {
 	'jetz-session': { target: 'jetz-session.js' },
 	'middleware': { target: 'middleware.js' },
 	'jetz-test': { target: 'jetz-test.js' },
+	'jetz-devtools': { target: 'jetz-devtools.js' },
 };
 
-const runtimeFiles = ['jetz.js', 'jetz-ui.js', 'jetz-router.js', 'jetz-session.js', 'middleware.js', 'jetz-test.js'];
+const runtimeFiles = ['jetz.js', 'jetz-ui.js', 'jetz-router.js', 'jetz-session.js', 'middleware.js', 'jetz-test.js', 'jetz-devtools.js'];
 
 /** Collects the exported symbol names of a runtime module without executing its DOM code. */
 function collectExports(file) {
