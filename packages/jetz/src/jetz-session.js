@@ -18,13 +18,18 @@ export class JetzSession {
         return this.savedData != null && Object.prototype.hasOwnProperty.call(this.savedData, key);
     }
     set(key, value) {
+        // `__proto__` would re-parent the stored object instead of storing a value
+        if (key === '__proto__') return true;
         if (this.savedData == null) this.savedData = {};
         this.savedData[key] = value;
         this.save();
         return true;
     }
     setInitialData(data) {
-        const oldData = sessionStorage.getItem(this.session_id);
+        let oldData = null;
+        try {
+            oldData = sessionStorage.getItem(this.session_id);
+        } catch (e) { /* storage unavailable: start from the initial data */ }
         if (oldData) {
             try {
                 this.savedData = JSON.parse(oldData);
@@ -39,7 +44,9 @@ export class JetzSession {
         }
     }
     destroy() {
-        sessionStorage.removeItem(this.session_id);
+        try {
+            sessionStorage.removeItem(this.session_id);
+        } catch (e) { /* storage unavailable */ }
         this.savedData = {};
     }
     save() {

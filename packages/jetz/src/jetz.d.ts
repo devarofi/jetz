@@ -469,14 +469,41 @@ export declare function computed<T>(computeFn: () => T): State<T>;
 
 /**
  * Runs a side-effect function that automatically re-runs when its state dependencies change.
- * Returns a `dispose` function to stop the effect.
+ * Returns a `dispose` function to stop the effect. If `effectFn` returns a
+ * function, it is called before the next run and on dispose (since 1.2.0).
  *
  * @example
  * const dispose = effect(() => {
  *   document.title = `Count: ${counter.value}`;
  * });
  */
-export declare function effect(effectFn: () => void): () => void;
+export declare function effect(effectFn: () => void | (() => void)): () => void;
+
+/**
+ * Explicit watcher: runs `callback(value, oldValue, onCleanup)` when `source`
+ * changes. Only `source` is tracked. Returns a stop function.
+ * @since 1.2.0
+ *
+ * @example
+ * const stop = watch(userId, (id, prev, onCleanup) => {
+ *   const ctrl = new AbortController();
+ *   onCleanup(() => ctrl.abort());
+ *   fetch(`/users/${id}`, { signal: ctrl.signal });
+ * }, { immediate: true });
+ */
+export type WatchSource<T = any> = State<T> | (() => T);
+export declare function watch<T>(
+    source: WatchSource<T> | WatchSource[],
+    callback: (value: T, oldValue: T | undefined, onCleanup: (fn: () => void) => void) => void,
+    options?: { immediate?: boolean; once?: boolean }
+): () => void;
+
+/**
+ * Reads states inside `fn` without registering them as dependencies of the
+ * surrounding `computed()` / `effect()`.
+ * @since 1.2.0
+ */
+export declare function untrack<T>(fn: () => T): T;
 
 /** Updates state immediately, then flushes subscribers, computed values, effects, and DOM once. */
 export declare function batch<T>(callback: () => T): T;
@@ -614,6 +641,33 @@ export declare const Jetz: {
     devtools: boolean;
 
     remountByAttr: JetzElement[];
+
+    /**
+     * When true, `javascript:`, `vbscript:` and `data:text/html` URLs are written
+     * into navigable attributes (`href`, `src`, `action`, …) unchanged.
+     * Default `false`: such URLs are replaced with `about:blank#blocked`.
+     * @since 1.2.0
+     */
+    allowUnsafeUrls: boolean;
+
+    /**
+     * Central handler for errors Jetz catches (effect/watch cleanups, …).
+     * Defaults to `console.error` when `null`.
+     * @since 1.2.0
+     */
+    errorHandler: ((error: unknown, info: { source?: string; [key: string]: unknown }) => void) | null;
+
+    /** Routes an error to `errorHandler` (or the console). @since 1.2.0 */
+    reportError(error: unknown, info?: { source?: string; [key: string]: unknown }): void;
+
+    /** Number of component lifecycles still tracked (diagnostic). */
+    readonly liveLifecycles: number;
+
+    /** @internal Adds an element to `remountByAttr` (indexed). @since 1.2.0 */
+    registerRemount(element: JetzElement): void;
+    /** @internal Removes an element from `remountByAttr` (indexed). @since 1.2.0 */
+    unregisterRemount(element: JetzElement): void;
+
     $route?: Router;
     $session?: JetzSession;
 

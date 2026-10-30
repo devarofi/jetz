@@ -118,17 +118,58 @@ function writeStyle(style, key, value) {
 	if (key.startsWith('--')) style.setProperty(key, value);
 	else style[key] = value;
 }
-NodeList.prototype.last = function () {
-	return this[this.length - 1];
+/**
+ * Built-in prototype helpers (`[].last()`, `[].take()`, `(1).range(5)`).
+ *
+ * Defined non-enumerable: a plain assignment made them enumerable, so every
+ * `for...in` over any array in the page (including third-party code) visited
+ * `last` and `take` as if they were items. `NodeList` is guarded so the module
+ * can be imported where no DOM exists (SSR, workers, tests).
+ */
+function defineHelper(proto, name, fn) {
+	if (!proto) return;
+	Object.defineProperty(proto, name, { value: fn, writable: true, configurable: true, enumerable: false });
 }
-Array.prototype.last = function () {
+defineHelper(typeof NodeList !== 'undefined' ? NodeList.prototype : null, 'last', function () {
 	return this[this.length - 1];
-}
-Array.prototype.take = function (to) {
+});
+defineHelper(Array.prototype, 'last', function () {
+	return this[this.length - 1];
+});
+defineHelper(Array.prototype, 'take', function (to) {
 	return this.slice(0, to);
-}
-Number.prototype.range = function (to) {
+});
+defineHelper(Number.prototype, 'range', function (to) {
 	return range(this.valueOf(), to);
+});
+/** Attributes whose value the browser may navigate to or execute. */
+const urlAttributes = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'background', 'cite', 'data', 'ping']);
+const unsafeUrlPattern = /^(?:javascript:|vbscript:|data:text\/html)/i;
+// `javascript:void(0)` / `javascript:;` / `javascript:` are inert placeholders
+// still common in markup; they run nothing, so they stay allowed.
+const inertJavascriptUrl = /^\s*javascript\s*:\s*(?:;?|void\s*\(?\s*0\s*\)?\s*;?)\s*$/i;
+/**
+ * Neutralises script-bearing URLs (`javascript:`, `vbscript:`, `data:text/html`)
+ * written into a navigable attribute. Control characters and whitespace that
+ * browsers strip before parsing the scheme are removed first, so `java\tscript:`
+ * is caught too. Opt out with `Jetz.allowUnsafeUrls = true`.
+ */
+function sanitizeUrlAttribute(name, value) {
+	if (value == null || typeof value === 'boolean' || Jetz.allowUnsafeUrls) return value;
+	// fast path: most attributes are lowercase and not navigable, so skip the
+	// toLowerCase() allocation unless the name actually has uppercase letters
+	if (!urlAttributes.has(name) && (!/[A-Z]/.test(name) || !urlAttributes.has(name.toLowerCase()))) return value;
+	const text = String(value);
+	const normalized = text.replace(/[\u0000-\u001F\u007F\s]+/g, '');
+	if (!unsafeUrlPattern.test(normalized) || inertJavascriptUrl.test(text)) return value;
+	if (typeof console !== 'undefined') {
+		console.warn(`Jetz: blocked an unsafe URL in the "${name}" attribute. Set Jetz.allowUnsafeUrls = true to permit it.`);
+	}
+	return 'about:blank#blocked';
+}
+/** `on*` attribute names, matched case-insensitively (`onclick`, `OnClick`, …). */
+function isEventAttribute(name) {
+	return typeof name === 'string' && name.length > 2 && (name.charCodeAt(0) | 32) === 111 && (name.charCodeAt(1) | 32) === 110;
 }
 class UniqueString extends String {
 	constructor(val) {
@@ -184,8 +225,10 @@ export function addScript(src, options = {}) {
 		for (const key in options) {
 			if (Object.hasOwnProperty.call(options, key)) {
 				const optValue = options[key];
-				if (key === 'onload' && typeof optValue === 'function') {
-					script.addEventListener('load', optValue);
+				if (isEventAttribute(key) && typeof optValue === 'function') {
+					// `onload`, `onerror`, … as functions become listeners; any other
+					// on* function used to be stringified into an inline handler
+					script.addEventListener(key.slice(2).toLowerCase(), optValue, { once: true });
 				} else {
 					script.setAttribute(key, optValue);
 				}
@@ -194,7 +237,7 @@ export function addScript(src, options = {}) {
 		document.body.append(script);
 	};
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', inject);
+		document.addEventListener('DOMContentLoaded', inject, { once: true });
 	} else {
 		inject();
 	}
@@ -226,7 +269,10 @@ function warnStringifiedFunction(child) {
 	);
 }
 function isPlainObject(val) {
-    return val !== null && typeof val === 'object' && !Array.isArray(val) && val.constructor.name === 'Object';
+    if (val === null || typeof val !== 'object' || Array.isArray(val)) return false;
+    // null-prototype objects (Object.create(null)) have no constructor at all
+    const ctor = val.constructor;
+    return ctor === undefined ? Object.getPrototypeOf(val) === null : ctor.name === 'Object';
 }
 
 // Fast special child detection using constructor.name (avoids instanceof prototype chain walk)
@@ -1012,9 +1058,7 @@ class JetzElement {
 		disposeViewScope(this);
 		// the static remount registry is a strong root; drop entries owned by a
 		// subtree that is being discarded, or it pins the whole detached tree
-		if (Jetz.remountByAttr.includes(this)) {
-			Jetz.remountByAttr = Jetz.remountByAttr.filter(item => item !== this);
-		}
+		Jetz.unregisterRemount(this);
 		// conditional children (ifElse branches) hold references to their nodes
 		this.collectionConditionalChild.forEach(child => {
 			if (typeof child?.disposeBindings === 'function') child.disposeBindings();
@@ -1110,7 +1154,9 @@ class JetzElement {
 		for (const attr in this.attributes) {
 			if (Object.hasOwnProperty.call(this.attributes, attr)) {
 				const attrValue = this.attributes[attr];
-				if (attr.substring(0, 2) == 'on') {
+				if (isEventAttribute(attr)) {
+					// only functions become listeners: a string handler would be
+					// compiled by the browser from whatever data reached the key
 					if (typeof attrValue === "function") {
 						const eventName = attr.substring(2);
 						const handler = attrValue.bind(this);
@@ -1151,9 +1197,7 @@ class JetzElement {
 			let attrSpecial = new If(this, attrValue);
 			// // check is assign or not
 			this.parent.collectionConditionalChild.push(attrSpecial);
-			if (Jetz.isAllowToRemount(this.parent)) {
-				Jetz.remountByAttr.push(this.parent);
-			}
+			Jetz.registerRemount(this.parent);
 		} else if (attrName === 'else') {
 			var currentIfElement = this.parent.collectionConditionalChild.last();
 			var newElse = new Else(this, currentIfElement);
@@ -1307,11 +1351,9 @@ class JetzElement {
 					this.#bindTeardown(() => {
 						child.disposeBindings?.();
 						this.collectionConditionalChild =
-							this.collectionConditionalChild.filter(item => item !== child);
+							this.collectionConditionalChild?.filter(item => item !== child) ?? null;
 					});
-					if (Jetz.isAllowToRemount(this)) {
-						Jetz.remountByAttr.push(this);
-					}
+					Jetz.registerRemount(this);
 				}
 				if (typeof this.o !== "undefined") {
 					// marker + first branch are rendered here to keep the child order
@@ -1393,9 +1435,7 @@ class JetzElement {
 		listener.attachPrev(typeof this.o !== "undefined" ? this.o.lastChild : null);
 		if (!this.collectionConditionalChild.includes(listener)) {
 			this.collectionConditionalChild.push(listener);
-			if (Jetz.isAllowToRemount(this)) {
-				Jetz.remountByAttr.push(this);
-			}
+			Jetz.registerRemount(this);
 		}
 		if (typeof this.o === "undefined") {
 			// parent is not rendered yet, replay on render
@@ -1503,6 +1543,9 @@ class JetzElement {
 		return this;
 	}
 	#setAttributeValue(attrName, value) {
+		// a reactive value can never install an inline event handler
+		if (isEventAttribute(attrName)) return;
+		value = sanitizeUrlAttribute(attrName, value);
 		if (attrName === 'value') {
 			this.o.value = value;
 			if (value == null) this.o.removeAttribute(attrName);
@@ -1779,6 +1822,35 @@ class Jetz {
 	static devtools = false;
 	// Jetz Element Collection that have If Else Annotation
 	static remountByAttr = [];
+	/**
+	 * Membership index for `remountByAttr`: `isAllowToRemount()` ran
+	 * `Array#includes` per registration, i.e. O(n²) over a page with thousands of
+	 * conditional parents. The index is trusted only while the public array is
+	 * the one it was built for and has the length it expects; if user code
+	 * replaced or mutated the array directly, it falls back to a linear scan.
+	 */
+	static #remountIndex = new WeakSet();
+	static #remountIndexedArray = null;
+	static #remountIndexedLength = 0;
+	/**
+	 * When true, `javascript:` / `vbscript:` / `data:text/html` URLs are written
+	 * into `href`, `src`, `action`, … unchanged. Off by default (they are blocked).
+	 */
+	static allowUnsafeUrls = false;
+	/**
+	 * Optional central error handler `(error, info) => void` for errors thrown by
+	 * lifecycle hooks, effects and event listeners that Jetz already catches.
+	 * Defaults to `console.error`.
+	 */
+	static errorHandler = null;
+	/** @internal Routes a caught error to `Jetz.errorHandler` (or the console). */
+	static reportError(error, info = {}) {
+		const handler = Jetz.errorHandler;
+		if (typeof handler === 'function') {
+			try { handler(error, info); return; } catch (handlerError) { console.error(handlerError); }
+		}
+		console.error(error);
+	}
 	static #onRenderedCollections = [];
 	static #isMounting = false;
 	static #devtoolsListeners = new Set();
@@ -1856,7 +1928,11 @@ class Jetz {
 		Jetz.#onRenderedCollections.push(callback)
 	}
 	static onFirstRenderPage() {
-		Jetz.#onRenderedCollections.forEach(callback => callback());
+		// drain, don't replay: the queue was never cleared, so it grew with every
+		// render for the page's lifetime and a second mount re-ran old callbacks
+		const callbacks = Jetz.#onRenderedCollections;
+		Jetz.#onRenderedCollections = [];
+		callbacks.forEach(callback => callback());
 		// nodes are attached after mount; fire onMount for every live component
 		Jetz.#lifecycles.forEach(context => {
 			if (context.entry?.o?.isConnected) {
@@ -1922,20 +1998,43 @@ class Jetz {
 	static onLoad(callback) {
 		if (callback != null) {
 			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', () => callback());
+				document.addEventListener('DOMContentLoaded', () => callback(), { once: true });
 			} else {
 				callback();
 			}
 		}
 	}
 	static isAllowToRemount(findElement) {
-		return !Jetz.remountByAttr.includes(findElement);
+		const list = Jetz.remountByAttr;
+		if (list === Jetz.#remountIndexedArray && list.length === Jetz.#remountIndexedLength) {
+			return !Jetz.#remountIndex.has(findElement);
+		}
+		// the array was replaced or edited outside Jetz: rebuild the index
+		Jetz.#remountIndex = new WeakSet(list.filter(item => item !== null && typeof item === 'object'));
+		Jetz.#remountIndexedArray = list;
+		Jetz.#remountIndexedLength = list.length;
+		return !Jetz.#remountIndex.has(findElement);
+	}
+	/** @internal Adds an element to `remountByAttr`, keeping the index in sync. */
+	static registerRemount(element) {
+		if (!Jetz.isAllowToRemount(element)) return;
+		Jetz.remountByAttr.push(element);
+		Jetz.#remountIndex.add(element);
+		Jetz.#remountIndexedLength = Jetz.remountByAttr.length;
+	}
+	/** @internal Removes an element from `remountByAttr`, keeping the index in sync. */
+	static unregisterRemount(element) {
+		if (Jetz.isAllowToRemount(element)) return;
+		Jetz.remountByAttr = Jetz.remountByAttr.filter(item => item !== element);
+		Jetz.#remountIndex.delete(element);
+		Jetz.#remountIndexedArray = Jetz.remountByAttr;
+		Jetz.#remountIndexedLength = Jetz.remountByAttr.length;
 	}
 	static use(app) {
 		app.install(Jetz);
 	}
 	static get version() {
-		return '1.1.2';
+		return '1.2.0';
 	}
 	/** Clears the target container (string selector or element). */
 	static unmount(target) {
@@ -2070,7 +2169,10 @@ class State {
 	}
 	#assignContainerValue(container, value) {
 		if (container instanceof HTMLElement) {
-			container.innerHTML = value;
+			// state values are text everywhere else (Text nodes); writing them as
+			// markup here turned a string state into an HTML injection sink. Use
+			// html`…` / Raw for intentional markup.
+			container.textContent = value == null ? '' : String(value);
 		} else if (container instanceof Attr) {
 			if (container.nodeName === 'value') {
 				container.ownerElement.value = value;
@@ -2131,7 +2233,7 @@ class _RememberStateTemp {
 			}
 			this.rememberCollections = dataCollection
 		}
-		if (this.rememberCollections.hasOwnProperty(id) == false) {
+		if (!Object.prototype.hasOwnProperty.call(this.rememberCollections, id)) {
 			this.rememberCollections[id] = {};
 		}
 		this.rememberCollections[id][childKey] = childValue;
@@ -2979,6 +3081,9 @@ function stateOf(value, handler = { get(value) { return value } }) {
 	// css(() => ready ? 'is-ready' : null).
 	if (value !== null && typeof value === 'object' && !(value instanceof JetzElement)) {
 		for (const prop in value) {
+			// `__proto__` as an own key (e.g. from JSON.parse of stored data) would
+			// re-parent the object onto a State when assigned back; drop it instead
+			if (prop === '__proto__') { delete value[prop]; continue; }
 			if (Object.hasOwnProperty.call(value, prop)) {
 				const propValue = value[prop];
 				value[prop] = stateOf(propValue);
@@ -3080,7 +3185,11 @@ function shallowStateOf(value, handler = { get(value) { return value } }) {
 			if (prop === 'toObject') return () => ({ ...target });
 			if (prop === 'touch') return bump;
 			if (prop === 'set') return (patch) => {
-				if (patch != null && typeof patch === 'object') Object.assign(target, patch);
+				if (patch != null && typeof patch === 'object') {
+					for (const key of Object.keys(patch)) {
+						if (key !== '__proto__') target[key] = patch[key];
+					}
+				}
 				bump();
 			};
 			if (prop === 'peek') return (key) => target[key];
@@ -3100,6 +3209,7 @@ function shallowStateOf(value, handler = { get(value) { return value } }) {
 			return fallback;
 		},
 		set(target, prop, next) {
+			if (prop === '__proto__') return true;
 			target[prop] = next;
 			bump();
 			return true;
@@ -3138,7 +3248,7 @@ function mergeObject(obj1, ...obj2) {
 	var newObj = {};
 	for (const obj of sources) {
 		for (const prop in obj) {
-			if (Object.hasOwnProperty.call(obj, prop)) {
+			if (Object.hasOwnProperty.call(obj, prop) && prop !== '__proto__') {
 				const key = normalizeAttributeName(prop);
 				const value = obj[prop];
 				// check prop in newobj
@@ -3623,10 +3733,10 @@ function computed(computeFn) {
 		} finally {
 			_trackingEffect = prevTracking;
 			_computing = false;
+			// keep the dependencies read before a throw: a failed recompute must
+			// not leave the computed permanently detached from its sources
+			_deps.forEach(dep => dep.subscribe(scheduleTrack));
 		}
-
-		// Subscribe to all discovered dependencies
-		_deps.forEach(dep => dep.subscribe(scheduleTrack));
 
 		return result;
 	}
@@ -3659,9 +3769,10 @@ const derivedState = new State(initialValue, {
 		} finally {
 			_trackingEffect = prevTracking;
 			_computing = false;
+			// keep the dependencies read before a throw: a failed recompute must
+			// not leave the computed permanently detached from its sources
+			_deps.forEach(dep => dep.subscribe(scheduleTrack));
 		}
-
-		_deps.forEach(dep => dep.subscribe(scheduleTrack));
 
 		derivedState.value = result;
 		return result;
@@ -3699,6 +3810,7 @@ function effect(effectFn) {
 	let _deps = new Set();
 	let _running = false;
 	let _disposed = false;
+	let _cleanup = null;
 	function scheduleRun() {
 		if (_isFlushingBatch) _pendingBatchEffects.add(run);
 		else run();
@@ -3713,18 +3825,29 @@ function effect(effectFn) {
 		_deps.forEach(dep => dep.unsubscribe(scheduleRun));
 		_deps.clear();
 
+		// cleanup returned by the previous run goes first (React/Vue/Solid style)
+		runCleanup();
+
 		// Collect dependencies by tracking State.value reads
 		const prevTracking = _trackingEffect;
 		_trackingEffect = _deps;
 		try {
-			effectFn();
+			const result = effectFn();
+			if (typeof result === 'function') _cleanup = result;
 		} finally {
 			_trackingEffect = prevTracking;
 			_running = false;
+			// Subscribe even when the run threw: the dependencies read before the
+			// error are real, and dropping them left the effect dead for good.
+			_deps.forEach(dep => dep.subscribe(scheduleRun));
 		}
-
-		// Subscribe to all discovered dependencies
-		_deps.forEach(dep => dep.subscribe(scheduleRun));
+	}
+	function runCleanup() {
+		const cleanup = _cleanup;
+		_cleanup = null;
+		if (cleanup) {
+			try { cleanup(); } catch (error) { Jetz.reportError(error, { source: 'effect cleanup' }); }
+		}
 	}
 
 	// Run immediately to collect initial dependencies and execute effect
@@ -3732,13 +3855,96 @@ function effect(effectFn) {
 
 	// Return dispose function
 	function dispose() {
+		if (_disposed) return;
 		_disposed = true;
 		_deps.forEach(dep => dep.unsubscribe(scheduleRun));
 		_deps.clear();
+		runCleanup();
 	}
 	// scope teardown for effects created inside a `loop()` item
 	registerDisposable(dispose);
 	return dispose;
 }
 
-export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, defer, lazy, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy };
+/**
+ * Reads states inside `fn` without registering them as dependencies of the
+ * surrounding `computed()` / `effect()` (Solid's `untrack`, Vue's `toRaw` read).
+ *
+ * @example
+ * effect(() => log(count.value, untrack(() => label.value))); // re-runs on count only
+ */
+function untrack(fn) {
+	const prevTracking = _trackingEffect;
+	_trackingEffect = null;
+	try {
+		return fn();
+	} finally {
+		_trackingEffect = prevTracking;
+	}
+}
+
+/**
+ * Explicit watcher (Vue's `watch`): runs `callback(newValue, oldValue, onCleanup)`
+ * when `source` changes. `source` is a State or a getter reading states (or an
+ * array of those). Only `source` is tracked - state read inside `callback` is
+ * not. Returns a stop function and, like `effect()`, is released automatically
+ * when created inside a component, `loop()` item or `ifElse()` branch.
+ *
+ * @param {State|Function|Array<State|Function>} source
+ * @param {(value: any, oldValue: any, onCleanup: (fn: () => void) => void) => void} callback
+ * @param {{ immediate?: boolean, once?: boolean }} [options]
+ * @returns {() => void} stop function
+ */
+function watch(source, callback, options = {}) {
+	if (typeof callback !== 'function') throw new TypeError('Jetz watch(source, callback): callback must be a function');
+	const read = item => (typeof item === 'function' && !(item instanceof State) ? item() : isBindableState(item) ? item.value : item);
+	const getter = Array.isArray(source) ? () => source.map(read) : () => read(source);
+	const { immediate = false, once = false } = options;
+	let initialized = false;
+	let oldValue;
+	let cleanup = null;
+	let stop = null;
+	const onCleanup = fn => { cleanup = typeof fn === 'function' ? fn : null; };
+	const changed = (next, prev) => Array.isArray(next) && Array.isArray(prev)
+		? next.length !== prev.length || next.some((value, index) => !Object.is(value, prev[index]))
+		: !Object.is(next, prev);
+	const fire = (next, prev) => {
+		if (cleanup) {
+			const previousCleanup = cleanup;
+			cleanup = null;
+			try { previousCleanup(); } catch (error) { Jetz.reportError(error, { source: 'watch cleanup' }); }
+		}
+		untrack(() => callback(next, prev, onCleanup));
+		if (once && stop) stop();
+	};
+	const disposeEffect = effect(() => {
+		const next = getter();
+		if (!initialized) {
+			initialized = true;
+			oldValue = next;
+			if (immediate) fire(next, undefined);
+			return;
+		}
+		// object states mutated in place still notify: compare only primitives/arrays
+		if (typeof next === 'object' && next !== null && !Array.isArray(next) ? true : changed(next, oldValue)) {
+			const prev = oldValue;
+			oldValue = next;
+			fire(next, prev);
+		}
+	});
+	stop = () => {
+		disposeEffect();
+		if (cleanup) {
+			const lastCleanup = cleanup;
+			cleanup = null;
+			try { lastCleanup(); } catch (error) { Jetz.reportError(error, { source: 'watch cleanup' }); }
+		}
+	};
+	if (once && immediate && initialized) {
+		// fired during setup: the stop requested by `once` ran before `stop` existed
+		stop();
+	}
+	return stop;
+}
+
+export { Jetz, Dispatcher, Component, JetzElement, State, RememberState, Raw, createElement, rememberOf, stateOf, shallowStateOf, rowOf, rawOf, touchRow, computed, effect, batch, defer, lazy, _show, _else, _elseif, _if, html, listen, onCreate, onMount, onUpdate, onDestroy, watch, untrack };

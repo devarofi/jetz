@@ -138,9 +138,15 @@ export class Router {
 		}
 	}
 	#getSavedParams(routename) {
-		let data = sessionStorage.getItem(routename);
-		if (data == null) return null;
-		sessionStorage.removeItem(routename);
+		let data = null;
+		try {
+			data = sessionStorage.getItem(routename);
+			if (data == null) return null;
+			sessionStorage.removeItem(routename);
+		} catch (e) {
+			// storage unavailable (privacy mode, sandboxed iframe): no saved params
+			return null;
+		}
 		try {
 			return JSON.parse(data);
 		} catch (e) {
@@ -319,5 +325,11 @@ export let asBackLink = {
 	}
 }
 export function redirect(url) {
+	// a script-bearing URL would execute in the page instead of navigating
+	const scheme = String(url ?? '').replace(/[\u0000-\u001F\u007F\s]+/g, '');
+	if (/^(?:javascript:|vbscript:|data:text\/html)/i.test(scheme) && !Jetz.allowUnsafeUrls) {
+		console.warn('Jetz router: redirect() blocked an unsafe URL.');
+		return;
+	}
 	window.location.href = url;
 }
