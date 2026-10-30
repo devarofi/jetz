@@ -5,7 +5,7 @@
 
   <p>
     <a href="https://github.com/devarofi/jetz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-ISC-blue.svg" alt="License: ISC" /></a>
-    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.1.2-emerald.svg" alt="Version 1.1.2" /></a>
+    <a href="https://github.com/devarofi/jetz"><img src="https://img.shields.io/badge/version-1.2.0-emerald.svg" alt="Version 1.2.0" /></a>
     <a href="https://github.com/devarofi/jetz/actions"><img src="https://img.shields.io/badge/tests-passing-brightgreen.svg" alt="Tests" /></a>
     <a href="https://rspack.dev"><img src="https://img.shields.io/badge/bundled_with-Rspack-orange.svg" alt="Rspack" /></a>
   </p>
@@ -76,6 +76,7 @@ npm install @daevsoft/jetz
   - [11. Reactive Listeners (`listen`)](#11-reactive-listeners-listen)
   - [12. DOM Utilities & Helper Methods](#12-dom-utilities--helper-methods)
   - [13. Deferred Tasks (`defer`)](#13-deferred-tasks-defer)
+  - [14. Explicit Watchers (`watch`, `untrack`)](#14-explicit-watchers-watch-untrack)
 - [Scaling Large Data Sets](#scaling-large-data-sets)
   - [Shallow Row State (`shallowStateOf`, `rowOf`)](#shallow-row-state-shallowstateof-rowof)
   - [Untracked Pipeline Reads (`rawOf`)](#untracked-pipeline-reads-rawof)
@@ -89,6 +90,8 @@ npm install @daevsoft/jetz
   - [Dispatcher Pattern](#dispatcher-pattern)
   - [Script & Raw HTML Injection](#script--raw-html-injection)
   - [Prototype Extensions & Array Helpers](#prototype-extensions--array-helpers)
+  - [Unsafe URL Blocking](#unsafe-url-blocking)
+  - [Error Handling & Diagnostics](#error-handling--diagnostics)
 - [Jetz DevTools](#jetz-devtools)
 - [Real-World Example: Calculator](#real-world-example-calculator)
 - [Architecture Overview](#architecture-overview)
@@ -167,6 +170,7 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Derived State** | `computed(fn)` | Auto-tracked computed values with zero manual dependency arrays. |
 | **Reactive Classes** | `css(fn)` | Class attributes that re-evaluate whenever the state they read changes. |
 | **Side-Effects** | `effect(fn)` | Auto-tracking effects with instant execution and disposal cleanup. |
+| **Explicit Watchers** | `watch(source, fn)`, `untrack(fn)` | Change-driven callbacks with old/new values, and reads that stay out of the dependency graph. |
 | **Reactive Lists** | `listOf()`, `sequenceOf()` | Observable arrays with chainable methods (`push`, `remove`, `sort`). |
 | **Keyed Reconciliation** | `loop(list, keyFn, renderFn)` | O(1) DOM element recycling and minimal mutations on array changes. |
 | **Shallow Row State** | `shallowStateOf()`, `rowOf()` | Row-level reactivity for tables: one signal per record instead of one per cell. |
@@ -181,6 +185,8 @@ No build step required to parse custom syntax. That is valid, executable JavaScr
 | **Session State** | `JetzSession`, `sessionOf` | Reactive key-value store automatically backed by `sessionStorage`. |
 | **Dispatcher** | `Dispatcher` | Flux-like action dispatching for clean architecture. |
 | **DOM Utilities** | `find`, `findAll`, `.attr()`, `.addClass()`, ... | Fluent helper methods on every element before and after mounting. |
+| **Safe Navigation** | `Jetz.allowUnsafeUrls` | `javascript:` / `vbscript:` / `data:text/html` URLs are blocked in `href`, `src`, `action`, … |
+| **Error Reporting** | `Jetz.errorHandler`, `Jetz.reportError()` | One central sink for the errors Jetz catches inside effects, watchers and lifecycle hooks. |
 
 ---
 
@@ -424,6 +430,7 @@ Follow this structured guide to master Jetz step by step:
 13. [Scaling Large Data Sets](#scaling-large-data-sets) — Shallow rows and automatic cleanup for big tables
 14. [Router & Middleware](#router--link-navigation) — Multi-page SPA navigation
 15. [Session Storage](#session-storage-jetzsession-sessionof) — Tab-persistent state
+16. [Explicit Watchers](#14-explicit-watchers-watch-untrack) — `watch` and `untrack` for change-driven callbacks
 
 ---
 
@@ -602,6 +609,32 @@ const profile = stateOf({ name: "Ada" });
 profile.name.value = "Grace"; // object properties are reactive states too
 ```
 
+#### Batching State Updates
+
+Use `batch(fn)` when one user action updates multiple related states. `stateOf()` holds the source values, `computed()` derives a value from them, and `effect()` reacts to that derived value. Without `batch()`, the effect below sees an intermediate name; with `batch()`, it runs once with the completed name.
+
+```javascript
+import { batch, computed, effect, stateOf } from "jetz";
+
+const firstName = stateOf("Ada");
+const lastName = stateOf("Lovelace");
+const fullName = computed(() => `${firstName.value} ${lastName.value}`);
+
+effect(() => {
+  console.log(`Profile name: ${fullName.value}`);
+});
+
+// Without batch(), these writes would emit "Augusta Lovelace" then "Augusta King".
+batch(() => {
+  firstName.value = "Augusta";
+  lastName.value = "King";
+});
+
+// The effect emits only "Augusta King" for the batched update.
+```
+
+Values are readable immediately inside the callback. Computed values, effects, subscribers, and bound DOM update when the outermost batch finishes. Keep the callback synchronous.
+
 Use `stateOf` for temporary UI or application state. Use a `ListState` for collections that need reactive add, remove, or replace operations.
 
 Any value can be held, including falsy ones. `null`, `false`, `0`, `""`, and `undefined` are all valid initial values, so a state can start out "empty" and be filled in later:
@@ -611,6 +644,24 @@ const filter = stateOf("");   // starts blank
 const ready = stateOf(null);  // no value yet
 const chosen = stateOf(false);
 ```
+
+#### Reading Without Subscribing
+
+A `.value` read inside `computed()` or `effect()` registers a dependency. When
+you only want the current value, read it untracked:
+
+```javascript
+const count = stateOf(0);
+
+count.peek();     // current value, no dependency registered
+count.getValue(); // raw stored value, without invoking getter traps
+```
+
+`untrack(() => …)` does the same for a whole expression or a call that reads
+several states — see [Explicit Watchers](#14-explicit-watchers-watch-untrack).
+
+For diagnostics, `count.subscriberCount` reports how many bindings still hang on
+a state; a released view should leave none behind. Reading it retains nothing.
 
 #### Persisting State with `rememberOf`
 
@@ -882,6 +933,27 @@ effect(() => {
 dispose();
 ```
 
+#### Returning a Cleanup from an Effect
+
+When the callback **returns a function**, `effect()` treats it as that run's
+teardown: it executes before the next run and once more when the effect is
+disposed. This is the React/Vue/Solid shape, and it is how an effect releases
+what the previous run allocated - a timer, a subscription, an observer:
+
+```javascript
+const pollEvery = stateOf(5000);
+
+const stop = effect(() => {
+  const id = setInterval(loadFeed, pollEvery.value);
+  return () => clearInterval(id); // runs before the next pass, and on dispose
+});
+
+stop(); // last teardown still runs
+```
+
+A cleanup that throws does not break the effect; the error is routed to
+[`Jetz.errorHandler`](#error-handling--diagnostics) with `source: "effect cleanup"`.
+
 > An `effect()` created **inside** a `loop()` item is cleaned up for you: the
 > reconciler calls its `dispose()` when that row leaves the DOM. See
 > [Automatic Cleanup Lifecycle](#automatic-cleanup-lifecycle).
@@ -925,13 +997,22 @@ recentSearches.push("Jetz"); // saved to localStorage
 | `list.remove(item)` | Remove the first matching item |
 | `list.removeAt(index)` | Remove the item at an index |
 | `list.sort((a, b) => ...)` | Sort items in place; chainable |
+| `list.replaceAt(index, item)` | Swap one item and update rendered views |
+| `list.updateAt(index, fn)` | Swap one item with `fn(item, index)`; chainable |
+| `list.transform(fn)` | Replace every item with `fn(item, index)` and re-render |
 | `list.filter(predicate)` | Return a plain array without changing the list |
+| `list.find(predicate?)` | Return an **array** of matching items (`list.find(fn)[0]` for one) |
+| `list.take(count)` | Return up to the first `count` values as a plain array |
+| `list.at(index)` / `list.get(index)` | Read one item by position |
+| `list.indexOf(item)` / `list.includes(item)` | Position and membership lookups |
 | `list.clear()` | Empty the collection |
+| `list.toState()` | Convert plain object items into recursively reactive states |
 | `list.asUnique()` | Make duplicate string/number values distinct entries; chainable |
 | `list.asRemember(key?)` | Restore and persist the list using an optional stable key; chainable |
 | `list.size` | Returns item count |
 | `list.values` | Direct reference to underlying array |
 | `list.value` | Tracked snapshot of the items; assigning an array replaces the list |
+| `list.version` | The `State` behind that snapshot — what `computed()` and `effect()` subscribe to |
 | `list.subscribe(fn)` / `list.unsubscribe(fn)` | Run `fn` after every mutation (it receives the version counter, so read `list.value` inside it) |
 | `list.first()` / `list.last()` | Convenience accessors for boundary items |
 
@@ -1024,6 +1105,9 @@ const Nav = div(
   )
 );
 ```
+
+`_show` is an alias of `_if` — same behavior, same import — for code where
+"show this block" reads better than "if this is true".
 
 ---
 
@@ -1201,15 +1285,26 @@ box.replaceClass("active", "idle");// Replace class
 
 // DOM Tree & State
 box.text("Updated Text");          // Replace text content
+box.value();                       // Read an input's value (pass a value to set it)
 box.disable(); box.enable();       // Toggle disabled state
 box.focus(); box.blur();           // Focus controls
-box.empty();                       // Remove all children
+box.append(child, ...);            // Add children after mount
+box.empty();                       // Remove all children (and release their bindings)
 box.remove();                      // Remove element from DOM
+box.getParent();                   // Owning JetzElement, when there is one
+
+// Events
+box.on("click", handler);          // addEventListener wrapper
+box.off("click", handler);         // removeEventListener wrapper
 
 // Global Finders
 const header = find("#main-header");      // Returns HTMLElement
 const items = findAll(".list-item");      // Returns Array<HTMLElement>
 ```
+
+`addClass()` / `removeClass()` accept a whitespace-separated string or an array,
+so a multiline class list is applied as its individual tokens.
+`replaceClass()` matches a string or a `RegExp`.
 
 ---
 
@@ -1263,6 +1358,101 @@ const page = div(
   the error propagates.
 - Wrap `taskFn` in `batch(() => …)` when it performs many signal writes and
   you want a single flush at the end.
+
+---
+
+### 14. Explicit Watchers (`watch`, `untrack`)
+
+`effect()` re-runs on *any* state it read. `watch()` is the narrower tool: it
+follows one declared source and hands the callback the **new and old values** —
+Vue's `watch` in a few lines of JavaScript.
+
+```javascript
+import { stateOf, watch } from "jetz";
+
+const query = stateOf("");
+
+const stop = watch(query, (value, oldValue) => {
+  console.log(`search: "${oldValue}" -> "${value}"`);
+});
+
+query.value = "jetz"; // logs: search: "" -> "jetz"
+stop();               // watcher released
+```
+
+Only the source is tracked. States read *inside* the callback are not
+dependencies, so a watcher cannot widen its own trigger set by accident.
+
+#### Sources
+
+Pass a `State`, a getter, or an array of either:
+
+```javascript
+const count = stateOf(0);
+const label = stateOf("idle");
+
+watch(count, (value) => document.title = String(value));   // one State
+watch(() => `${label.value}: ${count.value}`, onChange);    // computed expression
+watch([count, label], ([c, l]) => log(c, l));               // several sources
+```
+
+An object created by `stateOf({ … })` and a `rowOf()` record are **not** sources
+on their own — their `.value` is not a single tracked signal. Watch a getter over
+the field you care about instead:
+
+```javascript
+const profile = stateOf({ name: "Ada" });
+watch(() => profile.name.value, (name) => save(name));   // not watch(profile, …)
+
+const row = rowOf({ id: 1, score: 10 });
+watch(() => row.score, (score) => repaint(score));
+```
+
+#### Options & cleanup
+
+| Option | Effect |
+|---|---|
+| `immediate: true` | Run the callback once during setup, with `oldValue` as `null`. |
+| `once: true` | Stop automatically after the first run. |
+
+The third callback argument registers teardown for the *next* run — the same
+contract as an `effect()` return value:
+
+```javascript
+watch(socket, (url, previousUrl, onCleanup) => {
+  const connection = open(url);
+  onCleanup(() => connection.close()); // closes before the next run and on stop()
+}, { immediate: true });
+```
+
+Writes inside the callback are not re-tracked, and a callback that throws (or a
+cleanup that throws) is reported through
+[`Jetz.errorHandler`](#error-handling--diagnostics) rather than breaking the
+signal that fired it. A watcher created inside a `loop()` item, an `ifElse()`
+branch or a component is disposed with that view, exactly like `effect()` —
+no manual `stop()` needed. Outside a managed render, keep the returned function.
+
+#### Untracked reads (`untrack`)
+
+`untrack(fn)` runs `fn` and returns its result, while every `.value` read inside
+it is skipped by dependency tracking — Solid's `untrack`. Use it when a computed
+or effect needs a peek at a value without subscribing to it:
+
+```javascript
+import { effect, stateOf, untrack } from "jetz";
+
+const page = stateOf(1);
+const filter = stateOf("");
+
+effect(() => {
+  // re-runs on page changes only; filter is read for context
+  report(page.value, untrack(() => filter.value));
+});
+```
+
+For a single State the same thing is `state.peek()`; `untrack()` covers a whole
+expression, a loop over many states, or a function call you do not want to
+inline. `rawOf(row)` is the shallow-row equivalent.
 
 ---
 
@@ -1797,6 +1987,11 @@ const localSession = sessionOf({ activeFilter: "all" });
 localSession.activeFilter = "completed"; // persisted
 ```
 
+When the browser refuses storage — private mode, a sandboxed iframe — reads and
+writes are skipped instead of throwing: the app runs on the values it was given
+and simply loses them on reload. Route parameters passed between navigations
+degrade the same way.
+
 ---
 
 ### Dispatcher Pattern
@@ -2062,6 +2257,130 @@ document.querySelectorAll("li").last(); // Last matched DOM node
 
 ---
 
+### Unsafe URL Blocking
+
+A URL you did not write can still reach an attribute — data from an API, a
+stored value, user-generated content. Jetz neutralises the script-bearing
+schemes before they can execute:
+
+```javascript
+a({ href: "javascript:alert(1)" }, "Link");
+// renders <a href="about:blank#blocked"> and warns in the console
+```
+
+The check covers `javascript:`, `vbscript:` and `data:text/html` on the
+attributes a browser can navigate to or load: `href`, `src`, `action`,
+`formaction`, `xlink:href`, `poster`, `background`, `cite`, `data` and `ping`.
+Control characters and whitespace are stripped before the scheme is matched, so
+`java\tscript:` and `javascript :alert(1)` are caught too. Reactive bindings,
+`addAttr()` and the `href(...)` helper go through the same path — a state that
+later receives an unsafe URL is blocked when it writes.
+
+Two deliberate exceptions:
+
+* Inert placeholders (`javascript:`, `javascript:;`, `javascript:void(0)`) stay
+  as written — they are common in existing markup and run nothing.
+* `href="javascript:…"` built from a **trusted** literal is still yours to opt
+  into, one flag for the whole app:
+
+```javascript
+Jetz.allowUnsafeUrls = true; // stop blocking; attributes are written verbatim
+```
+
+The same guard covers `redirect()` in the router — a script-bearing target is
+refused with a console warning instead of running in the page — and the flag
+switches both off. Boolean and `null` attribute values are passed through
+untouched.
+
+#### Handlers are listeners, never inline markup
+
+An `on*` key on an element is a **listener**, and only a function becomes one:
+
+```javascript
+button("Save", { onclick: () => save() });   // addEventListener("click", …)
+div({ onclick: "doEvil()" });                // ignored — nothing is written
+```
+
+A string is never compiled into an inline handler, so data from an API or a form
+cannot execute in the page, and the app needs no `unsafe-inline` CSP allowance.
+Reactive attribute values are excluded from the same path: a `State` or callback
+assigned to `on*` is dropped rather than stringified. Function handlers bind to
+the element and are detached automatically when the element's view is released.
+
+`addScript()` follows the same rule for its options: any `on*` function
+(`onload`, `onerror`, …) is attached as a one-time listener.
+
+```javascript
+addScript("/vendor/chart.js", {
+  async: true,
+  onload: () => buildChart(),
+  onerror: () => console.warn("chart.js unavailable"),
+});
+```
+
+---
+
+### Error Handling & Diagnostics
+
+Jetz catches some errors on your behalf — a teardown that throws while a row is
+being released must not abort the rest of the cleanup sweep. Those errors go to
+`Jetz.reportError()`, which by default prints to `console.error`. Assign a
+handler once to route them into your own logging instead:
+
+```javascript
+import { Jetz } from "jetz";
+
+Jetz.errorHandler = (error, info) => {
+  myTracker.capture(error, { tags: { source: info.source } });
+};
+```
+
+`info.source` names the Jetz path that caught it (`"effect cleanup"`,
+`"watch cleanup"`, …). Anything you catch yourself can be forwarded through the
+same sink, and a handler that throws is reported rather than swallowed:
+
+```javascript
+try {
+  await loadPreferences();
+} catch (error) {
+  Jetz.reportError(error, { source: "bootstrap" });
+}
+```
+
+A `Dispatcher` fan-out is isolated per subscriber — one broken store cannot abort
+the dispatch or take the others down. It reports through its own hook, which
+receives the action and the token:
+
+```javascript
+const store = new Dispatcher();
+store.onError = (error, action, token) => console.error(token, action, error);
+```
+
+Two read-only counters help you prove a page released what it created. Neither
+retains anything, so reading them cannot keep a component alive:
+
+```javascript
+Jetz.liveLifecycles;   // component lifecycles still tracked
+filter.subscriberCount; // bindings still attached to one State
+```
+
+For a stream of *what* the framework is doing, `Jetz.observeDevtools()` is the
+channel `JetzDevtools` itself is built on. It emits element and component events
+(`create`, `attach`, `render`, `component`, `lifecycle` with its `stage`,
+`dispose`) and costs nothing until a listener is installed:
+
+```javascript
+const stopObserving = Jetz.observeDevtools(event => {
+  if (event.type === "lifecycle" && event.stage === "destroy") {
+    console.log("destroyed", event.element.tagName);
+  }
+});
+
+stopObserving();
+```
+
+---
+
 ## Jetz DevTools
 
 `JetzDevtools` is an opt-in development plugin. It renders a small toggle and
@@ -2105,7 +2424,7 @@ a browser-DOM inspector. It does not evaluate or edit application state.
 
 Here is how real Jetz applications compose state, collections, UI elements, and styling together.
 
-*(Adapted from the built-in [Calculator Demo](file:///c:/Labs/ai/codedev/src/components/calculator/calculator.js))*:
+*(Adapted from the built-in [Calculator Demo](https://github.com/devarofi/jetz/blob/main/src/components/calculator/calculator.js))*:
 
 ```javascript
 import { Jetz, stateOf, listOf, loop } from "jetz";
@@ -2212,7 +2531,10 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`stateOf(initialValue)`](#3-reactive-state-stateof-rememberof): Create reactive single value.
 * [`rememberOf(key, initialValue)`](#3-reactive-state-stateof-rememberof): Reactive value persisted in `localStorage`.
 * [`computed(fn)`](#4-computed-state-computed): Auto-tracked derived state.
-* [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`).
+* [`effect(fn)`](#5-side-effects-effect): Auto-tracked imperative effect (returns `dispose`; a returned function is that run's cleanup).
+* [`watch(source, fn, options)`](#14-explicit-watchers-watch-untrack): Watch one source for `(newValue, oldValue)`, with `onCleanup`, `immediate` and `once`.
+* [`untrack(fn)`](#14-explicit-watchers-watch-untrack): Read states inside `fn` without subscribing to them.
+* [`state.peek()` / `state.getValue()`](#reading-without-subscribing): Untracked read of a single state.
 * [`batch(fn)`](#13-deferred-tasks-defer): Coalesce state notifications and reactive updates until the callback finishes.
 * [`listen(callback)`](#11-reactive-listeners-listen): Reactive inline listener attached to element.
 * [`css(...)`](#reactive-classes): Class attribute; the function form `css(() => …)` re-evaluates on state change.
@@ -2228,10 +2550,12 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`listOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive array with helper mutation methods.
 * [`sequenceOf(...items)`](#6-reactive-collections-listof-sequenceof): Reactive unique sequence array.
 * [`loop(list, keyFn, renderFn)`](#7-keyed-list-reconciliation-loop): Key-reconciled list rendering.
+* [`list.transform(fn)`, `replaceAt()`, `updateAt()`](#complete-liststate-api): In-place item swaps that re-render keyed views.
 * [`element.disposeBindings()`](#manual-cleanup-disposebindings): Release every reactive binding of an element and its subtree.
 
 ### Conditional Rendering
 * [`_if(conditionFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Conditional branch render.
+* [`_show(conditionFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Alias of `_if`.
 * [`_elseif(conditionFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Alternate conditional branch.
 * [`_else`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Default branch.
 * [`ifElse(cond, trueFn, falseFn)`](#8-conditional-rendering-_if-_elseif-_else-ifelse): Inline two-way conditional.
@@ -2256,9 +2580,14 @@ Jetz.mount(CalculatorApp(), document.body);
 * [`Jetz.unmount(container)`](#12-dom-utilities--helper-methods): Cleanly teardown mounted elements.
 * [`Jetz.style(cssString)`](#quick-start): Inject dynamic `<style>` rules.
 * [`Jetz.use(plugin)`](#router--link-navigation): Install plugin (e.g. Router, Session).
+* [`Jetz.errorHandler`, `Jetz.reportError(error, info)`](#error-handling--diagnostics): Central sink for the errors Jetz catches.
+* [`Jetz.allowUnsafeUrls`](#unsafe-url-blocking): Opt out of blocking `javascript:` / `vbscript:` / `data:text/html` attribute URLs.
+* [`Jetz.observeDevtools(listener)`](#error-handling--diagnostics): Subscribe to element and component events; returns an unsubscribe function.
+* [`Jetz.liveLifecycles`, `state.subscriberCount`](#error-handling--diagnostics): Read-only teardown diagnostics.
 * [`find(selector)`, `findAll(selector)`](#12-dom-utilities--helper-methods): DOM query helpers.
 * [`JetzBindingError`](#when-a-binding-fails): Diagnostic error for invalid `bind` targets.
 * [`html(content)`, `addScript(src, options)`](#script--raw-html-injection): Wrap raw HTML or load an external script.
+* [`on*` attributes](#handlers-are-listeners-never-inline-markup): Functions become listeners; strings are never compiled into inline handlers.
 * [`range`, `flatMap`, `createList`](#prototype-extensions--array-helpers): Array construction and flattening helpers.
 * [`Array.last()`, `Array.take()`, `Number.range()`, `NodeList.last()`](#prototype-extensions--array-helpers): Convenience prototype helpers.
 
@@ -2322,7 +2651,7 @@ npm publish --access public
 
 ## License & Community
 
-Jetz is open-source software licensed under the [ISC License](file:///c:/Labs/ai/codedev/LICENSE).
+Jetz is open-source software licensed under the [ISC License](https://github.com/devarofi/jetz/blob/main/LICENSE).
 
 * **Repository:** [https://github.com/devarofi/jetz](https://github.com/devarofi/jetz)
 * **Author:** [@daevsoft](https://github.com/devarofi)

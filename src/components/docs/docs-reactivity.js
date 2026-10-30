@@ -83,6 +83,43 @@ export class DocsReactivity extends Component {
                 "The effect reads count.value, so count becomes its dependency. When this work is tied to a component or reactive branch, Jetz can dispose of it when that scope is removed. Call the returned stop function when managing an effect manually."
             ),
             tutorialSection(
+                "Step 2b: Clean up before the next run",
+                "When the callback returns a function, Jetz treats it as that run's teardown. It runs before the next pass and once more when the effect stops, which is how an effect releases what the previous pass created.",
+                'import { effect, stateOf } from "@daevsoft/jetz";\n\n' +
+                'const pollEvery = stateOf(5000);\n\n' +
+                'const stop = effect(() => {\n' +
+                '  const timer = setInterval(loadFeed, pollEvery.value);\n' +
+                '  return () => clearInterval(timer);\n' +
+                '});\n\n' +
+                'pollEvery.value = 15000; // old timer cleared, new one starts\n' +
+                'stop(); // last cleanup still runs',
+                "Changing pollEvery re-runs the effect with a new interval, and the returned function clears the previous one first. A cleanup that throws is reported through Jetz.errorHandler instead of breaking the effect."
+            ),
+            tutorialSection(
+                "Step 2c: Watch one value for its old and new state",
+                "watch() follows a single source you name and calls back with (newValue, oldValue). Only that source is tracked, so states read inside the callback cannot widen the trigger set by accident.",
+                'import { stateOf, watch } from "@daevsoft/jetz";\n\n' +
+                'const query = stateOf("");\n\n' +
+                'const stop = watch(query, (value, oldValue) => {\n' +
+                '  console.log(`search: "${oldValue}" -> "${value}"`);\n' +
+                '}, { immediate: false });\n\n' +
+                'query.value = "jetz"; // logs: search: "" -> "jetz"\n' +
+                'stop(); // no longer watching',
+                "Pass a State, a getter that reads States, or an array of either. An object made with stateOf({ ... }) or a rowOf() record is not a source on its own - watch a getter over the field instead, such as () => row.score. Options: immediate runs the callback during setup with oldValue as null, once stops it after the first run, and the third callback argument registers cleanup for the next run."
+            ),
+            tutorialSection(
+                "Step 2d: Read a value without subscribing to it",
+                "untrack(fn) returns the result of fn while skipping dependency tracking for every read inside it. Use state.peek() for one value, and untrack() for an expression or a call that reads several.",
+                'import { effect, stateOf, untrack } from "@daevsoft/jetz";\n\n' +
+                'const page = stateOf(1);\n' +
+                'const filter = stateOf("");\n\n' +
+                'effect(() => {\n' +
+                '  // runs again when page changes, but not when filter changes\n' +
+                '  sendReport(page.value, untrack(() => filter.value));\n' +
+                '});',
+                "page.value is a tracked read, so the effect depends on page. filter is read inside untrack(), so it is only reported for context and never becomes a dependency."
+            ),
+            tutorialSection(
                 "Step 3: Understand tracked and untracked reads",
                 "Reading state.value inside computed() or effect() subscribes that calculation to the State. Use state.peek() when you only need the current value and do not want it to become a dependency. This is useful when an effect checks its output before writing.",
                 'import { effect, stateOf } from "@daevsoft/jetz";\n\n' +
