@@ -36,12 +36,9 @@ import {
 import logo from '../../../public/img/logo/small.png';
 import '../../../public/css/style.css';
 
-// Prism core plus the JavaScript grammar. The grammar files publish themselves
-// on the global `Prism` object the core module creates, so the core has to stay
-// the first import of this trio.
-import Prism from "prismjs/components/prism-core.js";
-import "prismjs/components/prism-clike.js";
-import "prismjs/components/prism-javascript.js";
+// Prism core plus the JavaScript grammar, shared with every other page through
+// `src/prism.js`, which also switches off the automatic document sweep.
+import { Prism } from "../../prism.js";
 
 
 // The theme is shared with every other page through `src/theme.js`: one

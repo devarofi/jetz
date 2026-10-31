@@ -1,6 +1,6 @@
-import Prism from "prismjs/components/prism-core.js";
-import "prismjs/components/prism-clike.js";
-import "prismjs/components/prism-javascript.js";
+// Prism core plus the JavaScript grammar, shared with every other page through
+// `src/prism.js`, which also switches off the automatic document sweep.
+import { Prism } from "../prism.js";
 
 import { Component, html, stateOf, computed, listOf } from "../lib/jetz.js";
 import {

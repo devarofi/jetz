@@ -207,6 +207,10 @@ assert('/ home offers both interactive examples', home.welcomeExamples, 2);
 section('/: learn-by-doing code explorer');
 const panelHeading = () => page.$eval('.jetz-code-content .jetz-code-heading strong', el => el.textContent);
 assert('/ home code explorer opens on the State panel', await panelHeading(), 'Reactive state without ceremony');
+// The first panel is rendered before Prism would ever see it, so its line
+// numbers have to survive to first paint: an automatic document sweep rebuilds
+// each `code[class*="language-"]` from its textContent and flattens them.
+assert('/ home numbers the opening panel lines on first render', await page.$$eval('.jetz-code-pane .jetz-code-line', lines => lines.length), 15);
 for (const [index, heading] of [
 	[1, 'Components are just functions'],
 	[2, 'Simple client-side routing'],
@@ -350,7 +354,7 @@ await new Promise(resolve => setTimeout(resolve, 300));
 assert('/docs api-reference opens the example on click', await page.$eval('#jetz-docs .jetz-docs-ref-item', item => item.open), true);
 assert('/docs api-reference reveals the highlighted example', await page.evaluate(() => {
 	const first = document.querySelector('#jetz-docs .jetz-docs-ref-item');
-	return first.querySelector('pre').offsetHeight > 0 && first.querySelectorAll('pre code .token').length > 0;
+	return first.querySelector('pre').offsetHeight > 0 && first.querySelectorAll('pre code [class*="hljs-"]').length > 0;
 }), true);
 await page.click('#jetz-docs .jetz-docs-ref-item > summary');
 assert('/docs api-reference collapses the example on second click', await page.$eval('#jetz-docs .jetz-docs-ref-item', item => item.open), false);

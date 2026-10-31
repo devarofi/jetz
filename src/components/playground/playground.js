@@ -7,11 +7,9 @@ import logoUrl from "../../../public/img/logo/small.png";
 // the one that has to load them.
 import jetzCoreUrl from "../../../packages/jetz/src/jetz.js?url";
 import jetzUiUrl from "../../../packages/jetz/src/jetz-ui.js?url";
-// Prism core plus the JavaScript grammar. The grammar files publish themselves on
-// the global `Prism` object the core module creates, so the core has to stay first.
-import Prism from "prismjs/components/prism-core.js";
-import "prismjs/components/prism-clike.js";
-import "prismjs/components/prism-javascript.js";
+// Prism core plus the JavaScript grammar, shared with every other page through
+// `src/prism.js`, which also switches off the automatic document sweep.
+import { Prism } from "../../prism.js";
 import "./playground.css";
 // One theme preference for the whole app: the home page and the playground read
 // and write the same remembered signal, so neither can drift out of step.
