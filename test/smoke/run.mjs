@@ -57,6 +57,9 @@ const localBrowsers = [
 ].filter(Boolean);
 
 const browser = await puppeteer.launch({
+	// 'new' headless: the legacy mode puppeteer 19 defaults to was removed
+	// from current Chrome/Edge, so the default launch exits immediately
+	headless: 'new',
 	executablePath: localBrowsers.find(candidate => existsSync(candidate))
 });
 

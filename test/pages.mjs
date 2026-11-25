@@ -62,6 +62,9 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const { port } = server.address();
 
 const browser = await puppeteer.launch({
+	// 'new' headless: the legacy mode puppeteer 19 defaults to was removed
+	// from current Chrome/Edge, so the default launch exits immediately
+	headless: 'new',
 	executablePath: [
 		process.env.CHROME_PATH,
 		'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',

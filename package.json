@@ -1,6 +1,6 @@
 {
   "name": "@daevsoft/jetz",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "A composable javascript framework",
   "types": "./packages/jetz/src/index.d.ts",
   "main": "index.js",
@@ -47,7 +47,7 @@
       "require": "./src/lib/jetz-devtools.js"
     }
   },
-  "private": true,
+  
   "scripts": {
     "start": "rspack serve",
     "build": "rspack build --mode production",
