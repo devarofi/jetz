@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jetz reconciler probe</title>
+    <!--
+        Measures ONE framework's list algorithm (ListState + loop()), not a
+        framework comparison. Nothing loads over the network, and the table is
+        off-screen: layout still runs, paint does not, so a mutation count and a
+        duration describe the reconciler rather than the renderer.
+    -->
+    <style>
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #0a1620;
+            color: #e6f0f7;
+            font: 13px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+            white-space: pre;
+        }
+        .arena { position: fixed; top: 0; left: -99999px; width: 900px; }
+        .bench .row { display: block; padding: 2px 8px; border-bottom: 1px solid rgba(230, 240, 247, .10); }
+        .bench .row a { color: #6cc2f2; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div id="out"></div>
+    <div class="arena"></div>
+    <script src="./reorder.bundle.js"></script>
+</body>
+</html>

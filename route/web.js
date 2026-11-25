@@ -30,7 +30,8 @@ import { DocsApiReference } from "../src/components/docs/docs-api-reference.js";
 import {
     DocsApiApplication, DocsApiCollections, DocsApiComponents, DocsApiElements, DocsApiState,
 } from "../src/components/docs/docs-api-tutorials.js";
-import { TryMe } from "../src/components/my/tryme.js";
+import { KanbanPage } from "../src/components/my/tryme.js";
+import { SampleGrid } from "../src/components/my/sample-grid.js";
 
 const SITE_URL = 'https://devarofi.github.io/jetz';
 
@@ -100,7 +101,8 @@ export let routeWeb = [
         ],
     }),
     route('aetheria-ui', titled(AetheriaDocs, "Aetheria UI", "Browse the glassmorphic Aetheria component system built with Jetz.", "/aetheria-ui")),
-    route('my', titled(TryMe, "Try Jetz", "Try Jetz in a browser-based environment and explore a small, interactive app built with the framework.", "/my")),
+    route('grid', titled(SampleGrid, "Sample DataGrid", "Explore a sample data grid implementation with Jetz.", "/grid")),
+    route('my', titled(KanbanPage, "Try Jetz", "Try Jetz in a browser-based environment and explore a small, interactive app built with the framework.", "/my")),
     route('open-todo', titled(ToDo, "Tasks", "Manage tasks and work items with Jetz using a lightweight, reactive to-do interface.", "/open-todo")),
     route('counter', titled(counter, "Counter", "Use Jetz to build a tiny counter example with reactive state and direct UI updates.", "/counter")),
     route('remember-todo', titled(RememberTodo, "Saved tasks", "Keep track of saved tasks in Jetz with persistence-friendly state and local data handling.", "/remember-todo")),

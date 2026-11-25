@@ -1,0 +1,20 @@
+{
+    "name": "jetz-framework-benchmark",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "description": "Standalone js-framework-benchmark-style harness: Jetz vs React vs Vue vs raw DOM.",
+    "scripts": {
+        "dev": "node build.mjs --serve",
+        "build": "node build.mjs --release",
+        "bench": "node run-headless.mjs"
+    },
+    "dependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "vue": "^3.5.0"
+    },
+    "devDependencies": {
+        "esbuild": "^0.25.0"
+    }
+}
