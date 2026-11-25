@@ -1,4 +1,5 @@
 node_modules
 dist
-test/smoke/out.qoder
+test/smoke/out
+.qoder
 .vitest
