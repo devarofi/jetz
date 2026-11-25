@@ -33,6 +33,9 @@ export class Router {
 	#routeHeadNodes = [];
 	#lastListenerUrl = null;
 	#defaultTitle;
+	/** Bound listeners kept as fields so destroy() can detach them from window. */
+	#onNavigateEvent = null;
+	#onHashChange = null;
 
 	constructor(...route) {
 		this.#defaultTitle = document.title;
@@ -43,21 +46,42 @@ export class Router {
 	}
 	#initialNavigateListener() {
 		if ('navigation' in window) {
-			this.#navigationObserver.addEventListener("navigate", (event) => {
+			this.#onNavigateEvent = (event) => {
 				this.#fallbackNavigateListener(event.destination.url);
-			});
+			};
+			this.#navigationObserver.addEventListener("navigate", this.#onNavigateEvent);
 		} else {
-			window.addEventListener('popstate', (e) => {
+			this.#onNavigateEvent = () => {
 				this.#fallbackNavigateListener(window.location.href);
-			});
+			};
+			window.addEventListener('popstate', this.#onNavigateEvent);
 		}
 		// Hash routing (`#/...`) works without any opt-in: a fragment shaped
 		// like a route always wins over the pathname, so static hosts without
 		// server rewrites stay navigable. Plain anchors (`#section`) fall
 		// through to the pathname route.
-		window.addEventListener('hashchange', () => {
+		this.#onHashChange = () => {
 			this.#fallbackNavigateListener(window.location.href);
-		});
+		};
+		window.addEventListener('hashchange', this.#onHashChange);
+	}
+	/**
+	 * Detaches every window listener this router installed and drops its head
+	 * nodes. A router is otherwise a permanent global listener owner, so a
+	 * discarded instance (tests, micro-frontends, hot reload) kept receiving
+	 * navigate events and re-rendering forever.
+	 */
+	destroy() {
+		if (this.#navigationObserver && this.#onNavigateEvent) {
+			this.#navigationObserver.removeEventListener('navigate', this.#onNavigateEvent);
+		}
+		if (this.#onNavigateEvent) window.removeEventListener('popstate', this.#onNavigateEvent);
+		if (this.#onHashChange) window.removeEventListener('hashchange', this.#onHashChange);
+		this.#onNavigateEvent = null;
+		this.#onHashChange = null;
+		this.#routeHeadNodes.forEach(node => node.remove());
+		this.#routeHeadNodes = [];
+		return this;
 	}
 	/**
 	 * Reads a route out of a URL fragment. Only fragments shaped like a
@@ -112,6 +136,10 @@ export class Router {
 		const hashTarget = typeof route_name === 'string' && route_name.trim()[0] === '#';
 		route_name = this.#fixRoutename(route_name);
 		this.#saveParams(route_name, params);
+		// a fresh programmatic navigation must never be swallowed by the
+		// duplicate-delivery guard below: `to('/users', {page: 2})` while
+		// already at /users is a real navigation (new params / re-render)
+		this.#lastListenerUrl = null;
 		if (hashTarget)
 			window.history.pushState('', '', route_name === '/' ? '#/' : `#/${route_name}`);
 		else
@@ -127,7 +155,10 @@ export class Router {
 	}
 	back() {
 		// popstate / navigation events fire asynchronously and trigger the
-		// listener; resolving the url here would navigate to the OLD page
+		// listener; resolving the url here would navigate to the OLD page.
+		// The duplicate-delivery guard is cleared so landing on the same URL
+		// as the current one (two history entries, one path) still resolves.
+		this.#lastListenerUrl = null;
 		window.history.back();
 	}
 	#saveParams(routename, params) {

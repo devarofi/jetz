@@ -1056,6 +1056,11 @@ With Keys:
 
 The classic 2-argument form `loop(list, renderFn)` remains available for backward compatibility.
 
+> **Keys must be unique.** A key addresses exactly one row, so duplicate keys
+> cannot be tracked 1:1. When a duplicate is detected the list warns once and
+> falls back to the classic full re-render for that list, so every item keeps a
+> visible row instead of one row silently winning the key.
+
 Beyond diffing, `loop()` also owns the **lifecycle** of each item: every
 `effect()`, `computed()`, subscription and listener created while that item
 renders is released when the reconciler drops the view. For very large data sets
@@ -1716,9 +1721,13 @@ rendered, jsdom + `--expose-gc`):
 | Heap growth over the run | 302.68 MB | **15.10 MB** |
 | Row states still pinning a DOM node | 40 500 | **500** |
 
-> Teardown is deliberately **not** wired into `element.remove()`: `_if` / `_else`
-> remove a node only to re-insert the same node later, so releasing bindings
-> there would break them. The reconciler knows which views are really gone.
+> `element.remove()` is a **full teardown**: it releases the element's reactive
+> bindings (subscribers, computed/effect scopes, listeners, class parts) and its
+> remount-registry entry before detaching the node — one call is enough for a
+> subtree you drop yourself. The `_if` / `_else` internals only detach the raw
+> node (bindings survive a hide/show round trip), which is why that pair is not
+> affected. `disposeBindings()` stays available when you want to release
+> bindings but keep the node.
 
 ### Manual Cleanup (`disposeBindings`)
 
@@ -1731,8 +1740,7 @@ import { button } from "jetz/ui";
 
 const panel = div(span("Live region"), button("Close", {
   onclick: () => {
-    panel.disposeBindings(); // subscriptions, computed, listeners, containers
-    panel.remove();          // then detach the node
+    panel.remove();          // full teardown: bindings + detach (disposeBindings() alone also works)
   }
 }));
 

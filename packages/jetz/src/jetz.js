@@ -25,10 +25,23 @@ function isPlainRememberedObject(value) {
 		&& (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
 
+/** Rows already hydrated by a remembered list: re-setting one must not copy it. */
+const _hydratedRememberRows = new WeakSet();
+
 function hydrateRememberedItem(item) {
-	return isPlainRememberedObject(item)
-		? stateOf(JSON.parse(serializeRemembered(item)))
-		: item;
+	if (!isPlainRememberedObject(item)) return item;
+	// Already-reactive rows keep their identity: re-hydrating on every
+	// set()/transform() replaced the row with a fresh state object (staling
+	// every reference the UI held) and left the previous row's subscriptions
+	// behind. A row counts as reactive when we hydrated it before or when the
+	// caller built it with stateOf() itself.
+	if (_hydratedRememberRows.has(item)) return item;
+	for (const key of Object.keys(item)) {
+		if (item[key] instanceof State) return item;
+	}
+	const hydrated = stateOf(JSON.parse(serializeRemembered(item)));
+	_hydratedRememberRows.add(hydrated);
+	return hydrated;
 }
 
 function subscribeRememberedValues(value, onChange, seen = new Set()) {
@@ -143,8 +156,12 @@ defineHelper(Number.prototype, 'range', function (to) {
 	return range(this.valueOf(), to);
 });
 /** Attributes whose value the browser may navigate to or execute. */
-const urlAttributes = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'background', 'cite', 'data', 'ping']);
+const urlAttributes = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'background', 'cite', 'data', 'ping', 'srcset']);
+/** Attributes holding a LIST of URLs: a hostile scheme in entry 2+ must be caught too. */
+const urlListAttributes = new Set(['ping', 'srcset']);
 const unsafeUrlPattern = /^(?:javascript:|vbscript:|data:text\/html)/i;
+/** Unanchored variant for list-valued attributes (any entry may be hostile). */
+const unsafeUrlInListPattern = /(?:javascript:|vbscript:|data:text\/html)/i;
 // `javascript:void(0)` / `javascript:;` / `javascript:` are inert placeholders
 // still common in markup; they run nothing, so they stay allowed.
 const inertJavascriptUrl = /^\s*javascript\s*:\s*(?:;?|void\s*\(?\s*0\s*\)?\s*;?)\s*$/i;
@@ -161,7 +178,13 @@ function sanitizeUrlAttribute(name, value) {
 	if (!urlAttributes.has(name) && (!/[A-Z]/.test(name) || !urlAttributes.has(name.toLowerCase()))) return value;
 	const text = String(value);
 	const normalized = text.replace(/[\u0000-\u001F\u007F\s]+/g, '');
-	if (!unsafeUrlPattern.test(normalized) || inertJavascriptUrl.test(text)) return value;
+	const listValued = urlListAttributes.has(name.toLowerCase());
+	// list-valued attributes (srcset, ping) cannot use the anchored pattern:
+	// their second entry onwards would sail past `^` unchecked
+	const hostile = listValued
+		? unsafeUrlInListPattern.test(normalized)
+		: unsafeUrlPattern.test(normalized);
+	if (!hostile || (!listValued && inertJavascriptUrl.test(text))) return value;
 	if (typeof console !== 'undefined') {
 		console.warn(`Jetz: blocked an unsafe URL in the "${name}" attribute. Set Jetz.allowUnsafeUrls = true to permit it.`);
 	}
@@ -516,13 +539,32 @@ let _isFlushingBatch = false;
 let _pendingBatchStates = new Map();
 let _pendingBatchComputations = new Set();
 let _pendingBatchEffects = new Set();
+/**
+ * Upper bound on drain passes per flush. A computation/effect that writes a
+ * state it also reads re-queues itself forever; without a cap the while loop
+ * below hangs the page. On overflow the remaining queues are dropped and the
+ * cycle is reported, mirroring the "potential infinite loop" guards of larger
+ * reactive frameworks.
+ */
+const MAX_BATCH_FLUSH_PASSES = 1000;
 
 function flushBatch() {
 	if (_batchDepth > 0 || _isFlushingBatch) return;
 	let hasStateChanges = false;
 	_isFlushingBatch = true;
+	let passes = 0;
 	try {
 		while (_pendingBatchStates.size || _pendingBatchComputations.size || _pendingBatchEffects.size) {
+			if (++passes > MAX_BATCH_FLUSH_PASSES) {
+				_pendingBatchStates = new Map();
+				_pendingBatchComputations = new Set();
+				_pendingBatchEffects = new Set();
+				Jetz.reportError(new Error(
+					`Jetz: batch flush exceeded ${MAX_BATCH_FLUSH_PASSES} passes and the pending queues were dropped. `
+					+ 'An effect/computed is probably writing a state it also reads; break the cycle or write inside untrack().'
+				), { source: 'flushBatch' });
+				break;
+			}
 			while (_pendingBatchStates.size || _pendingBatchComputations.size) {
 				// Swap, don't copy: work runs on the detached queue while writes
 				// triggered by it land in the fresh one and are picked up next pass.
@@ -811,6 +853,8 @@ class LifecycleContext {
 	mounted = false;
 	destroyed = false;
 	#created = false;
+	/** Re-entrancy guard: an onUpdate hook that writes state re-entered the sweep. */
+	#updating = false;
 	hooks = { onCreate: [], onMount: [], onUpdate: [], onDestroy: [] };
 	add(stage, callback) {
 		if (typeof callback === 'function' && stage in this.hooks) {
@@ -834,12 +878,21 @@ class LifecycleContext {
 		}
 	}
 	runUpdate() {
-		if (!this.mounted || this.destroyed) return;
-		Jetz.emitDevtoolsEvent({ type: 'lifecycle', stage: 'update', element: this.entry });
-		this.hooks.onUpdate.forEach(cb => cb());
-		const component = this.component;
-		if (component && component.constructor.prototype.hasOwnProperty('onUpdate')) {
-			component.onUpdate();
+		if (!this.mounted || this.destroyed || this.#updating) return;
+		// An onUpdate hook that writes state used to re-enter Jetz.triggerByState
+		// -> #sweepLifecycles -> runUpdate until the stack overflowed. The guard
+		// breaks the cycle: a nested update of the same component is skipped
+		// (the outer pass already observes the latest state).
+		this.#updating = true;
+		try {
+			Jetz.emitDevtoolsEvent({ type: 'lifecycle', stage: 'update', element: this.entry });
+			this.hooks.onUpdate.forEach(cb => cb());
+			const component = this.component;
+			if (component && component.constructor.prototype.hasOwnProperty('onUpdate')) {
+				component.onUpdate();
+			}
+		} finally {
+			this.#updating = false;
 		}
 	}
 	runDestroy() {
@@ -969,6 +1022,7 @@ class JetzElement {
 	// Allocate these collections only when reactive/class bindings are used.
 	#classParts = null;
 	#classUnsubs = null;
+	#classPartsTeardown = null;
 	/** Reactive bindings created for this element (listeners, subscriptions, containers). */
 	#disposers = null;
 	/** Scope this element was rendered in by a `loop()` item, if any. */
@@ -1291,6 +1345,7 @@ class JetzElement {
 	}
 	#appendChildren(children) {
 		children.forEach((child, i) => {
+			if (child === null || child === undefined || typeof child === "boolean") return;
 			if (child instanceof JetzElement) {
 				this.addPreviousElement(child, children, i);
 			}
@@ -1301,13 +1356,14 @@ class JetzElement {
 		const prevPosition = childPosition - 1;
 		if (prevPosition >= 0) {
 			let childPrev = children[prevPosition];
-			if (childPrev instanceof State || childPrev.prototype instanceof State)
+			if (childPrev instanceof State || (childPrev !== null && typeof childPrev === "function" && childPrev.prototype instanceof State))
 				element.setPrevious(childPrev.container.last());
 			else
 				element.setPrevious(childPrev);
 		}
 	}
 	append(child, ...children) {
+		if (child === null || child === undefined) return this;
 		if (children.length > 0) {
 			this.#appendChildren([child, ...children]);
 			return this;
@@ -1317,7 +1373,7 @@ class JetzElement {
 			if (child instanceof JetzElement) {
 				child.render(this);
 				_child = child.getElement();
-			} else if (child instanceof State || child.prototype instanceof State) {
+			} else if (child instanceof State || (child !== null && typeof child === "function" && child.prototype instanceof State)) {
 				_child = child.generateMutable();
 				// the state keeps a strong reference to this node; without this the
 				// text/element node of a removed row stays reachable from the row's
@@ -1583,7 +1639,11 @@ class JetzElement {
 		const newParts = (Array.isArray(value) ? value.flat(Infinity) : [value])
 			.map(part => (typeof part === 'function' ? computed(part) : part));
 		
-		// Reuse subscriptions for unchanged parts (by identity)
+		// Reuse a subscription only when the part stays at the SAME index with the
+		// same identity. Matching by identity anywhere in the array kept the old
+		// index's subscription alive while a second one was added at the new
+		// index: subscriber counts grew with every shift and each stale compose
+		// callback kept recomputing (and retaining the element).
 		const oldParts = this.#classParts ?? [];
 		const oldUnsubs = this.#classUnsubs ?? [];
 		const newUnsubs = [];
@@ -1593,26 +1653,34 @@ class JetzElement {
 				newUnsubs.push(null);
 				return;
 			}
-			// Find matching old part by identity
 			const oldPart = oldParts[i];
 			if (oldPart === part && oldUnsubs[i]) {
 				// Same subscription, keep it
 				newUnsubs.push(oldUnsubs[i]);
 				return;
 			}
-			// New or changed part - subscribe
+			// New or moved part - subscribe a fresh compose
 			const compose = () => this.#setClassAttribute(
 				this.#classParts.map(p => (p instanceof State ? p.getValue() : p))
 			);
 			part.subscribe(compose);
-			const off = () => part.unsubscribe(compose);
-			newUnsubs.push(off);
-			this.#bindTeardown(off);
+			newUnsubs.push(() => part.unsubscribe(compose));
 		});
 		
-		// Unsubscribe only for removed parts
+		// One shared teardown entry for the whole class attribute: rebinds used
+		// to push a fresh entry into #disposers per part per call, which grew
+		// without bound when a listen() recomposed the class on every change.
+		if (!this.#classPartsTeardown) {
+			this.#classPartsTeardown = () => {
+				this.#classPartsTeardown = null;
+				this.#unbindClassParts();
+			};
+			this.#bindTeardown(this.#classPartsTeardown);
+		}
+		
+		// Unsubscribe every slot whose part is not reused at that index
 		oldParts.forEach((part, i) => {
-			if (!newParts.includes(part) && part instanceof State) {
+			if (part instanceof State && newParts[i] !== part) {
 				oldUnsubs[i]?.();
 			}
 		});
@@ -1629,6 +1697,7 @@ class JetzElement {
 		this.#classUnsubs?.forEach(off => off?.());
 		this.#classUnsubs = null;
 		this.#classParts = null;
+		this.#classPartsTeardown = null;
 	}
 	#setClassAttribute(value) {
 		// `value` is already flat (produced by `#classParts.map(...)`), but each
@@ -1750,6 +1819,11 @@ class JetzElement {
 	remove() {
 		if (this.o) {
 			this.destroyLifecycle();
+			// remove() is a real drop: release reactive bindings (subscribers,
+			// computed/effect scopes, listeners, class parts) and the strong
+			// remount registry entry, then detach the node. Internal hide/show
+			// paths (_if/_else) detach the raw node instead and keep bindings.
+			this.disposeBindings();
 			this.o.remove();
 		}
 	}
@@ -1892,21 +1966,41 @@ class Jetz {
 	static get liveLifecycles() {
 		return Jetz.#lifecycles.size;
 	}
+	static #triggerDepth = 0;
+	/**
+	 * Maximum nesting of triggerByState() calls. Lifecycle hooks, listeners and
+	 * conditionals may write state, which re-enters this method; the per-context
+	 * runUpdate() guard already breaks component cycles, this cap is the last
+	 * line of defence for exotic hook/subscriber ping-pong.
+	 */
+	static #MAX_TRIGGER_DEPTH = 100;
 	static triggerByState() {
-		// Walk by index, not forEach(): forEach() visits a range fixed before the
-		// first callback, but a trigger can build new UI whose _if/_elseif children
-		// register their parent element onto remountByAttr mid-pass (e.g. an
-		// ifElse branch rendering a panel that contains its own conditionals).
-		// Such a parent would miss its first trigger and show every branch at once
-		// until the next state change. New entries only appear once per freshly
-		// built element (IfElse re-renders only on a condition change), so the
-		// growing index terminates.
-		for (let i = 0; i < this.remountByAttr.length; i++) {
-			const element = this.remountByAttr[i];
-			element.collectionConditionalChild.forEach(rm => rm.trigger());
+		if (Jetz.#triggerDepth >= Jetz.#MAX_TRIGGER_DEPTH) {
+			Jetz.reportError(new Error(
+				`Jetz: reactive trigger recursion exceeded depth ${Jetz.#MAX_TRIGGER_DEPTH}; the nested trigger was dropped. `
+				+ 'A lifecycle hook or subscriber is writing state in a cycle - break the cycle or write inside batch().'
+			), { source: 'triggerByState' });
+			return;
 		}
-		if (!Jetz.#isMounting) {
-			Jetz.#sweepLifecycles();
+		Jetz.#triggerDepth++;
+		try {
+			// Walk by index, not forEach(): forEach() visits a range fixed before the
+			// first callback, but a trigger can build new UI whose _if/_elseif children
+			// register their parent element onto remountByAttr mid-pass (e.g. an
+			// ifElse branch rendering a panel that contains its own conditionals).
+			// Such a parent would miss its first trigger and show every branch at once
+			// until the next state change. New entries only appear once per freshly
+			// built element (IfElse re-renders only on a condition change), so the
+			// growing index terminates.
+			for (let i = 0; i < this.remountByAttr.length; i++) {
+				const element = this.remountByAttr[i];
+				element.collectionConditionalChild.forEach(rm => rm.trigger());
+			}
+			if (!Jetz.#isMounting) {
+				Jetz.#sweepLifecycles();
+			}
+		} finally {
+			Jetz.#triggerDepth--;
 		}
 	}
 	/** Fires onUpdate for live components and onDestroy for detached ones. */
@@ -1955,21 +2049,15 @@ class Jetz {
 			if (Array.isArray(components)) {
 				components.forEach(element => {
 					if (element != null) {
-						if (typeof element === 'function') {
-							const component = element;
-							// the root is called plainly (no lifecycle context), but it still
-							// renders a scope: `effect()`/`computed()` it creates belong to the
-							// tree mounted here, so `Jetz.unmount()` releases them with it
-							const scoped = withReactiveScope(() => component());
-							element = scoped.value;
-							if (element instanceof JetzElement) {
-								adoptScope(element, scoped.scope);
-								Jetz.emitDevtoolsEvent({
-									type: 'component',
-									element,
-									name: component.displayName || component.name || 'Anonymous component'
-								});
-							}
+						if (typeof element === 'function' || element instanceof Component) {
+							// renderComponent() gives the documented bootstrap
+							// (Jetz.mount(App, '#app')) a real LifecycleContext: hooks in
+							// the ROOT component used to be ignored (it was called
+							// plainly, useLifecycle() warned and dropped them) and a
+							// class root threw when invoked without `new`. The render
+							// scope it opens also owns the root's effect()/computed(),
+							// so Jetz.unmount() releases them with the tree.
+							element = renderComponent(element);
 						}
 
 						element.render();
@@ -2144,28 +2232,42 @@ class State {
 		Jetz.triggerByState();
 	}
 	#notify(oldValue) {
+		// Each container and each subscriber is isolated: one throwing target
+		// used to abort the forEach/map and silently freeze every binding and
+		// computed registered after it. Errors are routed to Jetz.reportError
+		// and the notification continues.
 		this.container = this.container.map(container => {
-			if (this.#value instanceof JetzElement) {
-				this.#value.render();
-				let element = this.#value.getElement();
-				// the swapped-out node is detached for good: release its bindings
-				const previous = container.$;
-				container.replaceWith(element);
-				if (previous instanceof JetzElement && previous !== this.#value) {
-					previous.disposeBindings?.();
+			try {
+				if (this.#value instanceof JetzElement) {
+					this.#value.render();
+					let element = this.#value.getElement();
+					// the swapped-out node is detached for good: release its bindings
+					const previous = container.$;
+					container.replaceWith(element);
+					if (previous instanceof JetzElement && previous !== this.#value) {
+						previous.disposeBindings?.();
+					}
+					// trigger lifecycle
+					if (this.#value.lifecycles.onRendered)
+						this.#value.lifecycles.onRendered();
+					return element;
+				} else if (typeof (this.#value) === 'object') {
+					// console.log('obj')
+				} else {
+					this.#assignContainerValue(container, this.#value);
 				}
-				// trigger lifecycle
-				if (this.#value.lifecycles.onRendered)
-					this.#value.lifecycles.onRendered();
-				return element;
-			} else if (typeof (this.#value) === 'object') {
-				// console.log('obj')
-			} else {
-				this.#assignContainerValue(container, this.#value);
+			} catch (error) {
+				Jetz.reportError(error, { source: 'state container update' });
 			}
 			return container;
 		});
-		this.#subscribers.forEach(fn => fn(this.#value, oldValue));
+		this.#subscribers.forEach(fn => {
+			try {
+				fn(this.#value, oldValue);
+			} catch (error) {
+				Jetz.reportError(error, { source: 'state subscriber' });
+			}
+		});
 	}
 	#assignContainerValue(container, value) {
 		if (container instanceof HTMLElement) {
@@ -2198,8 +2300,10 @@ class State {
 		if (_trackingEffect) {
 			_trackingEffect.add(this);
 		}
-		this.#handler.get(this);
-		return this.getValue();
+		// custom read mapping: the handler may transform the raw value
+		// (stateOf(v, { get })); returning undefined keeps the raw value
+		const mapped = this.#handler.get(this);
+		return mapped === undefined ? this.getValue() : mapped;
 	}
 	set value(val) {
 		this.#handler.set(this, val);
@@ -2223,15 +2327,13 @@ class _RememberStateTemp {
 	static rememberCollections = {};
 	static assignCollectionValue(id, childKey, childValue) {
 		if (this.storageDriver == null) return;
-		let dataCollection = {};
-		const oldCollection = this.storageDriver.getItem(this.keyRememberState);
-		if (oldCollection != null) {
-			try {
-				dataCollection = JSON.parse(oldCollection);
-			} catch (e) {
-				dataCollection = {};
-			}
-			this.rememberCollections = dataCollection
+		// The in-memory collection is the single source of truth: the old code
+		// re-read and re-parsed the whole blob from localStorage on every write,
+		// which cost O(total) per keystroke on remembered fields. init() loads
+		// once; concurrent-tab merges were only approximated before and are
+		// last-write-wins now.
+		if (!this.rememberCollections || typeof this.rememberCollections !== 'object') {
+			this.rememberCollections = {};
 		}
 		if (!Object.prototype.hasOwnProperty.call(this.rememberCollections, id)) {
 			this.rememberCollections[id] = {};
@@ -2368,6 +2470,8 @@ export class ListState extends Array {
 	_useKeyedReconciliation = false;
 	/** @internal maps key -> { item, view (JetzElement) } per parent */
 	_keyMaps = [];
+	/** Warn-once flag for the duplicate-key degradation below. */
+	#keyWarningIssued = false;
 	/** @internal lazy version signal, created on first reactive read */
 	#version = null;
 	/**
@@ -2393,22 +2497,48 @@ export class ListState extends Array {
 	unsubscribe(listener) {
 		return this.version.unsubscribe(listener);
 	}
+	/**
+	 * Bumps the lazy version signal. Returns true when the signal exists -
+	 * its setState() already drives Jetz.triggerByState() - so callers run the
+	 * trigger themselves only when no reactive reader ever allocated the
+	 * signal. Without that fallback `set()`/`transform()`/`sort()` left every
+	 * `_if`/`ifElse`/`listen()` stale while `removeAt()` updated them.
+	 */
 	#bump() {
 		// Lists nobody reads reactively never allocate the signal.
-		if (this.#version === null) return;
+		if (this.#version === null) return false;
 		this.#version.setState(this.#version.peek() + 1);
+		return true;
 	}
 	#syncArray() {
-		super.splice(0, this.length, ...this.values);
-		this.length = this.values.length;
+		// Index copy instead of `super.splice(0, this.length, ...values)`: the
+		// spread hands every value in as one argument and overflows the call
+		// stack around ~100k items. Writing indices has no such limit.
+		const values = this.values;
+		for (let i = 0; i < values.length; i++) this[i] = values[i];
+		this.length = values.length;
 	}
 	#commitValues(values) {
 		this.values = values;
 		this.#syncArray();
 		this.renderView(true);
-		this.#bump();
+		if (!this.#bump()) Jetz.triggerByState();
 		if (this.isRemember) this.#persistRemembered();
 		return this;
+	}
+
+	/**
+	 * Builds a list from an existing array without rest/spread argument
+	 * expansion, so arbitrarily large arrays are safe (the rest-args API of
+	 * `listOf(...items)` and the constructor is limited by the engine's
+	 * maximum argument count).
+	 */
+	static fromArray(values) {
+		const list = new ListState(false);
+		list.values = Array.isArray(values) ? values.slice() : [values];
+		list.length = list.values.length;
+		list.#syncArray();
+		return list;
 	}
 
 	asUnique() {
@@ -2433,9 +2563,15 @@ export class ListState extends Array {
 		this.objRemember = objRemember;
 		return this.#commitValues(saved.map(item => this.#prepareRememberedItem(item)));
 	}
+	/** @internal one persist subscription per row/nested state per list */
+	#rememberSeen = new WeakSet();
 	#prepareRememberedItem(item) {
 		const prepared = hydrateRememberedItem(item);
-		subscribeRememberedValues(prepared, () => this.#persistRemembered());
+		// One persist subscription per row (and nested state) per list: the old
+		// code re-subscribed on every set()/push()/transform(), so N re-sets gave
+		// each row N callbacks and every mutation ran N full-storage persists
+		// that grew without bound.
+		subscribeRememberedValues(prepared, () => this.#persistRemembered(), this.#rememberSeen);
 		return prepared;
 	}
 	#persistRemembered() {
@@ -2461,7 +2597,7 @@ export class ListState extends Array {
 		this.values = values;
 		this.length = values.length;
 		if (this.isRemember) {
-			this.values.forEach(item => subscribeRememberedValues(item, () => this.#persistRemembered()));
+			this.values.forEach(item => subscribeRememberedValues(item, () => this.#persistRemembered(), this.#rememberSeen));
 		}
 	}
 	set(newData) {
@@ -2558,6 +2694,28 @@ export class ListState extends Array {
 			return;
 		}
 		parent.attachRendered(view);
+	}
+	/** True when two items resolve to the same key. */
+	#keysCollide(keys) {
+		const seen = new Set();
+		for (let i = 0; i < keys.length; i++) {
+			if (seen.has(keys[i])) return true;
+			seen.add(keys[i]);
+		}
+		return false;
+	}
+	/**
+	 * Drops out of keyed reconciliation for good. The key map is strictly
+	 * 1:1 key -> view, so duplicate keys used to overwrite each other and the
+	 * reconciliation then dropped rows from the DOM (silent data loss). The
+	 * classic path re-renders every row and never loses one.
+	 */
+	#disableKeyed() {
+		this._useKeyedReconciliation = false;
+		if (!this.#keyWarningIssued) {
+			this.#keyWarningIssued = true;
+			console.warn('Jetz: loop() keys must be unique - duplicate keys detected; this list falls back to full re-render so no row is lost.');
+		}
 	}
 	/**
 	 * Resolves every item of a keyed refresh to the view that must represent it,
@@ -2658,7 +2816,15 @@ export class ListState extends Array {
 					const keyMap = this._keyMaps[i];
 					const currentView = this.views[i]?.[this.views[i].length - 1];
 					if (keyMap && currentView) {
-						keyMap.set(this._keyFn(item), { item, view: currentView });
+						const key = this._keyFn(item);
+						if (keyMap.has(key)) {
+							// duplicate key pushed into an existing map: the old
+							// entry would be overwritten and its row dropped on the
+							// next keyed refresh
+							this.#disableKeyed();
+						} else {
+							keyMap.set(key, { item, view: currentView });
+						}
 					}
 				}
 				return parent;
@@ -2668,11 +2834,18 @@ export class ListState extends Array {
 				this.#persistRemembered();
 			}
 		}
-		this.#bump();
+		if (!this.#bump()) Jetz.triggerByState();
 	}
 	renderView(refresh = false) {
 		// Keyed reconciliation path
 		if (this._useKeyedReconciliation && this._keyFn && refresh) {
+			if (this.#keysCollide(this.values.map(item => this._keyFn(item)))) {
+				// duplicate keys cannot live in the 1:1 key map; degrade to the
+				// classic full refresh instead of dropping rows
+				this.#disableKeyed();
+				this.renderView(true);
+				return;
+			}
 			this._keyMaps.forEach((keyMap, parentIdx) => {
 				const parent = this.parentElement[parentIdx];
 				if (!parent || !parent.o) return;
@@ -2825,9 +2998,7 @@ export class ListState extends Array {
 			this._keyMaps.forEach(keyMap => keyMap?.delete(removedKey));
 		}
 		if (this.isRemember) this.#persistRemembered();
-		this.#bump();
-		// trigger state
-		Jetz.triggerByState();
+		if (!this.#bump()) Jetz.triggerByState();
 	}
 	get(index) {
 		if (typeof index == 'number') {
@@ -2863,9 +3034,7 @@ export class ListState extends Array {
 		if (this.isRemember) items = items.map(item => this.#prepareRememberedItem(item));
 		const values = this.values.slice();
 		values.splice(index, 0, ...items);
-		this.#commitValues(values);
-		Jetz.triggerByState();
-		return this;
+		return this.#commitValues(values);
 	}
 	sort(compareFn) {
 		return this.#commitValues(this.values.slice().sort(compareFn));
@@ -2894,6 +3063,9 @@ export class ListState extends Array {
 		this.parentElement.push([]);
 		let lastIndex = this.parentElement.length - 1;
 		this.parentElement[lastIndex] = parent;
+		if (this._useKeyedReconciliation && this._keyFn && this.#keysCollide(this.values.map(item => this._keyFn(item)))) {
+			this.#disableKeyed();
+		}
 		// Initialize keyed map for this parent
 		if (this._useKeyedReconciliation && this._keyFn) {
 			const keyMap = new Map();
@@ -3043,7 +3215,7 @@ function rememberOf(keyOrValue, value) {
 		}
 		instance = initialValue;
 	} else if (initialValue instanceof Array) {
-		instance = new ListState(false, ...initialValue).asRemember(key);
+		instance = ListState.fromArray(initialValue).asRemember(key);
 	} else {
 		const optDefaultProxy = {
 			get(obj, prop) {
@@ -3104,11 +3276,18 @@ function stateOf(value, handler = { get(value) { return value } }) {
 	} else {
 		const optDefaultProxy = {
 			get(obj) {
-				let outValue = handler.get(obj);
-				return outValue ?? obj.getValue();
+				// custom read hook: handler.get receives the raw value and may
+				// map it (identity by default). It used to receive the State
+				// itself and its return value was discarded by State.get value,
+				// so a custom handler never had any effect.
+				const outValue = handler.get(obj.getValue());
+				return outValue === undefined ? obj.getValue() : outValue;
 			},
 			set(obj, value) {
-				obj.setState(value);
+				// custom write hook: handler.set receives the new value and may
+				// return a replacement to store (undefined keeps it as-is)
+				const next = typeof handler.set === 'function' ? handler.set(value) : undefined;
+				obj.setState(next === undefined ? value : next);
 				return true;
 			}
 		};
@@ -3326,7 +3505,11 @@ class AttrSpecial {
 
 	hide() {
 		this.initContainer();
-		this.element.remove();
+		// raw node detach, NOT element.remove(): a hidden `_if` branch is shown
+		// again by re-inserting the same node, so its bindings must survive the
+		// round trip (remove() is a real teardown since the audit fix)
+		this.element.destroyLifecycle();
+		this.element.o?.remove();
 	}
 	show() {
 		this.initContainer();
@@ -3437,7 +3620,9 @@ class Else {
 	}
 
 	hide() {
-		this.element.remove();
+		// raw node detach, NOT element.remove() — see AttrSpecial.hide()
+		this.element.destroyLifecycle();
+		this.element.o?.remove();
 	}
 	show() {
 		if (this.positionElement == 0 && this.beforeNode) {
@@ -3495,17 +3680,13 @@ class IfElse {
 			return result.map(item => this.#resolveBranch(item)).flat();
 		}
 		if (typeof result === 'function') {
-			if (result.prototype instanceof Component) {
-				return this.#resolveBranch(new result());
-			}
-			return this.#resolveBranch(result.call());
+			// renderComponent() wires a real LifecycleContext: hooks registered by
+			// the branch's component (onCreate/onMount/onUpdate/onDestroy) used to
+			// be silently ignored because the callback was invoked plainly here
+			return this.#resolveBranch(renderComponent(result));
 		}
 		if (result instanceof Component) {
-			const rendered = result.render();
-			if (rendered instanceof JetzElement && result.constructor.prototype.hasOwnProperty('onRendered')) {
-				rendered.onRendered(result.onRendered.bind(result));
-			}
-			return this.#resolveBranch(rendered);
+			return this.#resolveBranch(renderComponent(result));
 		}
 		if (result instanceof JetzElement) {
 			result.render(this.targetParent);
@@ -3557,7 +3738,11 @@ class IfElse {
 	#clearBranch() {
 		this.currentNodes.forEach(node => node.remove?.());
 		this.currentNodes = [];
-		this.currentViews.forEach(view => view.disposeBindings?.());
+		this.currentViews.forEach(view => {
+			view.disposeBindings?.();
+			// a component rendered in this branch must get its onDestroy too
+			view.destroyLifecycle?.();
+		});
 		this.currentViews = [];
 		this.currentStates.forEach(({ state, node }) => {
 			try { state.removeContainer?.(node); } catch (error) { /* ignore */ }

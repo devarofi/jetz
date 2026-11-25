@@ -210,20 +210,33 @@ describe('keyed reconciliation', () => {
     }
   });
 
-  it('renders one row per key when two items share a key', async () => {
-    // A key addresses one row, so duplicates cannot take part in minimal
-    // moves: the plan declines and the previous position-by-position walk
-    // handles it. Documented behaviour — the item that owns the key LAST in
-    // the list is the one the row ends up showing, and nothing throws.
+  it('keeps one row per item when two items share a key (classic fallback)', async () => {
+    // Duplicate keys are a developer error. The 1:1 key map cannot track two
+    // rows under one key, and the old behaviour (one row per key, last item
+    // wins) silently dropped every earlier twin from the DOM - audited as
+    // data loss. The list now degrades to the classic full re-render with a
+    // one-time warning, so every item keeps a visible row.
     const items = listOf(...rows(1, 2));
     const { body } = keyedTable(items);
     const twin = rowOf({ id: 1, label: 'row 1 twin' });
-
-    items.set([items.values[0], items.values[1], twin]);
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(' '));
+    try {
+      items.set([items.values[0], items.values[1], twin]);
+    } finally {
+      console.warn = originalWarn;
+    }
     await settle();
 
-    expect(orderOf(body)).toBe('2,1');
+    expect(orderOf(body)).toBe('1,2,1');
+    expect(body.children).toHaveLength(3);
+    // each row shows its OWN item (a row renders the label twice: directly
+    // and through its nested component)
+    expect(body.children[0].textContent).toBe('row 1row 1');
+    expect(body.children[1].textContent).toBe('row 2row 2');
     expect(body.lastElementChild.textContent).toBe('row 1 twinrow 1 twin');
+    expect(warnings.some(line => line.includes('keys must be unique'))).toBe(true);
   });
 
   it('falls back to the walk when a retained view is not in this parent', () => {
