@@ -2,8 +2,16 @@ import type { Router } from './jetz-router.js';
 import type { JetzSession } from './jetz-session.js';
 
 export interface StateHandler<T> {
-    get(state: State<T>): T | undefined;
-    set(state: State<T>, value: T): boolean | void;
+    /**
+     * Read mapping: receives the raw value and may return a replacement.
+     * Return `undefined` to keep the raw value.
+     */
+    get(value: T): T | undefined;
+    /**
+     * Write hook: receives the new value and may return a replacement to
+     * store. Return `undefined` to store the value as-is.
+     */
+    set(value: T): T | void;
 }
 
 export type JetzDevtoolsEvent =
@@ -108,6 +116,13 @@ export declare class ListState<T = any, TInput = T> extends Array<T> {
     objRemember: RememberState<string> | undefined;
 
     constructor(isRemember?: boolean, ...values: T[]);
+
+    /**
+     * Builds a list from an existing array without rest/spread expansion, so
+     * arbitrarily large arrays are safe (the rest-args API is limited by the
+     * engine's maximum argument count). Since 1.3.0.
+     */
+    static fromArray<T = any>(values: T[]): ListState<T>;
 
     /** Number of items currently in the list. */
     readonly size: number;
@@ -297,7 +312,12 @@ export declare class JetzElement {
     /** Clears all child nodes. */
     empty(): this;
 
-    /** Removes this element from the DOM. */
+    /**
+     * Full teardown: releases this element's reactive bindings (see
+     * `disposeBindings()`), fires destruction lifecycle hooks, then detaches
+     * the node. The `if`/`else` internals only detach the raw node, so hidden
+     * branches keep their bindings. Since 1.3.0 the teardown is included.
+     */
     remove(): void;
 
     /** Fires destruction lifecycle hooks for this element and descendants. */
@@ -306,8 +326,8 @@ export declare class JetzElement {
     /**
      * Releases every reactive binding created for this element and its subtree:
      * state subscriptions, computed/effect scope, DOM listeners and state
-     * containers. Called automatically when `loop()` drops a view, by `empty()`
-     * and by `Jetz.unmount()`. Idempotent.
+     * containers. Called automatically when `loop()` drops a view, by `empty()`,
+     * by `remove()` and by `Jetz.unmount()`. Idempotent.
      */
     disposeBindings(): this;
 

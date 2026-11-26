@@ -2122,7 +2122,7 @@ class Jetz {
 		app.install(Jetz);
 	}
 	static get version() {
-		return '1.2.0';
+		return '1.3.0';
 	}
 	/** Clears the target container (string selector or element). */
 	static unmount(target) {

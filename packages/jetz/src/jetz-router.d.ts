@@ -44,6 +44,13 @@ export declare class Router {
     /** Navigate back one step in browser history. */
     back(): void;
 
+    /**
+     * Detaches every window listener this router installed and drops its head
+     * nodes. Call it when a router is discarded (tests, micro-frontends, hot
+     * reload) so it stops receiving navigate events. Since 1.3.0.
+     */
+    destroy(): this;
+
     /** Returns the reactive State containing the active routed component element. */
     browser(): State<any>;
 
