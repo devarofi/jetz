@@ -991,14 +991,17 @@ class JetzElement {
 	tagName;
 	attributes;
 	children;
-	oldStyle = {};
-	_styleTarget = {};
+	// Lazily allocated: most elements never hide(), never touch the imperative
+	// .style API and carry no render hooks, so three eager {} objects per
+	// element were pure GC pressure across large renders.
+	oldStyle = null;
+	_styleTarget = null;
 	_styleProxy = null;
 	get style() {
 		// Most elements never use the imperative style API; pay Proxy cost only on access.
 		if (!this._styleProxy) {
 			const element = this;
-			this._styleProxy = new Proxy(this._styleTarget, {
+			this._styleProxy = new Proxy(this._styleTarget ?? (this._styleTarget = {}), {
 				set(target, key, value) {
 					if (element.o) writeStyle(element.o.style, String(key), value);
 					target[key] = value;
@@ -1033,10 +1036,8 @@ class JetzElement {
 	parent;
 	position;
 	childPosition = 0;
-	lifecycles = {
-		onRendered: null,
-		onStart: null
-	};
+	/** Render hooks (`onRendered`/`onStart`); allocated only when used. */
+	lifecycles = null;
 	_collectionConditionalChild = null;
 	get collectionConditionalChild() { return this._collectionConditionalChild ?? (this._collectionConditionalChild = []); }
 	set collectionConditionalChild(value) { this._collectionConditionalChild = value; }
@@ -1065,7 +1066,7 @@ class JetzElement {
 		this.tagName = tag;
 		this.attributes = attributes;
 		this.children = children;
-		Jetz.emitDevtoolsEvent({
+		if (Jetz.isObservingDevtools) Jetz.emitDevtoolsEvent({
 			type: 'create',
 			element: this,
 			tag,
@@ -1106,7 +1107,7 @@ class JetzElement {
 	}
 	/** Releases only this element's own bindings (not its subtree). */
 	#releaseBindings() {
-		Jetz.emitDevtoolsEvent({ type: 'dispose', element: this });
+		if (Jetz.isObservingDevtools) Jetz.emitDevtoolsEvent({ type: 'dispose', element: this });
 		this.#disposers?.forEach(entry => entry());
 		this.#unbindClassParts();
 		disposeViewScope(this);
@@ -1120,11 +1121,12 @@ class JetzElement {
 		this.collectionConditionalChild = null;
 	}
 	#atLifecycles(main) {
-		if (this.lifecycles.onStart) {
+		if (this.lifecycles?.onStart) {
 			this.lifecycles.onStart();
 		}
 		main()
-		if (this.lifecycles.onRendered) {
+		// re-read: main() may install the hook (render() wires onRendered)
+		if (this.lifecycles?.onRendered) {
 			Jetz.addRenderedEffect(this.lifecycles.onRendered);
 		}
 	}
@@ -1140,7 +1142,7 @@ class JetzElement {
 	render(parent = null, renderPosition = 0) {
 		this.renderPosition = renderPosition;
 		this.parent = parent; // Parent JetzElement
-		Jetz.emitDevtoolsEvent({
+		if (Jetz.isObservingDevtools) Jetz.emitDevtoolsEvent({
 			type: 'attach',
 			element: this,
 			parent: parent instanceof JetzElement ? parent : null
@@ -1160,14 +1162,15 @@ class JetzElement {
 			this.initStyle();
 			this.initListener();
 			this.o.$ = this;
-			Jetz.emitDevtoolsEvent({ type: 'render', element: this });
+			if (Jetz.isObservingDevtools) Jetz.emitDevtoolsEvent({ type: 'render', element: this });
 			// class components fire their own onMount/onRendered once their
 			// element exists; function components registered through context
 			if (this.lifecycle) {
 				const component = this.lifecycle.component;
 				if (component && component.constructor.prototype.hasOwnProperty('onRendered')) {
-					const prevHook = this.lifecycles.onRendered;
-					this.lifecycles.onRendered = () => {
+					const hooks = this.lifecycles ??= {};
+					const prevHook = hooks.onRendered;
+					hooks.onRendered = () => {
 						prevHook?.();
 						component.onRendered();
 					};
@@ -1197,11 +1200,11 @@ class JetzElement {
 		return this.o;
 	}
 	onRendered(callback = null) {
-		this.lifecycles.onRendered = callback;
+		(this.lifecycles ??= {}).onRendered = callback;
 		return this;
 	}
 	onStart(callback = () => { }) {
-		this.lifecycles.onStart = callback;
+		(this.lifecycles ??= {}).onStart = callback;
 		return this;
 	}
 	assignAttributes() {
@@ -1455,9 +1458,7 @@ class JetzElement {
 			if (child instanceof JetzElement && child.o) child.#notifyMounted();
 		}
 		if (child instanceof JetzElement) {
-			if (child.lifecycles.onRendered) {
-				child.lifecycles.onRendered();
-			}
+			child.lifecycles?.onRendered?.();
 		}
 
 		return this;
@@ -1482,7 +1483,7 @@ class JetzElement {
 		}
 		this.o.append(child.o);
 		child.#notifyMounted();
-		child.lifecycles.onRendered?.();
+		child.lifecycles?.onRendered?.();
 		return this;
 	}
 	/** Registers a reactive listener child - it renders nothing, its callback is triggered instead. */
@@ -1536,8 +1537,9 @@ class JetzElement {
 	hide() {
 		if (typeof this.o !== "undefined") {
 			// preserve original display value before hiding
-			if (typeof this.oldStyle.display === "undefined") {
-				this.oldStyle.display = this.o.style.display ?? "";
+			const old = this.oldStyle ??= {};
+			if (typeof old.display === "undefined") {
+				old.display = this.o.style.display ?? "";
 			}
 			this.o.style.display = "none";
 		} else {
@@ -1551,8 +1553,9 @@ class JetzElement {
 			delete this.style.display;
 			return this;
 		}
-		if (this.oldStyle.display && this.oldStyle.display !== "none") {
-			this.o.style.display = this.oldStyle.display;
+		const old = this.oldStyle;
+		if (old?.display && old.display !== "none") {
+			this.o.style.display = old.display;
 		} else {
 			this.o.style.display = null;
 		}
@@ -1934,6 +1937,11 @@ class Jetz {
 	static get isMounting() {
 		return Jetz.#isMounting;
 	}
+	/** @internal True while a devtools observer is installed (hot-path guard,
+	 *  so the per-element event objects are not allocated in normal runs). */
+	static get isObservingDevtools() {
+		return Jetz.#devtoolsListeners.size > 0;
+	}
 	/** Subscribes to opt-in element and component lifecycle events. */
 	static observeDevtools(listener) {
 		if (typeof listener !== 'function') throw new TypeError('Jetz.observeDevtools expects a function');
@@ -2248,8 +2256,7 @@ class State {
 						previous.disposeBindings?.();
 					}
 					// trigger lifecycle
-					if (this.#value.lifecycles.onRendered)
-						this.#value.lifecycles.onRendered();
+					this.#value.lifecycles?.onRendered?.();
 					return element;
 				} else if (typeof (this.#value) === 'object') {
 					// console.log('obj')
