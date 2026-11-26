@@ -238,3 +238,47 @@ Semua perbaikan ditutup dengan regression test di `test/audit-fixes.test.js` (21
 | Smoke & pages (puppeteer) | **terblokir lingkungan mesin ini** — proses headless Chrome/Edge keluar senyap sebelum memuat kode (sudah gagal dengan cara yang sama sebelum perbaikan). Harness diperbarui ke `headless: 'new'` (mode lama sudah dihapus browser modern), tetapi mesin ini tetap tidak bisa men-spawn browser headless; jalankan `pnpm test:smoke && pnpm test:pages` di mesin dengan browser yang bisa di-automate. |
 
 Catatan: `packages/jetz/src/*.min.js` diregenerasi dari sumber terbaru.
+
+---
+
+## 7. Audit lanjutan — jejak heap di benchmark (`clear 10.000 baris`)
+
+**Pertanyaan:** mengapa kolom *JS heap* pada baris `Clear 10,000 rows · Jetz` sangat tinggi
+(±1.039 MB vs Raw DOM 435 / React 355 / Vue 164)?
+
+**Jawaban: itu terutama *garbage yang belum dikumpulkan*, bukan kebocoran.** Dua temuan:
+
+1. **Semantik pengukuran.** `heapMb()` membaca `performance.memory.usedJSHeapSize` **tanpa
+   GC paksa**, dan sampel `clear` diambil tepat setelah clear terakhir dari siklus
+   reset→clear berulang (samples + warmup). Angka tersebut = heap live + semua garbage dari
+   baris yang baru saja dilepas. Footnote lama ("anything left over is retained state") hanya
+   benar setelah GC paksa.
+2. **Rasio garbage mengikuti overhead per-baris jetz, bukan anomali.** Probe terukur
+   (jsdom + `--expose-gc`, arm benchmark yang asli, 5 siklus render 2k → clear):
+
+   | metrik (2.000 baris) | Raw DOM | Jetz | arti |
+   |---|---|---|---|
+   | live setelah create (GC dulu) | 141,8 MB | 186,6 MB | buku besar per-baris jetz |
+   | garbage saat clear (tanpa GC) | 130,5 MB | 188,8 MB | volume alokasi yang dibuang clear |
+   | **live setelah clear (GC dulu)** | **42,9 MB** | **44,0 MB** | **baseline — tidak ada retensi** |
+   | drift live@clear 5 siklus | 0,1 MB | 0,1 MB | **tidak ada leak** |
+
+   Setelah clear, heap live jetz kembali ke baseline (selisih ±1 MB = `ListState` + registri),
+   dan drift 5 siklus 0,1 MB — konsisten dengan suite memori (105/105). Rasio garbage di
+   Chrome lebih lebar (1.039/435 ≈ 2,4×) karena node DOM Chrome jauh lebih ramping dari jsdom,
+   sehingga 23 objek `JetzElement` + state reaktif per baris mendominasi.
+
+**Perbaikan yang diterapkan:**
+
+- `JetzElement` kini mengalokasikan `oldStyle`, `_styleTarget`, `lifecycles` **secara lazy**
+  (sebelumnya 3 objek kosong per elemen × 230.000 elemen per render 10k — murni tekanan GC).
+- Event devtools (`create`/`attach`/`render`/`dispose`) dijaga `Jetz.isObservingDevtools` —
+  objek literal per event tidak dialokasikan sama sekali saat tidak ada observer.
+  Hasil probe (2k baris): live@create 193,2 → 186,6 MB, garbage@clear 196,5 → 188,8 MB;
+  efek di Chrome lebih besar karena node DOM-nya ramping.
+- Harness benchmark dibuat jujur sesuai footnote-nya: `run-headless.mjs` meluncurkan Chromium
+  dengan `--js-flags=--expose-gc` dan `heapMb()` memaksa GC sebelum membaca — kolom JS heap
+  kini **live heap** (setelah `clear`, sisa = retensi beneran). Tanpa flag itu (browser biasa
+  saat `npm run dev`), angka tetap termasuk garbage dan footnotenya menjelaskannya.
+
+Verifikasi setelah perubahan: **413/413 unit test**, **105/105 memory suite**, `check-exports` OK.
