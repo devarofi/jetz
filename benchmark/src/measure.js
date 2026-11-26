@@ -156,8 +156,19 @@ export function geometricMean(values) {
 
 export function round(value) { return +value.toFixed(2); }
 
-/** Chrome-only; other browsers report 0 and the memory column shows 'n/a'. */
+/**
+ * Chrome-only; other browsers report 0 and the memory column shows 'n/a'.
+ *
+ * Forces a GC round first when the page has `window.gc()` (the headless runner
+ * launches Chromium with `--js-flags=--expose-gc`), so the number is LIVE heap
+ * — what is actually retained after the operation. Without that flag (a plain
+ * `npm run dev` in a normal browser) the raw `usedJSHeapSize` also contains
+ * uncollected garbage, which dominates the reading right after a bulk
+ * operation like clear: a big number there is allocation pressure pending
+ * collection, not a leak.
+ */
 export function heapMb() {
+    globalThis.gc?.();
     const memory = performance.memory;
     return memory ? round(memory.usedJSHeapSize / 1048576) : 0;
 }

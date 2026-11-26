@@ -98,7 +98,7 @@ app.append(
     el('div', 'card',
         el('h2', null, 'Memory and DOM footprint'),
         memoryHost,
-        el('div', 'note', 'Heap is Chrome-only (performance.memory). Nodes after clear should fall back to the empty-table size — anything left over is retained state.')
+        el('div', 'note', 'Heap is Chrome-only (performance.memory), measured after a forced GC when the runner exposes window.gc() — then it is live heap and anything left after clear is retained state. In a plain browser (no gc flag) the raw reading also contains uncollected garbage, so the clear row shows allocation pressure rather than retention. Nodes after clear should fall back to the empty-table size — anything left over is retained state.')
     ),
     arenaHost
 );

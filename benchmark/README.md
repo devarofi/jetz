@@ -195,7 +195,11 @@ mean** of those ratios; the index is `100 ÷ that mean`.
 - **Heap is Chrome-only** (`performance.memory`) and includes the harness's own retained row data,
   so read it as an ordering, not an absolute. It is also the column where a reactive-record
   framework pays for its bookkeeping: Jetz and Vue hold per-row reactive state, raw DOM and React
-  hold plain objects.
+  hold plain objects. The headless runner launches Chromium with `--js-flags=--expose-gc` and the
+  page forces a GC round before sampling, so the number is **live heap** — after `clear`, anything
+  above the empty-table baseline is genuinely retained state. A plain `npm run dev` browser has no
+  `window.gc()`, and the raw `usedJSHeapSize` there also counts uncollected garbage: the `clear`
+  row then measures allocation pressure, not retention.
 - **One machine, one browser profile.** Close nothing else, run at 6 samples or more before
   quoting a number, and re-run after any change to the arms — a single sample has visible frame
   noise on the 10,000-row ops.

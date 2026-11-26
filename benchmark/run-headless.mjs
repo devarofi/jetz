@@ -58,6 +58,8 @@ const chrome = spawn(binary, [
     '--disable-extensions',
     // without this, performance.memory reports bucketed values
     '--enable-precise-memory-info',
+    // exposes window.gc() so the page can measure LIVE heap (see measure.js)
+    '--js-flags=--expose-gc',
     `${url}${page}?autorun=1&samples=${samples}`
 ], { stdio: 'ignore' });
 
